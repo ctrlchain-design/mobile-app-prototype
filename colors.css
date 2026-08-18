@@ -1,0 +1,124 @@
+:root {
+  /* Colors - Neutrals */
+  --color-neutrals-50: #ffffff; /* White */
+  --color-neutrals-100: #fafafa;
+  --color-neutrals-200: #ebebeb;
+  --color-neutrals-300: #d9d9d9;
+  --color-neutrals-400: #b3b3b3;
+  --color-neutrals-500: #8b8b8b;
+  --color-neutrals-600: #717171;
+  --color-neutrals-700: #565656;
+  --color-neutrals-800: #3e3e3e;
+  --color-neutrals-900: #333333; /* #272727 old Black */
+
+  /* Colors - Green */
+  --color-green-50: #f6fbe9;
+  --color-green-100: #e3f2c4;
+  --color-green-200: #d5eba9;
+  --color-green-300: #b7d47f;
+  --color-green-400: #a7c46c;
+  --color-green-500: #8dab51;
+  --color-green-600: #6f8f2f;
+  --color-green-700: #638029;
+  --color-green-800: #4b6615;
+  --color-green-900: #3d5213;
+  --color-green-950: #343630;
+  --color-green-1000: #282925;
+
+  /* Colors - Purple */
+  --color-purple-50: #efecf8;
+  --color-purple-100: #c6bae7;
+  --color-purple-200: #b3a3de;
+  --color-purple-300: #9984d3;
+  --color-purple-400: #775bc5;
+  --color-purple-500: #53389e;
+  --color-purple-600: #473086;
+  --color-purple-700: #3c2872;
+  --color-purple-800: #332261;
+  --color-purple-900: #2b1d53;
+
+  /* Colors - Orange */
+  --color-orange-50: #fcf0de;
+  --color-orange-100: #fadfba;
+  --color-orange-200: #f7c988;
+  --color-orange-300: #f5b153;
+  --color-orange-400: #f4a12d;
+  --color-orange-500: #f5930b;
+  --color-orange-600: #eb8900;
+  --color-orange-700: #e08300;
+  --color-orange-800: #b25900;
+  --color-orange-900: #804000;
+
+  /* Colors - Red */
+  --color-red-50: #f9e1e1;
+  --color-red-100: #f3adad;
+  --color-red-200: #ef9292;
+  --color-red-300: #e96e6e;
+  --color-red-400: #e23e3e;
+  --color-red-500: #b91c1c;
+  --color-red-600: #9d1818;
+  --color-red-700: #861414;
+  --color-red-800: #721111;
+  --color-red-900: #610f0f;
+
+  /* Colors - Bluegreen */
+  --color-bluegreen-50: #e3f8f1;
+  --color-bluegreen-100: #c4f2e3;
+  --color-bluegreen-200: #a0e8d0;
+  --color-bluegreen-300: #7fdbbd;
+  --color-bluegreen-400: #52d1a7;
+  --color-bluegreen-500: #3bc497;
+  --color-bluegreen-600: #2db286;
+  --color-bluegreen-700: #1b966d;
+  --color-bluegreen-800: #0b7d57;
+  --color-bluegreen-900: #0d6648;
+
+  /* Colors - Blue */
+  --color-blue-50: #e7eff7;
+  --color-blue-100: #cbdae7;
+  --color-blue-200: #a5c3d9;
+  --color-blue-300: #759dbd;
+  --color-blue-400: #4b82af;
+  --color-blue-500: #2a628f;
+  --color-blue-600: #1d5a8b;
+  --color-blue-700: #17476d;
+  --color-blue-800: #0d3759;
+  --color-blue-900: #0a2a44;
+
+  /* Colors - NewCold Official */
+  --color-newCold-50: #e7e8ea;
+  --color-newCold-100: #cfd0d5;
+  --color-newCold-200: #9fa1ab;
+  --color-newCold-300: #707382;
+  --color-newCold-400: #404458;
+  --color-newCold-500: #10152e;
+  --color-newCold-600: #0c1024;
+  --color-newCold-700: #090c19;
+  --color-newCold-800: #05070f;
+  --color-newCold-900: #020205;
+
+  /* Colors below are experimental for future NC theme */
+  /* Colors - Newcold-1 */
+  --color-newcold-1-50: #f8faff;
+  --color-newcold-1-100: #e4edff;
+  --color-newcold-1-200: #c1d6ff;
+  --color-newcold-1-300: #9dc0fa;
+  --color-newcold-1-400: #085bff;
+  --color-newcold-1-500: #003aae;
+  --color-newcold-1-600: #001847;
+  --color-newcold-1-700: #000b20;
+  --color-newcold-1-800: #000308;
+  --color-newcold-1-900: #000000;
+
+  /* Colors - Newcold-2 */
+  --color-newcold-2-50: #fafdff;
+  --color-newcold-2-100: #ecf6ff;
+  --color-newcold-2-200: #d4ecff;
+  --color-newcold-2-300: #b3ddff;
+  --color-newcold-2-400: #53b2ff;
+  --color-newcold-2-500: #1596ff;
+  --color-newcold-2-600: #0070cc;
+  --color-newcold-2-700: #004177;
+  --color-newcold-2-800: #002544;
+  --color-newcold-2-900: #001c33;
+}
