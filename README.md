@@ -8,7 +8,9 @@ Early stage — currently holds the exported design tokens (`colors.css`, `theme
 
 ## Deployment
 
-This prototype is intended to be published for stakeholder review via **GitHub Pages** (a free `github.io` domain, no separate hosting needed). Once the prototype has reviewable screens, enable Pages under **Settings → Pages** on this repo (serve from `main` or a `gh-pages` branch) and share the resulting `https://ctrlchain-design.github.io/mobile-app-prototype/` link with stakeholders.
+Published for stakeholder review via **GitHub Pages** (free `github.io` domain, no separate hosting needed): **https://ctrlchain-design.github.io/mobile-app-prototype/**
+
+Pages builds automatically from the `main` branch root on every push. Since there's no `index.html` yet (see [Status](#status)), the live URL won't show a prototype screen until one is added — pushing an `index.html` to `main` is enough to make it appear.
 
 ## Design tokens
 
