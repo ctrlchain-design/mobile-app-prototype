@@ -458,11 +458,13 @@ button { font-family: inherit; }
 }
 .sms-bubble {
   background: #fff;
+  color: var(--color-neutrals-900);
   border: 1px solid var(--border-neutral-default);
   border-radius: var(--radius-md);
   padding: 12px 14px;
   max-width: 85%;
 }
+.sms-bubble strong { color: var(--color-neutrals-900); }
 .sms-link {
   color: var(--accent-blue-default);
   text-decoration: underline;
