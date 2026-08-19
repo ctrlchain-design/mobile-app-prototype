@@ -17,7 +17,7 @@ const MOCK_PLANNER_RECORD = {
   phone: '+44 7700 900123',
 };
 
-const MOCK_RETURNING_DRIVER = { firstName: 'Jordan', lastName: 'Reyes', carrier: 'Meridian Freight Ltd', phone: '+44 7700 900456' };
+const MOCK_RETURNING_DRIVER = { firstName: 'Jordan', lastName: 'Reyes', carrier: 'Meridian Freight Ltd', phone: '+44 7700 900456', email: 'jordan.reyes@meridianfreight.example' };
 
 const MOCK_TRIPS = [
   { id: 'TRIP2026-000123', pickup: 'Meridian Distribution Centre, Coventry', dropoff: 'Aldi RDC, Bristol', status: 'Upcoming', badge: 'info', eta: 'Today, 14:30' },
@@ -36,11 +36,13 @@ function currentPortalRecord() {
 /* Route metadata: { flow, step, total } for progress display. null = terminal/no-flow screen. */
 const ROUTE_META = {
   'welcome': null,
-  'self-reg-signup': { flow: 'self-reg', step: 1, total: 5 },
-  'self-reg-otp': { flow: 'self-reg', step: 2, total: 5 },
-  'self-reg-details': { flow: 'self-reg', step: 3, total: 5 },
-  'self-reg-gdpr': { flow: 'self-reg', step: 4, total: 5 },
-  'self-reg-pending': { flow: 'self-reg', step: 5, total: 5 },
+  'self-reg-signup': { flow: 'self-reg', step: 1, total: 7 },
+  'self-reg-otp': { flow: 'self-reg', step: 2, total: 7 },
+  'self-reg-password': { flow: 'self-reg', step: 3, total: 7 },
+  'self-reg-details': { flow: 'self-reg', step: 4, total: 7 },
+  'self-reg-gdpr': { flow: 'self-reg', step: 5, total: 7 },
+  'self-reg-pin': { flow: 'self-reg', step: 6, total: 7 },
+  'self-reg-pending': { flow: 'self-reg', step: 7, total: 7 },
   'portal-sms': { flow: 'portal', step: 1, total: 8 },
   'portal-install': { flow: 'portal', step: 2, total: 8 },
   'portal-code': { flow: 'portal', step: 3, total: 8 },
@@ -52,8 +54,8 @@ const ROUTE_META = {
   'returning-entry': { flow: 'returning', step: 1, total: 2 },
   'returning-pin': { flow: 'returning', step: 2, total: 2 },
   'returning-password': { flow: 'returning', step: 2, total: 2 },
-  'returning-request-activation': { flow: 'returning', step: 3, total: 4 },
-  'returning-activation-sent': { flow: 'returning', step: 4, total: 4 },
+  'returning-request-activation': { flow: 'returning', step: 2, total: 3 },
+  'returning-activation-sent': { flow: 'returning', step: 3, total: 3 },
   'guest-sms': { flow: 'guest', step: 1, total: 3 },
   'guest-trust': { flow: 'guest', step: 2, total: 3 },
   'guest-scoped': { flow: 'guest', step: 3, total: 3 },
@@ -68,8 +70,10 @@ const TITLES = {
   'welcome': '',
   'self-reg-signup': 'Create your account',
   'self-reg-otp': 'Verify your number',
+  'self-reg-password': 'Set a password',
   'self-reg-details': 'Your details',
   'self-reg-gdpr': 'Terms & privacy',
+  'self-reg-pin': 'Secure your account',
   'self-reg-pending': 'Almost there',
   'portal-sms': "You've been invited",
   'portal-install': 'Get the app',
@@ -82,8 +86,8 @@ const TITLES = {
   'returning-entry': 'Welcome back',
   'returning-pin': 'Quick sign-in',
   'returning-password': 'Session expired',
-  'returning-request-activation': 'Request activation',
-  'returning-activation-sent': 'Request sent',
+  'returning-request-activation': 'Reactivate your account',
+  'returning-activation-sent': 'Link sent',
   'guest-sms': 'Guest access',
   'guest-trust': "You've been added",
   'guest-scoped': 'Single-trip access',
@@ -98,6 +102,7 @@ function freshState() {
     phone: '',
     email: '',
     otp: '',
+    password: '',
     firstName: '',
     lastName: '',
     gdprAccepted: false,
@@ -107,6 +112,7 @@ function freshState() {
     pinTarget: 'dashboard',
     portalGdprAccepted: false,
     dashboardMode: 'full', // 'locked' | 'full' | 'guest'
+    returningOrigin: 'self-reg', // 'self-reg' | 'portal' — which onboarding path this returning driver used
     returningPassword: '',
     reactivating: false,
     selectedTripId: null,
@@ -266,7 +272,7 @@ const SCREENS = {
         <div class="choice-card__icon">&#128260;</div>
         <div class="choice-card__body">
           <div class="t-label-lg">Returning Driver</div>
-          <div class="t-body-sm t-muted">Already has an account — device-remembered quick sign-in, or a fresh device.</div>
+          <div class="t-body-sm t-muted">Already has an account — quick PIN/Face ID sign-in, or reactivation if the session expired.</div>
         </div>
         <div class="choice-card__chevron">&#8250;</div>
       </button>
@@ -304,15 +310,23 @@ const SCREENS = {
         </div>
       ` : ''}
       ${state.loginMethod === 'social' ? h`
-        <button class="btn btn-secondary" onclick="App.set('phone','google-account'); updateFooterState();">&#128172; Continue with Google</button>
-        <button class="btn btn-secondary" onclick="App.set('phone','apple-account'); updateFooterState();">&#63743; Continue with Apple</button>
+        <button class="btn btn-social" onclick="App.set('phone','google-account'); updateFooterState();">
+          <img class="btn-social__icon" src="assets/social-google.svg" alt="" /> Continue with Google
+        </button>
+        <button class="btn btn-social" onclick="App.set('phone','facebook-account'); updateFooterState();">
+          <img class="btn-social__icon" src="assets/social-facebook.svg" alt="" /> Continue with Facebook
+        </button>
+        <button class="btn btn-social" onclick="App.set('phone','apple-account'); updateFooterState();">
+          <img class="btn-social__icon" src="assets/social-apple.svg" alt="" /> Continue with Apple
+        </button>
       ` : ''}
     `,
     footer: () => {
       const ready = state.loginMethod === 'social'
         ? !!state.phone
         : (state.loginMethod === 'phone' ? state.phone.length >= 6 : state.email.includes('@'));
-      return h`<button class="btn btn-primary" ${ready ? '' : 'disabled'} onclick="App.nav('self-reg-otp')">Continue</button>`;
+      const nextRoute = state.loginMethod === 'social' ? 'self-reg-details' : 'self-reg-otp';
+      return h`<button class="btn btn-primary" ${ready ? '' : 'disabled'} onclick="App.nav('${nextRoute}')">Continue</button>`;
     },
   }),
 
@@ -325,7 +339,19 @@ const SCREENS = {
       <div class="t-body-sm t-caption">Demo: any 6 digits will verify.</div>
       <button class="btn-link">Resend code</button>
     `,
-    footer: () => h`<button class="btn btn-primary" ${state.otp.length === 6 ? '' : 'disabled'} onclick="App.nav('self-reg-details')">Verify</button>`,
+    footer: () => h`<button class="btn btn-primary" ${state.otp.length === 6 ? '' : 'disabled'} onclick="App.nav('self-reg-password')">Verify</button>`,
+  }),
+
+  'self-reg-password': () => ({
+    content: h`
+      <div class="t-body-md t-muted">Set a password so you can sign back in later, even if this device is reset or replaced.</div>
+      <div class="field">
+        <label class="field__label">Password</label>
+        <input class="field__input" type="password" placeholder="At least 8 characters" value="${state.password}" oninput="App.set('password', this.value); updateFooterState();" />
+        <div class="field__hint">Use at least 8 characters.</div>
+      </div>
+    `,
+    footer: () => h`<button class="btn btn-primary" ${state.password.length >= 8 ? '' : 'disabled'} onclick="App.nav('self-reg-details')">Continue</button>`,
   }),
 
   'self-reg-details': () => ({
@@ -343,7 +369,9 @@ const SCREENS = {
     footer: () => h`<button class="btn btn-primary" ${(state.firstName && state.lastName) ? '' : 'disabled'} onclick="App.nav('self-reg-gdpr')">Continue</button>`,
   }),
 
-  'self-reg-gdpr': () => gdprScreen('self-reg-pending', 'gdprAccepted'),
+  'self-reg-gdpr': () => gdprScreen('self-reg-pin', 'gdprAccepted', 'self-reg-pending'),
+
+  'self-reg-pin': () => pinScreen('setup'),
 
   'self-reg-pending': () => ({
     content: h`
@@ -439,7 +467,7 @@ const SCREENS = {
     };
   },
 
-  'portal-pin': () => pinScreen(),
+  'portal-pin': () => pinScreen('setup'),
 
   'portal-gdpr': () => gdprScreen('portal-complete', 'portalGdprAccepted'),
 
@@ -466,48 +494,58 @@ const SCREENS = {
         <div class="t-headline-md">Open app</div>
         <div class="t-body-md t-muted">The app checks your session automatically. For this prototype, pick which case to explore — matches the "Session Expired?" check already in the current app:</div>
       </div>
+      <div class="field">
+        <label class="field__label">Simulate: how did this driver originally sign up?</label>
+        <div class="segmented">
+          <div class="segmented__opt ${state.returningOrigin === 'self-reg' ? 'is-selected' : ''}" onclick="App.setAndRerender('returningOrigin','self-reg')">Self-Registered</div>
+          <div class="segmented__opt ${state.returningOrigin === 'portal' ? 'is-selected' : ''}" onclick="App.setAndRerender('returningOrigin','portal')">Portal-Based</div>
+        </div>
+      </div>
     `,
     footer: () => h`
       <button class="btn btn-primary" onclick="App.set('pinTarget','dashboard'); App.set('dashboardMode','full'); App.nav('returning-pin')">&#128274; Simulate: session not expired</button>
-      <button class="btn btn-secondary" onclick="App.nav('returning-password')">&#8987; Simulate: session expired</button>
+      <button class="btn btn-secondary" onclick="App.nav(state.returningOrigin === 'portal' ? 'returning-request-activation' : 'returning-password')">&#8987; Simulate: session expired</button>
     `,
   }),
 
-  'returning-pin': () => pinScreen(),
+  'returning-pin': () => pinScreen('unlock'),
 
   'returning-password': () => ({
     content: h`
-      <div class="t-body-md t-muted">Your session expired — sign in with your password to continue.</div>
+      <div class="t-body-md t-muted">Your session expired. Sign in the same way you originally set up your account.</div>
+      <div class="field">
+        <label class="field__label">Email address</label>
+        <div class="readonly-field">${MOCK_RETURNING_DRIVER.email}</div>
+      </div>
       <div class="field">
         <label class="field__label">Password</label>
         <input class="field__input" type="password" placeholder="&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;" value="${state.returningPassword}" oninput="App.set('returningPassword', this.value); updateFooterState();" />
       </div>
       <button class="btn-link">Forgot password?</button>
-      <button class="btn-link" onclick="App.nav('returning-request-activation')">Don't have a password? Request activation instead</button>
     `,
     footer: () => h`<button class="btn btn-primary" ${state.returningPassword.length >= 4 ? '' : 'disabled'} onclick="App.set('dashboardMode','full'); App.nav('dashboard')">Sign in</button>`,
   }),
 
   'returning-request-activation': () => ({
     content: h`
-      <div class="t-body-md t-muted">No password on file isn't something to self-service around — it goes through the same trusted path as joining for the first time.</div>
+      <div class="t-body-md t-muted">Portal-Based accounts don't have a separate password — your PIN or Face ID is the only way in. Since this device's session has expired, you'll need a new activation link.</div>
       <div class="card card--tinted">
         <div class="t-label-md">What happens next</div>
-        <div class="t-body-sm t-muted">${MOCK_RETURNING_DRIVER.carrier}'s ops team gets a reactivation request for your account. Once they verify it's you, they'll send a fresh activation link to ${MOCK_RETURNING_DRIVER.phone} — the exact same magic-link flow used for a driver's first sign-up.</div>
+        <div class="t-body-sm t-muted">We'll automatically send a new activation link to ${MOCK_RETURNING_DRIVER.phone} — the number already on file. No approval wait, and nothing for your carrier's ops team to action.</div>
       </div>
     `,
-    footer: () => h`<button class="btn btn-primary" onclick="App.nav('returning-activation-sent')">Send activation request</button>`,
+    footer: () => h`<button class="btn btn-primary" onclick="App.nav('returning-activation-sent')">Send me a new activation link</button>`,
   }),
 
   'returning-activation-sent': () => ({
     content: h`
       <div class="center-state">
         <div class="center-state__icon center-state__icon--success">&#128232;</div>
-        <div class="t-headline-md">Request sent</div>
-        <div class="t-body-md t-muted">${MOCK_RETURNING_DRIVER.carrier} has been notified. You'll get a text with a new activation link shortly.</div>
+        <div class="t-headline-md">Link sent</div>
+        <div class="t-body-md t-muted">A new activation link was just sent to ${MOCK_RETURNING_DRIVER.phone}. Tap it to get back in — no one else needs to action this.</div>
       </div>
     `,
-    footer: () => h`<button class="btn btn-primary" onclick="App.set('reactivating', true); App.nav('portal-confirm')">&#128241; Simulate: tap the activation link ops sent</button>`,
+    footer: () => h`<button class="btn btn-primary" onclick="App.set('reactivating', true); App.nav('portal-confirm')">&#128241; Simulate: tap the activation link</button>`,
   }),
 
   /* ---------------- GUEST / ONE-OFF DRIVER ---------------- */
@@ -629,10 +667,11 @@ const SCREENS = {
   },
 };
 
-function pinScreen() {
-  return {
+function pinScreen(mode) {
+  const isSetup = mode !== 'unlock';
+  const screen = {
     content: h`
-      <div class="t-body-md t-muted" style="text-align:center;">Set a 4-digit PIN for quick sign-in next time (optional).</div>
+      <div class="t-body-md t-muted" style="text-align:center;">${isSetup ? 'Set a 4-digit PIN for quick sign-in next time.' : 'Enter your PIN to continue.'}</div>
       <div class="pin-dots">
         ${[0,1,2,3].map(i => h`<div class="pin-dot ${state.pin.length > i ? 'is-filled' : ''}"></div>`).join('')}
       </div>
@@ -642,12 +681,16 @@ function pinScreen() {
         <button class="pin-key" onclick="App.pinPress(0)">0</button>
         <button class="pin-key" onclick="App.pinBackspace()">&#9003;</button>
       </div>
+      ${isSetup ? h`<div class="t-body-sm t-caption" style="text-align:center;">Required — this is how you'll sign back in on this device.</div>` : ''}
     `,
-    footer: () => h`<button class="btn btn-text" onclick="App.nav(state.pinTarget)">Skip for now</button>`,
   };
+  if (!isSetup) {
+    screen.footer = () => h`<button class="btn-link" onclick="App.nav(state.pinTarget)">Use Face ID instead</button>`;
+  }
+  return screen;
 }
 
-function gdprScreen(nextRoute, stateKey) {
+function gdprScreen(nextRoute, stateKey, pinTargetToSet) {
   return {
     content: h`
       <div class="t-body-md t-muted">Last step. This is tied to your account — you'll be asked again if terms change.</div>
@@ -664,7 +707,7 @@ function gdprScreen(nextRoute, stateKey) {
         <div class="t-body-md">I have read and accept the Terms of Service and Privacy Policy.</div>
       </div>
     `,
-    footer: () => h`<button class="btn btn-primary" ${state[stateKey] ? '' : 'disabled'} onclick="App.nav('${nextRoute}')">Accept &amp; continue</button>`,
+    footer: () => h`<button class="btn btn-primary" ${state[stateKey] ? '' : 'disabled'} onclick="${pinTargetToSet ? `App.set('pinTarget','${pinTargetToSet}'); ` : ''}App.nav('${nextRoute}')">Accept &amp; continue</button>`,
   };
 }
 
@@ -710,14 +753,13 @@ function render() {
     ${footerHtml}
   `;
 
-  document.querySelectorAll('.proto-flow-btn').forEach(btn => {
-    btn.classList.toggle('is-active', state.activeFlow === btn.dataset.flow);
-  });
+  const flowSelect = document.querySelector('.proto-flow-select');
+  if (flowSelect) flowSelect.value = state.activeFlow || '';
 
   const themeBtn = document.querySelector('.proto-theme-btn');
   if (themeBtn) {
     const isDark = document.documentElement.classList.contains('dark');
-    themeBtn.textContent = isDark ? '☀️ Light' : '🌙 Dark';
+    themeBtn.textContent = isDark ? '☀️' : '🌙';
     themeBtn.title = isDark ? 'Switch to light theme' : 'Switch to dark theme';
   }
 }
