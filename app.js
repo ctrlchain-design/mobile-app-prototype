@@ -42,12 +42,11 @@ const ROUTE_META = {
   'portal-pin': { flow: 'portal', step: 6, total: 8 },
   'portal-gdpr': { flow: 'portal', step: 7, total: 8 },
   'portal-complete': { flow: 'portal', step: 8, total: 8 },
-  'returning-entry': { flow: 'returning', step: 1, total: 3 },
-  'returning-session-check': { flow: 'returning', step: 2, total: 3 },
-  'returning-tripid': { flow: 'returning', step: 2, total: 3 },
-  'returning-pin': { flow: 'returning', step: 3, total: 3 },
-  'returning-password': { flow: 'returning', step: 3, total: 3 },
-  'returning-remember': { flow: 'returning', step: 3, total: 3 },
+  'returning-entry': { flow: 'returning', step: 1, total: 2 },
+  'returning-pin': { flow: 'returning', step: 2, total: 2 },
+  'returning-password': { flow: 'returning', step: 2, total: 2 },
+  'returning-tripid': { flow: 'returning', step: 3, total: 4 },
+  'returning-remember': { flow: 'returning', step: 4, total: 4 },
   'guest-sms': { flow: 'guest', step: 1, total: 3 },
   'guest-trust': { flow: 'guest', step: 2, total: 3 },
   'guest-scoped': { flow: 'guest', step: 3, total: 3 },
@@ -74,10 +73,9 @@ const TITLES = {
   'portal-gdpr': 'Terms & privacy',
   'portal-complete': "You're all set",
   'returning-entry': 'Welcome back',
-  'returning-session-check': 'Checking your session',
-  'returning-tripid': 'New device',
+  'returning-tripid': 'Sign in without a password',
   'returning-pin': 'Quick sign-in',
-  'returning-password': 'Sign in',
+  'returning-password': 'Session expired',
   'returning-remember': 'Almost done',
   'guest-sms': 'Guest access',
   'guest-trust': "You've been added",
@@ -452,26 +450,12 @@ const SCREENS = {
       <div class="center-state">
         <div class="center-state__icon center-state__icon--success">&#128241;</div>
         <div class="t-headline-md">Open app</div>
-        <div class="t-body-md t-muted">In a real device, the app checks silently whether this device is already recognized. For this prototype, pick which case to explore:</div>
+        <div class="t-body-md t-muted">The app checks your session automatically. For this prototype, pick which case to explore — matches the "Session Expired?" check already in the current app:</div>
       </div>
     `,
     footer: () => h`
-      <button class="btn btn-primary" onclick="App.nav('returning-session-check')">&#128241; Simulate: device remembered</button>
-      <button class="btn btn-secondary" onclick="App.nav('returning-tripid')">&#127760; Simulate: new / unrecognized device</button>
-    `,
-  }),
-
-  'returning-session-check': () => ({
-    content: h`
-      <div class="center-state">
-        <div class="center-state__icon center-state__icon--success">&#128274;</div>
-        <div class="t-headline-md">Device recognized</div>
-        <div class="t-body-md t-muted">No re-entry of Trip ID or last name needed. Pick which session state to explore:</div>
-      </div>
-    `,
-    footer: () => h`
-      <button class="btn btn-primary" onclick="App.set('pinTarget','dashboard'); App.set('dashboardMode','full'); App.nav('returning-pin')">Session still valid &#8594; PIN/fingerprint</button>
-      <button class="btn btn-secondary" onclick="App.nav('returning-password')">Session expired &#8594; password</button>
+      <button class="btn btn-primary" onclick="App.set('pinTarget','dashboard'); App.set('dashboardMode','full'); App.nav('returning-pin')">&#128274; Simulate: session not expired</button>
+      <button class="btn btn-secondary" onclick="App.nav('returning-password')">&#8987; Simulate: session expired</button>
     `,
   }),
 
@@ -485,13 +469,14 @@ const SCREENS = {
         <input class="field__input" type="password" placeholder="&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;" value="${state.returningPassword}" oninput="App.set('returningPassword', this.value); updateFooterState();" />
       </div>
       <button class="btn-link">Forgot password?</button>
+      <button class="btn-link" onclick="App.nav('returning-tripid')">Don't have a password? Use Trip ID + last name instead</button>
     `,
     footer: () => h`<button class="btn btn-primary" ${state.returningPassword.length >= 4 ? '' : 'disabled'} onclick="App.set('dashboardMode','full'); App.nav('dashboard')">Sign in</button>`,
   }),
 
   'returning-tripid': () => ({
     content: h`
-      <div class="t-body-md t-muted">No password needed — just what your planner already has on file for this trip.</div>
+      <div class="t-body-md t-muted">No password on file, or you'd rather not use it — this works instead, using what your planner already has for this trip.</div>
       <div class="field">
         <label class="field__label">Trip ID</label>
         <input class="field__input" placeholder="TR-48291" value="${state.returningTripId}" oninput="App.set('returningTripId', this.value); updateFooterState();" />
