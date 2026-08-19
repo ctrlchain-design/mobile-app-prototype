@@ -17,7 +17,7 @@ const MOCK_PLANNER_RECORD = {
   phone: '+44 7700 900123',
 };
 
-const MOCK_RETURNING_DRIVER = { firstName: 'Jordan', lastName: 'Reyes', carrier: 'Meridian Freight Ltd', phone: '+44 7700 900456', email: 'jordan.reyes@meridianfreight.example' };
+const MOCK_RETURNING_DRIVER = { firstName: 'Jordan', lastName: 'Reyes', carrier: 'Meridian Freight Ltd', phone: '+44 7700 900456' };
 
 const MOCK_TRIPS = [
   { id: 'TRIP2026-000123', pickup: 'Meridian Distribution Centre, Coventry', dropoff: 'Aldi RDC, Bristol', status: 'Upcoming', badge: 'info', eta: 'Today, 14:30' },
@@ -145,6 +145,7 @@ function freshState() {
     portalGdprAccepted: false,
     dashboardMode: 'full', // 'locked' | 'full' | 'guest'
     returningOrigin: 'self-reg', // 'self-reg' | 'portal' — which onboarding path this returning driver used
+    returningEmail: '',
     returningPassword: '',
     reactivating: false,
     selectedTripId: null,
@@ -573,10 +574,10 @@ const SCREENS = {
 
   'returning-password': () => ({
     content: h`
-      <div class="t-body-md t-muted">Your session expired. Sign in the same way you originally set up your account.</div>
+      <div class="t-body-md t-muted">Your session expired — the device doesn't have you signed in anymore. Sign in the same way you originally set up your account.</div>
       <div class="field">
         <label class="field__label">Email address</label>
-        <div class="readonly-field">${MOCK_RETURNING_DRIVER.email}</div>
+        <input class="field__input" type="email" placeholder="you@example.com" value="${state.returningEmail}" oninput="App.set('returningEmail', this.value); updateFooterState();" />
       </div>
       <div class="field">
         <label class="field__label">Password</label>
@@ -584,7 +585,7 @@ const SCREENS = {
       </div>
       <button class="btn-link">Forgot password?</button>
     `,
-    footer: () => h`<button class="btn btn-primary" ${state.returningPassword.length >= 4 ? '' : 'disabled'} onclick="App.set('dashboardMode','full'); App.nav('dashboard')">Sign in</button>`,
+    footer: () => h`<button class="btn btn-primary" ${(state.returningEmail.includes('@') && state.returningPassword.length >= 4) ? '' : 'disabled'} onclick="App.set('dashboardMode','full'); App.nav('dashboard')">Sign in</button>`,
   }),
 
   'returning-request-activation': () => ({
