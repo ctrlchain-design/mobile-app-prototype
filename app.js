@@ -17,14 +17,21 @@ const MOCK_PLANNER_RECORD = {
   phone: '+44 7700 900123',
 };
 
-const MOCK_RETURNING_DRIVER = { firstName: 'Jordan', lastName: 'Reyes', carrier: 'Meridian Freight Ltd' };
+const MOCK_RETURNING_DRIVER = { firstName: 'Jordan', lastName: 'Reyes', carrier: 'Meridian Freight Ltd', phone: '+44 7700 900456' };
 
 const MOCK_TRIPS = [
-  { id: 'TR-48291', pickup: 'Meridian Distribution Centre, Coventry', dropoff: 'Aldi RDC, Bristol', status: 'Upcoming', badge: 'info', eta: 'Today, 14:30' },
-  { id: 'TR-48355', pickup: 'Heathrow Cargo Terminal', dropoff: 'Southampton Docks', status: 'Scheduled', badge: 'warning', eta: 'Tomorrow, 08:00' },
+  { id: 'TRIP2026-000123', pickup: 'Meridian Distribution Centre, Coventry', dropoff: 'Aldi RDC, Bristol', status: 'Upcoming', badge: 'info', eta: 'Today, 14:30' },
+  { id: 'TRIP2026-000124', pickup: 'Heathrow Cargo Terminal', dropoff: 'Southampton Docks', status: 'Scheduled', badge: 'warning', eta: 'Tomorrow, 08:00' },
 ];
 
-const MOCK_GUEST_TRIP = { id: 'TR-90142', pickup: 'Heathrow Cargo Terminal', dropoff: 'Southampton Docks', status: 'In progress', badge: 'info', eta: 'Today, 16:00' };
+const MOCK_GUEST_TRIP = { id: 'TRIP2026-000142', pickup: 'Heathrow Cargo Terminal', dropoff: 'Southampton Docks', status: 'In progress', badge: 'info', eta: 'Today, 16:00' };
+
+/* Returns whichever mock driver record the currently-displayed portal-flow screen should show —
+   the original portal onboarding record, or the returning driver's own record when these same
+   screens are being reused for an account-reactivation request. */
+function currentPortalRecord() {
+  return state.reactivating ? MOCK_RETURNING_DRIVER : MOCK_PLANNER_RECORD;
+}
 
 /* Route metadata: { flow, step, total } for progress display. null = terminal/no-flow screen. */
 const ROUTE_META = {
@@ -45,8 +52,8 @@ const ROUTE_META = {
   'returning-entry': { flow: 'returning', step: 1, total: 2 },
   'returning-pin': { flow: 'returning', step: 2, total: 2 },
   'returning-password': { flow: 'returning', step: 2, total: 2 },
-  'returning-tripid': { flow: 'returning', step: 3, total: 4 },
-  'returning-remember': { flow: 'returning', step: 4, total: 4 },
+  'returning-request-activation': { flow: 'returning', step: 3, total: 4 },
+  'returning-activation-sent': { flow: 'returning', step: 4, total: 4 },
   'guest-sms': { flow: 'guest', step: 1, total: 3 },
   'guest-trust': { flow: 'guest', step: 2, total: 3 },
   'guest-scoped': { flow: 'guest', step: 3, total: 3 },
@@ -73,10 +80,10 @@ const TITLES = {
   'portal-gdpr': 'Terms & privacy',
   'portal-complete': "You're all set",
   'returning-entry': 'Welcome back',
-  'returning-tripid': 'Sign in without a password',
   'returning-pin': 'Quick sign-in',
   'returning-password': 'Session expired',
-  'returning-remember': 'Almost done',
+  'returning-request-activation': 'Request activation',
+  'returning-activation-sent': 'Request sent',
   'guest-sms': 'Guest access',
   'guest-trust': "You've been added",
   'guest-scoped': 'Single-trip access',
@@ -100,10 +107,8 @@ function freshState() {
     pinTarget: 'dashboard',
     portalGdprAccepted: false,
     dashboardMode: 'full', // 'locked' | 'full' | 'guest'
-    returningTripId: '',
-    returningLastName: '',
     returningPassword: '',
-    rememberDevice: null,
+    reactivating: false,
     selectedTripId: null,
   };
 }
@@ -398,50 +403,59 @@ const SCREENS = {
     footer: () => h`<button class="btn btn-primary" ${state.portalCode.length === 6 ? '' : 'disabled'} onclick="App.nav('portal-confirm')">Continue</button>`,
   }),
 
-  'portal-confirm': () => ({
-    content: h`
-      <div class="t-body-md t-muted">Pre-filled with what your planner entered — check it's correct.</div>
-      <div class="field">
-        <label class="field__label">Name</label>
-        <div class="readonly-field">${MOCK_PLANNER_RECORD.firstName} ${MOCK_PLANNER_RECORD.lastName}</div>
-      </div>
-      <div class="field">
-        <label class="field__label">Carrier</label>
-        <div class="readonly-field">${MOCK_PLANNER_RECORD.carrier}</div>
-      </div>
-      <div class="field">
-        <label class="field__label">Phone on file</label>
-        <div class="readonly-field">${MOCK_PLANNER_RECORD.phone}</div>
-      </div>
-    `,
-    footer: () => h`<button class="btn btn-primary" onclick="App.nav('portal-otp')">This is me — continue</button>`,
-  }),
+  'portal-confirm': () => {
+    const record = currentPortalRecord();
+    return {
+      content: h`
+        <div class="t-body-md t-muted">${state.reactivating ? "Pre-filled with what's already on file — check it's still correct." : "Pre-filled with what your planner entered — check it's correct."}</div>
+        <div class="field">
+          <label class="field__label">Name</label>
+          <div class="readonly-field">${record.firstName} ${record.lastName}</div>
+        </div>
+        <div class="field">
+          <label class="field__label">Carrier</label>
+          <div class="readonly-field">${record.carrier}</div>
+        </div>
+        <div class="field">
+          <label class="field__label">Phone on file</label>
+          <div class="readonly-field">${record.phone}</div>
+        </div>
+      `,
+      footer: () => h`<button class="btn btn-primary" onclick="App.nav('portal-otp')">This is me — continue</button>`,
+    };
+  },
 
-  'portal-otp': () => ({
-    content: h`
-      <div class="t-body-md t-muted">We've sent a code to ${MOCK_PLANNER_RECORD.phone} to confirm it's really you.</div>
-      <div class="otp-row">
-        ${[0,1,2,3,4,5].map(i => h`<input class="otp-box" inputmode="numeric" maxlength="1" oninput="App.otpInput(this, ${i}, '.otp-box', 'portalOtp')" onkeydown="App.otpKeydown(event, ${i}, '.otp-box')" />`).join('')}
-      </div>
-      <div class="t-body-sm t-caption">Demo: any 6 digits will verify.</div>
-    `,
-    footer: () => h`<button class="btn btn-primary" ${state.portalOtp.length === 6 ? '' : 'disabled'} onclick="App.set('pinTarget','portal-gdpr'); App.nav('portal-pin')">Verify</button>`,
-  }),
+  'portal-otp': () => {
+    const record = currentPortalRecord();
+    return {
+      content: h`
+        <div class="t-body-md t-muted">We've sent a code to ${record.phone} to confirm it's really you.</div>
+        <div class="otp-row">
+          ${[0,1,2,3,4,5].map(i => h`<input class="otp-box" inputmode="numeric" maxlength="1" oninput="App.otpInput(this, ${i}, '.otp-box', 'portalOtp')" onkeydown="App.otpKeydown(event, ${i}, '.otp-box')" />`).join('')}
+        </div>
+        <div class="t-body-sm t-caption">Demo: any 6 digits will verify.</div>
+      `,
+      footer: () => h`<button class="btn btn-primary" ${state.portalOtp.length === 6 ? '' : 'disabled'} onclick="App.set('pinTarget','portal-gdpr'); App.nav('portal-pin')">Verify</button>`,
+    };
+  },
 
   'portal-pin': () => pinScreen(),
 
   'portal-gdpr': () => gdprScreen('portal-complete', 'portalGdprAccepted'),
 
-  'portal-complete': () => ({
-    content: h`
-      <div class="center-state">
-        <div class="center-state__icon center-state__icon--success">&#10003;</div>
-        <div class="t-headline-md">Onboarding complete</div>
-        <div class="t-body-md t-muted">You're already associated with <strong>${MOCK_PLANNER_RECORD.carrier}</strong> — no separate approval needed.</div>
-      </div>
-    `,
-    footer: () => h`<button class="btn btn-primary" onclick="App.set('dashboardMode','full'); App.nav('dashboard')">Go to dashboard</button>`,
-  }),
+  'portal-complete': () => {
+    const record = currentPortalRecord();
+    return {
+      content: h`
+        <div class="center-state">
+          <div class="center-state__icon center-state__icon--success">&#10003;</div>
+          <div class="t-headline-md">${state.reactivating ? 'Access restored' : 'Onboarding complete'}</div>
+          <div class="t-body-md t-muted">You're ${state.reactivating ? 'back in, still' : 'already'} associated with <strong>${record.carrier}</strong> — no separate approval needed.</div>
+        </div>
+      `,
+      footer: () => h`<button class="btn btn-primary" onclick="App.set('dashboardMode','full'); App.nav('dashboard')">Go to dashboard</button>`,
+    };
+  },
 
   /* ---------------- RETURNING DRIVER ---------------- */
 
@@ -469,38 +483,31 @@ const SCREENS = {
         <input class="field__input" type="password" placeholder="&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;" value="${state.returningPassword}" oninput="App.set('returningPassword', this.value); updateFooterState();" />
       </div>
       <button class="btn-link">Forgot password?</button>
-      <button class="btn-link" onclick="App.nav('returning-tripid')">Don't have a password? Use Trip ID + last name instead</button>
+      <button class="btn-link" onclick="App.nav('returning-request-activation')">Don't have a password? Request activation instead</button>
     `,
     footer: () => h`<button class="btn btn-primary" ${state.returningPassword.length >= 4 ? '' : 'disabled'} onclick="App.set('dashboardMode','full'); App.nav('dashboard')">Sign in</button>`,
   }),
 
-  'returning-tripid': () => ({
+  'returning-request-activation': () => ({
     content: h`
-      <div class="t-body-md t-muted">No password on file, or you'd rather not use it — this works instead, using what your planner already has for this trip.</div>
-      <div class="field">
-        <label class="field__label">Trip ID</label>
-        <input class="field__input" placeholder="TR-48291" value="${state.returningTripId}" oninput="App.set('returningTripId', this.value); updateFooterState();" />
-      </div>
-      <div class="field">
-        <label class="field__label">Last name</label>
-        <input class="field__input" placeholder="Reyes" value="${state.returningLastName}" oninput="App.set('returningLastName', this.value); updateFooterState();" />
+      <div class="t-body-md t-muted">No password on file isn't something to self-service around — it goes through the same trusted path as joining for the first time.</div>
+      <div class="card card--tinted">
+        <div class="t-label-md">What happens next</div>
+        <div class="t-body-sm t-muted">${MOCK_RETURNING_DRIVER.carrier}'s ops team gets a reactivation request for your account. Once they verify it's you, they'll send a fresh activation link to ${MOCK_RETURNING_DRIVER.phone} — the exact same magic-link flow used for a driver's first sign-up.</div>
       </div>
     `,
-    footer: () => h`<button class="btn btn-primary" ${(state.returningTripId && state.returningLastName) ? '' : 'disabled'} onclick="App.nav('returning-remember')">Continue</button>`,
+    footer: () => h`<button class="btn btn-primary" onclick="App.nav('returning-activation-sent')">Send activation request</button>`,
   }),
 
-  'returning-remember': () => ({
+  'returning-activation-sent': () => ({
     content: h`
       <div class="center-state">
-        <div class="center-state__icon center-state__icon--success">&#10003;</div>
-        <div class="t-headline-md">You're in</div>
-        <div class="t-body-md t-muted">Remember this device for next time? You won't need to re-enter Trip ID + last name again.</div>
+        <div class="center-state__icon center-state__icon--success">&#128232;</div>
+        <div class="t-headline-md">Request sent</div>
+        <div class="t-body-md t-muted">${MOCK_RETURNING_DRIVER.carrier} has been notified. You'll get a text with a new activation link shortly.</div>
       </div>
     `,
-    footer: () => h`
-      <button class="btn btn-primary" onclick="App.set('rememberDevice', true); App.set('dashboardMode','full'); App.nav('dashboard')">Yes, remember this device</button>
-      <button class="btn btn-text" onclick="App.set('rememberDevice', false); App.set('dashboardMode','full'); App.nav('dashboard')">Not now</button>
-    `,
+    footer: () => h`<button class="btn btn-primary" onclick="App.set('reactivating', true); App.nav('portal-confirm')">&#128241; Simulate: tap the activation link ops sent</button>`,
   }),
 
   /* ---------------- GUEST / ONE-OFF DRIVER ---------------- */
