@@ -313,7 +313,17 @@ const SCREENS = {
           <div class="launch-hero__tagline">Moving transport forward</div>
         </div>
         <div class="launch-hero__actions">
-          <button class="btn btn-primary" onclick="App.nav('self-reg-signup')">Get started</button>
+          <div class="launch-hero__divider"><span>Sign up or log in with</span></div>
+          <button class="btn btn-social" onclick="App.set('loginMethod','social'); App.set('phone','google-account'); App.nav('self-reg-details')">
+            <img class="btn-social__icon" src="assets/social-google.svg" alt="" /> Continue with Google
+          </button>
+          <button class="btn btn-social" onclick="App.set('loginMethod','social'); App.set('phone','apple-account'); App.nav('self-reg-details')">
+            <img class="btn-social__icon" src="assets/social-apple.svg" alt="" /> Continue with Apple
+          </button>
+          <button class="btn btn-social" onclick="App.set('loginMethod','social'); App.set('phone','facebook-account'); App.nav('self-reg-details')">
+            <img class="btn-social__icon" src="assets/social-facebook.svg" alt="" /> Continue with Facebook
+          </button>
+          <button class="btn-link launch-hero__secondary" onclick="App.nav('self-reg-signup')">Continue with email or phone number</button>
           <button class="btn-link launch-hero__signin" onclick="App.switchFlow('returning')">Already have an account? Sign in</button>
         </div>
       </div>
@@ -326,7 +336,6 @@ const SCREENS = {
       <div class="segmented">
         <div class="segmented__opt ${state.loginMethod === 'phone' ? 'is-selected' : ''}" onclick="App.setAndRerender('loginMethod','phone')">Phone</div>
         <div class="segmented__opt ${state.loginMethod === 'email' ? 'is-selected' : ''}" onclick="App.setAndRerender('loginMethod','email')">Email</div>
-        <div class="segmented__opt ${state.loginMethod === 'social' ? 'is-selected' : ''}" onclick="App.setAndRerender('loginMethod','social')">Social login</div>
       </div>
       ${state.loginMethod === 'phone' ? h`
         <div class="field">
@@ -340,24 +349,10 @@ const SCREENS = {
           <input class="field__input" type="email" placeholder="you@example.com" value="${state.email}" oninput="App.set('email', this.value); updateFooterState();" />
         </div>
       ` : ''}
-      ${state.loginMethod === 'social' ? h`
-        <button class="btn btn-social" onclick="App.set('phone','google-account'); updateFooterState();">
-          <img class="btn-social__icon" src="assets/social-google.svg" alt="" /> Continue with Google
-        </button>
-        <button class="btn btn-social" onclick="App.set('phone','facebook-account'); updateFooterState();">
-          <img class="btn-social__icon" src="assets/social-facebook.svg" alt="" /> Continue with Facebook
-        </button>
-        <button class="btn btn-social" onclick="App.set('phone','apple-account'); updateFooterState();">
-          <img class="btn-social__icon" src="assets/social-apple.svg" alt="" /> Continue with Apple
-        </button>
-      ` : ''}
     `,
     footer: () => {
-      const ready = state.loginMethod === 'social'
-        ? !!state.phone
-        : (state.loginMethod === 'phone' ? state.phone.length >= 6 : state.email.includes('@'));
-      const nextRoute = state.loginMethod === 'social' ? 'self-reg-details' : 'self-reg-otp';
-      return h`<button class="btn btn-primary" ${ready ? '' : 'disabled'} onclick="App.nav('${nextRoute}')">Continue</button>`;
+      const ready = state.loginMethod === 'phone' ? state.phone.length >= 6 : state.email.includes('@');
+      return h`<button class="btn btn-primary" ${ready ? '' : 'disabled'} onclick="App.nav('self-reg-otp')">Continue</button>`;
     },
   }),
 

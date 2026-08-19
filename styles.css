@@ -487,10 +487,10 @@ button { font-family: inherit; }
 .launch-hero::before {
   content: '';
   position: absolute;
-  inset: -6%;
+  inset: -2%;
   background-image: url('assets/hero-truck.jpeg');
   background-size: cover;
-  background-position: center 55%;
+  background-position: center 38%;
   animation: launch-hero-zoom 24s ease-in-out infinite alternate;
   z-index: 0;
 }
@@ -498,12 +498,12 @@ button { font-family: inherit; }
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(6,12,9,0.25) 0%, rgba(6,12,9,0.55) 55%, rgba(6,12,9,0.94) 100%);
+  background: linear-gradient(180deg, rgba(6,12,9,0.15) 0%, rgba(6,12,9,0.5) 60%, rgba(6,12,9,0.95) 100%);
   z-index: 1;
 }
 @keyframes launch-hero-zoom {
   0% { transform: scale(1); }
-  100% { transform: scale(1.12); }
+  100% { transform: scale(1.05); }
 }
 .launch-hero__sheen {
   position: absolute;
@@ -520,13 +520,13 @@ button { font-family: inherit; }
 .launch-hero__body {
   position: relative;
   z-index: 2;
-  padding: 80px 28px 0;
+  padding: 56px 28px 0;
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 14px;
+  gap: 10px;
 }
 .launch-hero__mark {
   position: relative;
@@ -554,13 +554,33 @@ button { font-family: inherit; }
 .launch-hero__actions {
   position: relative;
   z-index: 2;
-  padding: 0 24px 30px;
+  padding: 0 24px 28px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
-.launch-hero__actions .btn-primary { box-shadow: 0 8px 24px rgba(0,0,0,0.35); }
-.launch-hero__signin { color: #fff; text-decoration: underline; margin: 0 auto; }
+.launch-hero__actions .btn-social { box-shadow: 0 6px 18px rgba(0,0,0,0.28); }
+.launch-hero__divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: rgba(255,255,255,0.75);
+  font-size: 12px;
+  margin-bottom: 2px;
+}
+.launch-hero__divider::before,
+.launch-hero__divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: rgba(255,255,255,0.35);
+}
+.launch-hero__secondary {
+  color: #fff;
+  text-decoration: underline;
+  margin: 4px auto 0;
+}
+.launch-hero__signin { color: rgba(255,255,255,0.85); text-decoration: underline; margin: 0 auto; }
 
 /* ---------- Trip cards (dashboard) ---------- */
 .trip-card { cursor: pointer; gap: 4px; }
