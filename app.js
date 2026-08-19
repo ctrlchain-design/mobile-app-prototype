@@ -159,39 +159,58 @@ function freshState() {
 
 let state = freshState();
 
+/* Explicit in-app navigation stack, not the browser's history. window.history
+   is unreliable here: it survives restartFlow()/switchFlow() resetting state,
+   so the browser's "back" could land on a screen built for a driver record
+   that no longer exists, and it does nothing predictable when there's no
+   prior entry at all (e.g. the very first screen in a fresh tab). This stack
+   is cleared exactly when state is, so it can never point at a stale screen. */
+let navHistory = [];
+
+function setHash(route) {
+  if (window.location.hash === '#' + route) {
+    // Setting hash to its current value doesn't fire 'hashchange' — render
+    // directly so navigating "back to" the screen you're already on (e.g.
+    // restarting a flow from its own landing screen) still takes effect.
+    render();
+  } else {
+    window.location.hash = route;
+  }
+}
+
 const App = {
 
   nav(route) {
-    if (window.location.hash === '#' + route) {
-      // Setting hash to its current value doesn't fire 'hashchange' — render
-      // directly so navigating "back to" the screen you're already on (e.g.
-      // restarting a flow from its own landing screen) still takes effect.
-      render();
-      return;
-    }
-    window.location.hash = route;
+    const current = currentRoute();
+    if (current !== route) navHistory.push(current);
+    setHash(route);
   },
 
   switchFlow(flow) {
     state = freshState();
+    navHistory = [];
     state.activeFlow = flow;
-    this.nav(FLOW_FIRST_ROUTE[flow]);
+    // setHash, not this.nav — nav() would push the pre-reset route onto the
+    // (just-cleared) history, letting "back" step into a screen this fresh
+    // state no longer matches.
+    setHash(FLOW_FIRST_ROUTE[flow]);
   },
 
   restartFlow() {
     const meta = ROUTE_META[currentRoute()];
     const flow = state.activeFlow || (meta && meta.flow) || null;
     state = freshState();
+    navHistory = [];
     if (flow) {
       state.activeFlow = flow;
-      this.nav(FLOW_FIRST_ROUTE[flow]);
+      setHash(FLOW_FIRST_ROUTE[flow]);
     } else {
-      this.nav('welcome');
+      setHash('welcome');
     }
   },
 
   back() {
-    window.history.back();
+    setHash(navHistory.pop() || 'welcome');
   },
 
   set(key, value) {
@@ -953,7 +972,9 @@ function render() {
   const route = currentRoute();
   const screen = SCREENS[route] ? SCREENS[route]() : SCREENS['welcome']();
   const meta = ROUTE_META[route];
-  const canGoBack = route !== 'welcome';
+  // 'welcome' and 'dashboard' are both parent/home screens — nothing above
+  // them to go back to, regardless of how this session happened to arrive.
+  const canGoBack = route !== 'welcome' && route !== 'dashboard';
 
   let headerHtml = '';
   if (!screen.hideHeader) {
