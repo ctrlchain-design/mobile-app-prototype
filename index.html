@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CtrlChain Driver — Onboarding Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="colors.css" />
+<link rel="stylesheet" href="themes.css" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <div class="proto-controls" role="navigation" aria-label="Prototype controls">
+    <div class="proto-controls__label">Prototype controls</div>
+    <div class="proto-controls__flows">
+      <button type="button" class="proto-flow-btn" data-flow="self-reg" onclick="App.switchFlow('self-reg')">Self-Registration</button>
+      <button type="button" class="proto-flow-btn" data-flow="portal" onclick="App.switchFlow('portal')">Portal-Based (Magic Link)</button>
+    </div>
+    <button type="button" class="proto-restart-btn" onclick="App.restartFlow()" title="Restart current flow">&#8635; Restart</button>
+  </div>
+
+  <div class="phone-frame">
+    <div class="status-bar">
+      <span class="status-bar__time">9:41</span>
+      <span class="status-bar__icons">&#9679;&#9679;&#9679; &#128246; &#128267;</span>
+    </div>
+    <div id="app" class="app-root"></div>
+  </div>
+
+  <p class="proto-footnote">CtrlChain Driver App — onboarding prototype for stakeholder review. Not production code.</p>
+
+<script src="app.js"></script>
+</body>
+</html>
