@@ -483,14 +483,16 @@ button { font-family: inherit; }
   justify-content: flex-end;
   color: #fff;
   text-align: center;
+  background: #0c130f;
 }
 .launch-hero::before {
   content: '';
   position: absolute;
-  inset: -2%;
+  top: 0; left: 0; right: 0;
+  height: 58%;
   background-image: url('assets/hero-truck.jpeg');
   background-size: cover;
-  background-position: center 38%;
+  background-position: 40% 40%;
   animation: launch-hero-zoom 24s ease-in-out infinite alternate;
   z-index: 0;
 }
@@ -498,12 +500,12 @@ button { font-family: inherit; }
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(6,12,9,0.15) 0%, rgba(6,12,9,0.5) 60%, rgba(6,12,9,0.95) 100%);
+  background: linear-gradient(180deg, rgba(6,12,9,0.05) 0%, rgba(6,12,9,0.2) 38%, rgba(6,12,9,0.68) 56%, rgba(6,12,9,0.97) 74%, #0c130f 100%);
   z-index: 1;
 }
 @keyframes launch-hero-zoom {
   0% { transform: scale(1); }
-  100% { transform: scale(1.05); }
+  100% { transform: scale(1.035); }
 }
 .launch-hero__sheen {
   position: absolute;
@@ -548,25 +550,25 @@ button { font-family: inherit; }
   70% { transform: scale(1.6); opacity: 0; }
   100% { transform: scale(1.6); opacity: 0; }
 }
-.launch-hero__icon { width: 40px; height: 40px; position: relative; z-index: 1; }
-.launch-hero__wordmark { font-size: 30px; font-weight: 700; letter-spacing: -0.01em; }
-.launch-hero__tagline { color: var(--color-green-300); font-size: var(--type-body-md-size); }
+.launch-hero__icon { width: 40px; height: 40px; position: relative; z-index: 1; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.5)); }
+.launch-hero__wordmark { font-size: 30px; font-weight: 700; letter-spacing: -0.01em; text-shadow: 0 2px 10px rgba(0,0,0,0.55), 0 1px 3px rgba(0,0,0,0.85); }
+.launch-hero__tagline { color: var(--color-green-300); font-size: var(--type-body-md-size); text-shadow: 0 1px 6px rgba(0,0,0,0.65), 0 1px 3px rgba(0,0,0,0.9); }
 .launch-hero__actions {
   position: relative;
   z-index: 2;
-  padding: 0 24px 28px;
+  padding: 0 24px 32px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
-.launch-hero__actions .btn-social { box-shadow: 0 6px 18px rgba(0,0,0,0.28); }
+.launch-hero__actions .btn-social { box-shadow: 0 6px 18px rgba(0,0,0,0.28); min-height: 48px; }
 .launch-hero__divider {
   display: flex;
   align-items: center;
   gap: 10px;
   color: rgba(255,255,255,0.75);
   font-size: 12px;
-  margin-bottom: 2px;
+  margin-bottom: 6px;
 }
 .launch-hero__divider::before,
 .launch-hero__divider::after {
@@ -576,11 +578,24 @@ button { font-family: inherit; }
   background: rgba(255,255,255,0.35);
 }
 .launch-hero__secondary {
+  background: rgba(255,255,255,0.10);
   color: #fff;
-  text-decoration: underline;
-  margin: 4px auto 0;
+  border: 1.5px solid rgba(255,255,255,0.6);
+  min-height: 48px;
+  margin-top: 10px;
 }
-.launch-hero__signin { color: rgba(255,255,255,0.85); text-decoration: underline; margin: 0 auto; }
+.launch-hero__secondary:hover { background: rgba(255,255,255,0.18); }
+.launch-hero__signin {
+  color: rgba(255,255,255,0.85);
+  text-decoration: underline;
+  margin: 8px auto 0;
+  padding: 12px 14px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+}
 
 /* ---------- Trip cards (dashboard) ---------- */
 .trip-card { cursor: pointer; gap: 4px; }

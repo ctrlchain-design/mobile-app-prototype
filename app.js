@@ -312,7 +312,7 @@ const SCREENS = {
           <div class="launch-hero__wordmark">CtrlChain</div>
           <div class="launch-hero__tagline">Moving transport forward</div>
         </div>
-        <div class="launch-hero__actions">
+        <div class="launch-hero__actions" role="group" aria-label="Sign up or log in options">
           <div class="launch-hero__divider"><span>Sign up or log in with</span></div>
           <button class="btn btn-social" onclick="App.set('loginMethod','social'); App.set('phone','google-account'); App.nav('self-reg-details')">
             <img class="btn-social__icon" src="assets/social-google.svg" alt="" /> Continue with Google
@@ -323,7 +323,7 @@ const SCREENS = {
           <button class="btn btn-social" onclick="App.set('loginMethod','social'); App.set('phone','facebook-account'); App.nav('self-reg-details')">
             <img class="btn-social__icon" src="assets/social-facebook.svg" alt="" /> Continue with Facebook
           </button>
-          <button class="btn-link launch-hero__secondary" onclick="App.nav('self-reg-signup')">Continue with email or phone number</button>
+          <button class="btn launch-hero__secondary" onclick="App.nav('self-reg-signup')">Continue with email or phone number</button>
           <button class="btn-link launch-hero__signin" onclick="App.switchFlow('returning')">Already have an account? Sign in</button>
         </div>
       </div>
