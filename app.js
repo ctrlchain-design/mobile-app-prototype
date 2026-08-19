@@ -378,11 +378,11 @@ const SCREENS = {
           <label class="field__label">Mobile number</label>
           <div class="phone-input">
             <div class="phone-input__code">
-              <span class="phone-input__flag">&#127468;&#127463;</span>
-              <span>+44</span>
+              <span class="phone-input__flag">&#127475;&#127473;</span>
+              <span>+31</span>
             </div>
             <div class="phone-input__number-wrap">
-              <input class="phone-input__number" type="tel" inputmode="numeric" placeholder="7700 900123" value="${state.phone}" oninput="App.set('phone', this.value); this.nextElementSibling.style.visibility = this.value ? 'visible' : 'hidden'; updateFooterState();" />
+              <input class="phone-input__number" type="tel" inputmode="numeric" placeholder="6 12345678" value="${state.phone}" oninput="App.set('phone', this.value); this.nextElementSibling.style.visibility = this.value ? 'visible' : 'hidden'; updateFooterState();" />
               <button type="button" class="phone-input__clear" aria-label="Clear" style="visibility:${state.phone ? 'visible' : 'hidden'}" onclick="App.setAndRerender('phone','')">&#10005;</button>
             </div>
           </div>

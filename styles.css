@@ -355,14 +355,21 @@ button { font-family: inherit; }
 .field__error { color: var(--form-critical); font-size: var(--type-body-sm-size); }
 .field__input.has-error { border-color: var(--form-critical); }
 
-/* ---------- Phone field (country code chip + underlined number) ---------- */
-.phone-input { display: flex; align-items: center; gap: 14px; }
+/* ---------- Phone field (country code chip + number, one bordered field) ---------- */
+.phone-input {
+  display: flex;
+  align-items: stretch;
+  border: 1.5px solid var(--form-border);
+  border-radius: var(--radius-sm);
+  background: var(--form-bg);
+}
+.phone-input:focus-within { border-color: var(--form-border-focus); }
 .phone-input__code {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding-bottom: 10px;
-  border-bottom: 1.5px solid var(--form-border);
+  padding: 14px;
+  border-right: 1.5px solid var(--form-border);
   font-size: var(--type-body-lg-size);
   color: var(--form-value);
   flex-shrink: 0;
@@ -374,10 +381,8 @@ button { font-family: inherit; }
   display: flex;
   align-items: center;
   gap: 8px;
-  border-bottom: 1.5px solid var(--form-border);
-  padding-bottom: 10px;
+  padding: 14px;
 }
-.phone-input__number-wrap:focus-within { border-color: var(--form-border-focus); }
 .phone-input__number {
   flex: 1;
   min-width: 0;
