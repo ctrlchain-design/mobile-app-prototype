@@ -126,6 +126,13 @@ let state = freshState();
 const App = {
 
   nav(route) {
+    if (window.location.hash === '#' + route) {
+      // Setting hash to its current value doesn't fire 'hashchange' — render
+      // directly so navigating "back to" the screen you're already on (e.g.
+      // restarting a flow from its own landing screen) still takes effect.
+      render();
+      return;
+    }
     window.location.hash = route;
   },
 
