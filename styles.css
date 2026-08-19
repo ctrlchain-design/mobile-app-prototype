@@ -577,12 +577,12 @@ button { font-family: inherit; }
   height: 1px;
   background: rgba(255,255,255,0.35);
 }
+.launch-hero__divider--secondary { margin-top: 10px; }
 .launch-hero__secondary {
   background: rgba(255,255,255,0.10);
   color: #fff;
   border: 1.5px solid rgba(255,255,255,0.6);
   min-height: 48px;
-  margin-top: 10px;
 }
 .launch-hero__secondary:hover { background: rgba(255,255,255,0.18); }
 .launch-hero__signin {
