@@ -753,8 +753,9 @@ function render() {
     ${footerHtml}
   `;
 
-  const flowSelect = document.querySelector('.proto-flow-select');
-  if (flowSelect) flowSelect.value = state.activeFlow || '';
+  document.querySelectorAll('.proto-flow-btn').forEach(btn => {
+    btn.classList.toggle('is-active', state.activeFlow === btn.dataset.flow);
+  });
 
   const themeBtn = document.querySelector('.proto-theme-btn');
   if (themeBtn) {

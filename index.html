@@ -21,22 +21,18 @@
 <!-- GitHub Pages caches these for 10 min (Cache-Control: max-age=600). Bump ?v=N
      on every deploy that changes styles.css/app.js so reviewers don't see stale
      content right after an update. -->
-<link rel="stylesheet" href="colors.css?v=6" />
-<link rel="stylesheet" href="themes.css?v=6" />
-<link rel="stylesheet" href="styles.css?v=6" />
+<link rel="stylesheet" href="colors.css?v=7" />
+<link rel="stylesheet" href="themes.css?v=7" />
+<link rel="stylesheet" href="styles.css?v=7" />
 </head>
 <body>
 
   <div class="proto-controls" role="navigation" aria-label="Prototype controls">
-    <div class="proto-controls__select-wrap">
-      <span class="proto-controls__eyebrow">Viewing</span>
-      <select class="proto-flow-select" aria-label="Choose a flow to preview" onchange="App.switchFlow(this.value)">
-        <option value="" disabled selected>Choose a flow&hellip;</option>
-        <option value="self-reg">Self-Registration</option>
-        <option value="portal">Portal-Based (Magic Link)</option>
-        <option value="returning">Returning Driver</option>
-        <option value="guest">Guest / One-Off</option>
-      </select>
+    <div class="proto-controls__flows" role="tablist" aria-label="Choose a flow to preview">
+      <button type="button" class="proto-flow-btn" data-flow="self-reg" onclick="App.switchFlow('self-reg')">Self-Registration</button>
+      <button type="button" class="proto-flow-btn" data-flow="portal" onclick="App.switchFlow('portal')">Portal-Based (Magic Link)</button>
+      <button type="button" class="proto-flow-btn" data-flow="returning" onclick="App.switchFlow('returning')">Returning Driver</button>
+      <button type="button" class="proto-flow-btn" data-flow="guest" onclick="App.switchFlow('guest')">Guest / One-Off</button>
     </div>
     <div class="proto-controls__actions">
       <button type="button" class="proto-icon-btn proto-theme-btn" onclick="App.toggleTheme()" title="Toggle theme" aria-label="Toggle theme">🌙</button>
@@ -54,6 +50,6 @@
 
   <p class="proto-footnote">CtrlChain Driver App — onboarding prototype for stakeholder review. Not production code.</p>
 
-<script src="app.js?v=6"></script>
+<script src="app.js?v=7"></script>
 </body>
 </html>
