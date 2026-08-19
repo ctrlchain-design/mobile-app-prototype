@@ -376,7 +376,16 @@ const SCREENS = {
       ${state.loginMethod === 'phone' ? h`
         <div class="field">
           <label class="field__label">Mobile number</label>
-          <input class="field__input" type="tel" placeholder="+44 7700 900123" value="${state.phone}" oninput="App.set('phone', this.value); updateFooterState();" />
+          <div class="phone-input">
+            <div class="phone-input__code">
+              <span class="phone-input__flag">&#127468;&#127463;</span>
+              <span>+44</span>
+            </div>
+            <div class="phone-input__number-wrap">
+              <input class="phone-input__number" type="tel" inputmode="numeric" placeholder="7700 900123" value="${state.phone}" oninput="App.set('phone', this.value); this.nextElementSibling.style.visibility = this.value ? 'visible' : 'hidden'; updateFooterState();" />
+              <button type="button" class="phone-input__clear" aria-label="Clear" style="visibility:${state.phone ? 'visible' : 'hidden'}" onclick="App.setAndRerender('phone','')">&#10005;</button>
+            </div>
+          </div>
         </div>
       ` : ''}
       ${state.loginMethod === 'email' ? h`
