@@ -26,6 +26,33 @@ const MOCK_TRIPS = [
 
 const MOCK_GUEST_TRIP = { id: 'TRIP2026-000142', pickup: 'Heathrow Cargo Terminal', dropoff: 'Southampton Docks', status: 'In progress', badge: 'info', eta: 'Today, 16:00' };
 
+/* Mocked native OAuth account-chooser sheets — one per social provider, styled after
+   each provider's real embedded sign-in UI rather than CCA's own visual system. */
+const OAUTH_PROVIDERS = {
+  google: {
+    label: 'Google', domain: 'accounts.google.com', logo: 'assets/social-google.svg',
+    share: 'name, email address, language preference, and profile picture',
+    accounts: [
+      { name: 'Jordan Reyes', email: 'jordan.reyes@gmail.com', initial: 'J', color: '#7c5cbf', signedOut: true },
+      { name: 'Alex Turner', email: 'alex.turner@gmail.com', initial: 'A', color: '#3f7fbf' },
+    ],
+  },
+  apple: {
+    label: 'Apple', domain: 'appleid.apple.com', logo: 'assets/social-apple.svg',
+    share: 'name and email address',
+    accounts: [
+      { name: 'Jordan Reyes', email: 'jordan.reyes@icloud.com', initial: 'J', color: '#5a5a5f' },
+    ],
+  },
+  facebook: {
+    label: 'Facebook', domain: 'facebook.com', logo: 'assets/social-facebook.svg',
+    share: 'name, email address, and profile picture',
+    accounts: [
+      { name: 'Jordan Reyes', email: 'jordan.reyes@outlook.com', initial: 'J', color: '#3b5998' },
+    ],
+  },
+};
+
 /* Returns whichever mock driver record the currently-displayed portal-flow screen should show —
    the original portal onboarding record, or the returning driver's own record when these same
    screens are being reused for an account-reactivation request. */
@@ -37,6 +64,9 @@ function currentPortalRecord() {
 const ROUTE_META = {
   'welcome': null,
   'self-reg-welcome': null,
+  'self-reg-social-google': null,
+  'self-reg-social-apple': null,
+  'self-reg-social-facebook': null,
   'self-reg-signup': { flow: 'self-reg', step: 1, total: 7 },
   'self-reg-otp': { flow: 'self-reg', step: 2, total: 7 },
   'self-reg-password': { flow: 'self-reg', step: 3, total: 7 },
@@ -314,13 +344,13 @@ const SCREENS = {
         </div>
         <div class="launch-hero__actions" role="group" aria-label="Sign up or log in options">
           <div class="launch-hero__divider"><span>Sign up or log in with</span></div>
-          <button class="btn btn-social" onclick="App.set('loginMethod','social'); App.set('phone','google-account'); App.nav('self-reg-details')">
+          <button class="btn btn-social" onclick="App.nav('self-reg-social-google')">
             <img class="btn-social__icon" src="assets/social-google.svg" alt="" /> Continue with Google
           </button>
-          <button class="btn btn-social" onclick="App.set('loginMethod','social'); App.set('phone','apple-account'); App.nav('self-reg-details')">
+          <button class="btn btn-social" onclick="App.nav('self-reg-social-apple')">
             <img class="btn-social__icon" src="assets/social-apple.svg" alt="" /> Continue with Apple
           </button>
-          <button class="btn btn-social" onclick="App.set('loginMethod','social'); App.set('phone','facebook-account'); App.nav('self-reg-details')">
+          <button class="btn btn-social" onclick="App.nav('self-reg-social-facebook')">
             <img class="btn-social__icon" src="assets/social-facebook.svg" alt="" /> Continue with Facebook
           </button>
           <div class="launch-hero__divider launch-hero__divider--secondary"><span>Continue with</span></div>
@@ -330,6 +360,10 @@ const SCREENS = {
       </div>
     `,
   }),
+
+  'self-reg-social-google': () => oauthConsentScreen('google'),
+  'self-reg-social-apple': () => oauthConsentScreen('apple'),
+  'self-reg-social-facebook': () => oauthConsentScreen('facebook'),
 
   'self-reg-signup': () => ({
     content: h`
@@ -735,6 +769,45 @@ function gdprScreen(nextRoute, stateKey, pinTargetToSet) {
       </div>
     `,
     footer: () => h`<button class="btn btn-primary" ${state[stateKey] ? '' : 'disabled'} onclick="${pinTargetToSet ? `App.set('pinTarget','${pinTargetToSet}'); ` : ''}App.nav('${nextRoute}')">Accept &amp; continue</button>`,
+  };
+}
+
+function oauthConsentScreen(provider) {
+  const p = OAUTH_PROVIDERS[provider];
+  const choose = (email) => `App.set('loginMethod','social'); App.set('email','${email}'); App.set('phone','${provider}-account'); App.nav('self-reg-details')`;
+  return {
+    hideHeader: true,
+    content: h`
+      <div class="oauth-sheet">
+        <div class="oauth-sheet__bar">
+          <button class="oauth-sheet__cancel" onclick="App.nav('self-reg-welcome')">Cancel</button>
+          <div class="oauth-sheet__url"><span>&#128274;</span> ${p.domain}</div>
+          <button class="oauth-sheet__reload" aria-label="Reload">&#8635;</button>
+        </div>
+        <div class="oauth-sheet__provider">
+          <img class="oauth-sheet__provider-icon" src="${p.logo}" alt="" /> Sign in with ${p.label}
+        </div>
+        <div class="oauth-sheet__body">
+          <div class="oauth-sheet__title">Choose an account</div>
+          <div class="oauth-sheet__subtitle">to continue to <strong>CtrlChain</strong></div>
+          ${p.accounts.map(a => h`
+            <div class="oauth-account" onclick="${choose(a.email)}">
+              <div class="oauth-account__avatar" style="background:${a.color};">${a.initial}</div>
+              <div class="oauth-account__body">
+                <div class="oauth-account__name">${a.name}</div>
+                <div class="oauth-account__email">${a.email}</div>
+              </div>
+              ${a.signedOut ? '<div class="oauth-account__status">Signed out</div>' : ''}
+            </div>
+          `).join('')}
+          <div class="oauth-account" onclick="${choose(provider + '.driver@example.com')}">
+            <div class="oauth-account__avatar oauth-account__avatar--ghost">&#128100;</div>
+            <div class="oauth-account__name">Use another account</div>
+          </div>
+          <div class="oauth-sheet__disclosure">To continue, ${p.label} will share your ${p.share} with CtrlChain.</div>
+        </div>
+      </div>
+    `,
   };
 }
 
