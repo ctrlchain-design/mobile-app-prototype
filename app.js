@@ -377,10 +377,11 @@ const SCREENS = {
         <div class="field">
           <label class="field__label">Mobile number</label>
           <div class="phone-input">
-            <div class="phone-input__code">
+            <button type="button" class="phone-input__code" aria-label="Change country code">
               <span class="phone-input__flag">&#127475;&#127473;</span>
               <span>+31</span>
-            </div>
+              <svg class="phone-input__chevron" width="10" height="6" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
             <div class="phone-input__number-wrap">
               <input class="phone-input__number" type="tel" inputmode="numeric" placeholder="6 12345678" value="${state.phone}" oninput="App.set('phone', this.value); this.nextElementSibling.style.visibility = this.value ? 'visible' : 'hidden'; updateFooterState();" />
               <button type="button" class="phone-input__clear" aria-label="Clear" style="visibility:${state.phone ? 'visible' : 'hidden'}" onclick="App.setAndRerender('phone','')">&#10005;</button>

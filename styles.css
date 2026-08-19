@@ -369,12 +369,19 @@ button { font-family: inherit; }
   align-items: center;
   gap: 6px;
   padding: 14px;
+  border: none;
   border-right: 1.5px solid var(--form-border);
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  background: transparent;
   font-size: var(--type-body-lg-size);
+  font-family: inherit;
   color: var(--form-value);
   flex-shrink: 0;
+  cursor: pointer;
 }
+.phone-input__code:hover { background: var(--surface-neutral-dark); }
 .phone-input__flag { font-size: 18px; line-height: 1; }
+.phone-input__chevron { color: var(--icon-neutral-darker); flex-shrink: 0; }
 .phone-input__number-wrap {
   flex: 1;
   min-width: 0;
