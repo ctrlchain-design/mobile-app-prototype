@@ -4,9 +4,20 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>CtrlChain Driver — Onboarding Prototype</title>
+<script>
+  /* Default to light theme regardless of system preference; remember
+     a manual choice via localStorage. Runs before CSS to avoid a
+     flash of the wrong theme. */
+  (function () {
+    var saved = null;
+    try { saved = localStorage.getItem('cca-theme'); } catch (e) { /* ignore */ }
+    document.documentElement.classList.add(saved === 'dark' ? 'dark' : 'light');
+  })();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet" />
+<link rel="icon" href="assets/logo-icon.svg" />
 <link rel="stylesheet" href="colors.css" />
 <link rel="stylesheet" href="themes.css" />
 <link rel="stylesheet" href="styles.css" />
@@ -18,7 +29,10 @@
     <div class="proto-controls__flows">
       <button type="button" class="proto-flow-btn" data-flow="self-reg" onclick="App.switchFlow('self-reg')">Self-Registration</button>
       <button type="button" class="proto-flow-btn" data-flow="portal" onclick="App.switchFlow('portal')">Portal-Based (Magic Link)</button>
+      <button type="button" class="proto-flow-btn" data-flow="returning" onclick="App.switchFlow('returning')">Returning Driver</button>
+      <button type="button" class="proto-flow-btn" data-flow="guest" onclick="App.switchFlow('guest')">Guest / One-Off</button>
     </div>
+    <button type="button" class="proto-theme-btn" onclick="App.toggleTheme()" title="Toggle theme">🌙 Dark</button>
     <button type="button" class="proto-restart-btn" onclick="App.restartFlow()" title="Restart current flow">&#8635; Restart</button>
   </div>
 

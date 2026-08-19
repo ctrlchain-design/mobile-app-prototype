@@ -3,16 +3,12 @@
  * Vanilla JS, hash-routed, single mocked state object. No build step,
  * no dependencies — deployable as-is to GitHub Pages.
  *
- * Phase 1 scope: Self-Registration and Portal-Based (magic link) New
- * Driver onboarding flows only, per the FigJam "CCA Driver App —
- * Onboarding & Pickup Journey" board.
+ * Phase 1 scope: all four New Driver / returning-driver entry paths
+ * (Self-Registration, Portal-Based magic link, Returning Driver,
+ * Guest/One-Off) plus a shared Dashboard, per the FigJam
+ * "CCA Driver App — Onboarding & Pickup Journey" board. Milestone
+ * confirmation, exceptions, and communication are Phase 2.
  */
-
-const LOGO_SVG = `
-<svg class="hero__logo" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path d="M62 18 A35 35 0 1 0 62 82" stroke="#8dab51" stroke-width="11" stroke-linecap="round"/>
-  <rect x="53" y="46" width="14" height="14" fill="#775bc5" transform="rotate(45 60 53)"/>
-</svg>`;
 
 const MOCK_PLANNER_RECORD = {
   firstName: 'Alex',
@@ -21,8 +17,46 @@ const MOCK_PLANNER_RECORD = {
   phone: '+44 7700 900123',
 };
 
-const SELF_REG_FLOW = ['self-reg-signup', 'self-reg-otp', 'self-reg-details', 'self-reg-gdpr', 'self-reg-pending', 'self-reg-dashboard'];
-const PORTAL_FLOW = ['portal-sms', 'portal-install', 'portal-code', 'portal-confirm', 'portal-otp', 'portal-pin', 'portal-gdpr', 'portal-complete', 'portal-dashboard'];
+const MOCK_RETURNING_DRIVER = { firstName: 'Jordan', lastName: 'Reyes', carrier: 'Meridian Freight Ltd' };
+
+const MOCK_TRIPS = [
+  { id: 'TR-48291', pickup: 'Meridian Distribution Centre, Coventry', dropoff: 'Aldi RDC, Bristol', status: 'Upcoming', badge: 'info', eta: 'Today, 14:30' },
+  { id: 'TR-48355', pickup: 'Heathrow Cargo Terminal', dropoff: 'Southampton Docks', status: 'Scheduled', badge: 'warning', eta: 'Tomorrow, 08:00' },
+];
+
+const MOCK_GUEST_TRIP = { id: 'TR-90142', pickup: 'Heathrow Cargo Terminal', dropoff: 'Southampton Docks', status: 'In progress', badge: 'info', eta: 'Today, 16:00' };
+
+/* Route metadata: { flow, step, total } for progress display. null = terminal/no-flow screen. */
+const ROUTE_META = {
+  'welcome': null,
+  'self-reg-signup': { flow: 'self-reg', step: 1, total: 5 },
+  'self-reg-otp': { flow: 'self-reg', step: 2, total: 5 },
+  'self-reg-details': { flow: 'self-reg', step: 3, total: 5 },
+  'self-reg-gdpr': { flow: 'self-reg', step: 4, total: 5 },
+  'self-reg-pending': { flow: 'self-reg', step: 5, total: 5 },
+  'portal-sms': { flow: 'portal', step: 1, total: 8 },
+  'portal-install': { flow: 'portal', step: 2, total: 8 },
+  'portal-code': { flow: 'portal', step: 3, total: 8 },
+  'portal-confirm': { flow: 'portal', step: 4, total: 8 },
+  'portal-otp': { flow: 'portal', step: 5, total: 8 },
+  'portal-pin': { flow: 'portal', step: 6, total: 8 },
+  'portal-gdpr': { flow: 'portal', step: 7, total: 8 },
+  'portal-complete': { flow: 'portal', step: 8, total: 8 },
+  'returning-entry': { flow: 'returning', step: 1, total: 3 },
+  'returning-session-check': { flow: 'returning', step: 2, total: 3 },
+  'returning-tripid': { flow: 'returning', step: 2, total: 3 },
+  'returning-pin': { flow: 'returning', step: 3, total: 3 },
+  'returning-password': { flow: 'returning', step: 3, total: 3 },
+  'returning-remember': { flow: 'returning', step: 3, total: 3 },
+  'guest-sms': { flow: 'guest', step: 1, total: 3 },
+  'guest-trust': { flow: 'guest', step: 2, total: 3 },
+  'guest-scoped': { flow: 'guest', step: 3, total: 3 },
+  'dashboard': null,
+  'trip-detail': null,
+};
+
+const FLOW_FIRST_ROUTE = { 'self-reg': 'self-reg-signup', 'portal': 'portal-sms', 'returning': 'returning-entry', 'guest': 'guest-sms' };
+const FLOW_LABELS = { 'self-reg': 'Self-Registration', 'portal': 'Portal-Based (Magic Link)', 'returning': 'Returning Driver', 'guest': 'Guest / One-Off' };
 
 const TITLES = {
   'welcome': '',
@@ -31,7 +65,6 @@ const TITLES = {
   'self-reg-details': 'Your details',
   'self-reg-gdpr': 'Terms & privacy',
   'self-reg-pending': 'Almost there',
-  'self-reg-dashboard': 'Dashboard',
   'portal-sms': "You've been invited",
   'portal-install': 'Get the app',
   'portal-code': 'Enter your code',
@@ -40,11 +73,22 @@ const TITLES = {
   'portal-pin': 'Secure your account',
   'portal-gdpr': 'Terms & privacy',
   'portal-complete': "You're all set",
-  'portal-dashboard': 'Dashboard',
+  'returning-entry': 'Welcome back',
+  'returning-session-check': 'Checking your session',
+  'returning-tripid': 'New device',
+  'returning-pin': 'Quick sign-in',
+  'returning-password': 'Sign in',
+  'returning-remember': 'Almost done',
+  'guest-sms': 'Guest access',
+  'guest-trust': "You've been added",
+  'guest-scoped': 'Single-trip access',
+  'dashboard': 'Dashboard',
+  'trip-detail': 'Trip details',
 };
 
 function freshState() {
   return {
+    activeFlow: null,
     loginMethod: 'phone',
     phone: '',
     email: '',
@@ -52,12 +96,17 @@ function freshState() {
     firstName: '',
     lastName: '',
     gdprAccepted: false,
-    approved: false,
     portalCode: '',
     portalOtp: '',
     pin: '',
-    pinSkipped: false,
+    pinTarget: 'dashboard',
     portalGdprAccepted: false,
+    dashboardMode: 'full', // 'locked' | 'full' | 'guest'
+    returningTripId: '',
+    returningLastName: '',
+    returningPassword: '',
+    rememberDevice: null,
+    selectedTripId: null,
   };
 }
 
@@ -71,17 +120,17 @@ const App = {
 
   switchFlow(flow) {
     state = freshState();
-    const first = flow === 'self-reg' ? SELF_REG_FLOW[0] : PORTAL_FLOW[0];
-    this.nav(first);
+    state.activeFlow = flow;
+    this.nav(FLOW_FIRST_ROUTE[flow]);
   },
 
   restartFlow() {
-    const route = currentRoute();
+    const meta = ROUTE_META[currentRoute()];
+    const flow = state.activeFlow || (meta && meta.flow) || null;
     state = freshState();
-    if (SELF_REG_FLOW.includes(route)) {
-      this.nav(SELF_REG_FLOW[0]);
-    } else if (PORTAL_FLOW.includes(route)) {
-      this.nav(PORTAL_FLOW[0]);
+    if (flow) {
+      state.activeFlow = flow;
+      this.nav(FLOW_FIRST_ROUTE[flow]);
     } else {
       this.nav('welcome');
     }
@@ -102,6 +151,15 @@ const App = {
 
   toggle(key) {
     state[key] = !state[key];
+    render();
+  },
+
+  toggleTheme() {
+    const html = document.documentElement;
+    const goingDark = !html.classList.contains('dark');
+    html.classList.remove('light', 'dark');
+    html.classList.add(goingDark ? 'dark' : 'light');
+    try { localStorage.setItem('cca-theme', goingDark ? 'dark' : 'light'); } catch (e) { /* ignore */ }
     render();
   },
 
@@ -127,7 +185,7 @@ const App = {
     if (state.pin.length >= 4) return;
     state.pin += String(digit);
     if (state.pin.length === 4) {
-      setTimeout(() => this.nav('portal-gdpr'), 350);
+      setTimeout(() => this.nav(state.pinTarget), 350);
     }
     render();
   },
@@ -136,24 +194,41 @@ const App = {
     state.pin = state.pin.slice(0, -1);
     render();
   },
+
+  viewTrip(id) {
+    state.selectedTripId = id;
+    this.nav('trip-detail');
+  },
+
+  approveDashboard() {
+    state.dashboardMode = 'full';
+    render();
+  },
 };
 
 function currentRoute() {
   return window.location.hash.replace('#', '') || 'welcome';
 }
 
-function flowOf(route) {
-  if (SELF_REG_FLOW.includes(route)) return SELF_REG_FLOW;
-  if (PORTAL_FLOW.includes(route)) return PORTAL_FLOW;
-  return null;
-}
-
 function h(strings, ...values) {
   return strings.reduce((acc, str, i) => acc + str + (values[i] !== undefined ? values[i] : ''), '');
 }
 
+function tripCard(trip, clickable) {
+  return h`
+    <div class="card trip-card" ${clickable ? `onclick="App.viewTrip('${trip.id}')"` : ''}>
+      <div class="trip-card__top">
+        <span class="t-label-md">${trip.id}</span>
+        <span class="badge badge--${trip.badge}">${trip.status}</span>
+      </div>
+      <div class="t-body-sm t-muted">${trip.pickup} &#8594; ${trip.dropoff}</div>
+      <div class="t-body-sm t-caption">ETA ${trip.eta}</div>
+    </div>
+  `;
+}
+
 /* ---------------------------------------------------------------- */
-/* Screen renderers — each returns { content, footer, headerOverride } */
+/* Screen renderers */
 /* ---------------------------------------------------------------- */
 
 const SCREENS = {
@@ -162,12 +237,11 @@ const SCREENS = {
     hideHeader: true,
     content: h`
       <div class="hero">
-        ${LOGO_SVG}
-        <div class="t-headline-lg hero__word">CtrlChain Driver</div>
+        <img class="hero__logo" src="assets/logo-white.svg" alt="CtrlChain" />
         <div class="t-body-md hero__tagline">Moving transport forward</div>
       </div>
       <div class="t-body-md t-muted" style="padding: 0 2px;">
-        This prototype covers New Driver onboarding. Choose how the driver is joining:
+        This prototype covers driver onboarding and the dashboard. Choose an entry path:
       </div>
       <button class="choice-card" onclick="App.switchFlow('self-reg')">
         <div class="choice-card__icon">&#128241;</div>
@@ -182,6 +256,22 @@ const SCREENS = {
         <div class="choice-card__body">
           <div class="t-label-lg">Portal-Based (Magic Link)</div>
           <div class="t-body-sm t-muted">Ops adds the driver in the CCA web portal; driver claims the account via a link.</div>
+        </div>
+        <div class="choice-card__chevron">&#8250;</div>
+      </button>
+      <button class="choice-card" onclick="App.switchFlow('returning')">
+        <div class="choice-card__icon">&#128260;</div>
+        <div class="choice-card__body">
+          <div class="t-label-lg">Returning Driver</div>
+          <div class="t-body-sm t-muted">Already has an account — device-remembered quick sign-in, or a fresh device.</div>
+        </div>
+        <div class="choice-card__chevron">&#8250;</div>
+      </button>
+      <button class="choice-card" onclick="App.switchFlow('guest')">
+        <div class="choice-card__icon">&#127915;</div>
+        <div class="choice-card__body">
+          <div class="t-label-lg">Guest / One-Off Driver</div>
+          <div class="t-body-sm t-muted">Subcontracted for a single trip — scoped access, no account created.</div>
         </div>
         <div class="choice-card__chevron">&#8250;</div>
       </button>
@@ -265,39 +355,7 @@ const SCREENS = {
         </div>
       </div>
     `,
-    footer: () => h`
-      <button class="btn btn-primary" onclick="App.set('approved', false); App.nav('self-reg-dashboard')">View profile (locked)</button>
-      <button class="btn btn-text" onclick="App.set('approved', true); App.nav('self-reg-dashboard')">&#128295; Simulate: ops approved my account</button>
-    `,
-  }),
-
-  'self-reg-dashboard': () => ({
-    content: state.approved ? h`
-      <div class="center-state">
-        <div class="center-state__icon center-state__icon--success">&#10003;</div>
-        <div class="t-headline-md">You're approved!</div>
-        <span class="badge badge--success">Full trip visibility unlocked</span>
-        <div class="card" style="text-align:left; width:100%;">
-          <div class="t-label-md">${state.firstName} ${state.lastName}</div>
-          <div class="t-body-sm t-muted">${MOCK_PLANNER_RECORD.carrier}</div>
-        </div>
-        <div class="card" style="text-align:left; width:100%;">
-          <div class="t-label-md">No trips assigned yet</div>
-          <div class="t-body-sm t-muted">Your dashboard will show assigned trips here as a non-sequential list once dispatch assigns one.</div>
-        </div>
-      </div>
-    ` : h`
-      <div class="center-state">
-        <div class="center-state__icon center-state__icon--warning">&#128274;</div>
-        <div class="t-headline-md">Profile only</div>
-        <span class="badge badge--warning">Trips locked until approved</span>
-        <div class="card" style="text-align:left; width:100%;">
-          <div class="t-label-md">${state.firstName} ${state.lastName}</div>
-          <div class="t-body-sm t-muted">Awaiting carrier assignment</div>
-        </div>
-      </div>
-    `,
-    footer: () => h`<button class="btn btn-subtle" onclick="App.restartFlow()">Restart this flow</button>`,
+    footer: () => h`<button class="btn btn-primary" onclick="App.set('dashboardMode','locked'); App.nav('dashboard')">Continue to dashboard</button>`,
   }),
 
   /* ---------------- PORTAL-BASED (MAGIC LINK) ---------------- */
@@ -369,10 +427,218 @@ const SCREENS = {
       </div>
       <div class="t-body-sm t-caption">Demo: any 6 digits will verify.</div>
     `,
-    footer: () => h`<button class="btn btn-primary" ${state.portalOtp.length === 6 ? '' : 'disabled'} onclick="App.nav('portal-pin')">Verify</button>`,
+    footer: () => h`<button class="btn btn-primary" ${state.portalOtp.length === 6 ? '' : 'disabled'} onclick="App.set('pinTarget','portal-gdpr'); App.nav('portal-pin')">Verify</button>`,
   }),
 
-  'portal-pin': () => ({
+  'portal-pin': () => pinScreen(),
+
+  'portal-gdpr': () => gdprScreen('portal-complete', 'portalGdprAccepted'),
+
+  'portal-complete': () => ({
+    content: h`
+      <div class="center-state">
+        <div class="center-state__icon center-state__icon--success">&#10003;</div>
+        <div class="t-headline-md">Onboarding complete</div>
+        <div class="t-body-md t-muted">You're already associated with <strong>${MOCK_PLANNER_RECORD.carrier}</strong> — no separate approval needed.</div>
+      </div>
+    `,
+    footer: () => h`<button class="btn btn-primary" onclick="App.set('dashboardMode','full'); App.nav('dashboard')">Go to dashboard</button>`,
+  }),
+
+  /* ---------------- RETURNING DRIVER ---------------- */
+
+  'returning-entry': () => ({
+    content: h`
+      <div class="center-state">
+        <div class="center-state__icon center-state__icon--success">&#128241;</div>
+        <div class="t-headline-md">Open app</div>
+        <div class="t-body-md t-muted">In a real device, the app checks silently whether this device is already recognized. For this prototype, pick which case to explore:</div>
+      </div>
+    `,
+    footer: () => h`
+      <button class="btn btn-primary" onclick="App.nav('returning-session-check')">&#128241; Simulate: device remembered</button>
+      <button class="btn btn-secondary" onclick="App.nav('returning-tripid')">&#127760; Simulate: new / unrecognized device</button>
+    `,
+  }),
+
+  'returning-session-check': () => ({
+    content: h`
+      <div class="center-state">
+        <div class="center-state__icon center-state__icon--success">&#128274;</div>
+        <div class="t-headline-md">Device recognized</div>
+        <div class="t-body-md t-muted">No re-entry of Trip ID or last name needed. Pick which session state to explore:</div>
+      </div>
+    `,
+    footer: () => h`
+      <button class="btn btn-primary" onclick="App.set('pinTarget','dashboard'); App.set('dashboardMode','full'); App.nav('returning-pin')">Session still valid &#8594; PIN/fingerprint</button>
+      <button class="btn btn-secondary" onclick="App.nav('returning-password')">Session expired &#8594; password</button>
+    `,
+  }),
+
+  'returning-pin': () => pinScreen(),
+
+  'returning-password': () => ({
+    content: h`
+      <div class="t-body-md t-muted">Your session expired — sign in with your password to continue.</div>
+      <div class="field">
+        <label class="field__label">Password</label>
+        <input class="field__input" type="password" placeholder="&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;" value="${state.returningPassword}" oninput="App.set('returningPassword', this.value); updateFooterState();" />
+      </div>
+      <button class="btn-link">Forgot password?</button>
+    `,
+    footer: () => h`<button class="btn btn-primary" ${state.returningPassword.length >= 4 ? '' : 'disabled'} onclick="App.set('dashboardMode','full'); App.nav('dashboard')">Sign in</button>`,
+  }),
+
+  'returning-tripid': () => ({
+    content: h`
+      <div class="t-body-md t-muted">No password needed — just what your planner already has on file for this trip.</div>
+      <div class="field">
+        <label class="field__label">Trip ID</label>
+        <input class="field__input" placeholder="TR-48291" value="${state.returningTripId}" oninput="App.set('returningTripId', this.value); updateFooterState();" />
+      </div>
+      <div class="field">
+        <label class="field__label">Last name</label>
+        <input class="field__input" placeholder="Reyes" value="${state.returningLastName}" oninput="App.set('returningLastName', this.value); updateFooterState();" />
+      </div>
+    `,
+    footer: () => h`<button class="btn btn-primary" ${(state.returningTripId && state.returningLastName) ? '' : 'disabled'} onclick="App.nav('returning-remember')">Continue</button>`,
+  }),
+
+  'returning-remember': () => ({
+    content: h`
+      <div class="center-state">
+        <div class="center-state__icon center-state__icon--success">&#10003;</div>
+        <div class="t-headline-md">You're in</div>
+        <div class="t-body-md t-muted">Remember this device for next time? You won't need to re-enter Trip ID + last name again.</div>
+      </div>
+    `,
+    footer: () => h`
+      <button class="btn btn-primary" onclick="App.set('rememberDevice', true); App.set('dashboardMode','full'); App.nav('dashboard')">Yes, remember this device</button>
+      <button class="btn btn-text" onclick="App.set('rememberDevice', false); App.set('dashboardMode','full'); App.nav('dashboard')">Not now</button>
+    `,
+  }),
+
+  /* ---------------- GUEST / ONE-OFF DRIVER ---------------- */
+
+  'guest-sms': () => ({
+    content: h`
+      <div class="t-body-md t-muted">Simulating the message a subcontracted driver receives for a single trip — no account required.</div>
+      <div class="sms-mock">
+        <div class="sms-bubble">
+          <div class="t-body-md">You've been given temporary access to <strong>Trip ${MOCK_GUEST_TRIP.id}</strong> by <strong>${MOCK_PLANNER_RECORD.carrier}</strong>.</div>
+          <div class="t-body-sm sms-link" style="margin-top:8px;">app.ctrlchain.com/trip/${MOCK_GUEST_TRIP.id}?t=e91a&hellip;</div>
+        </div>
+      </div>
+      <div class="t-body-sm t-caption">Hashed, single-use token (~10-15 min validity) — app-store link sent separately if not yet installed.</div>
+    `,
+    footer: () => h`<button class="btn btn-primary" onclick="App.nav('guest-trust')">&#128241; Tap the link</button>`,
+  }),
+
+  'guest-trust': () => ({
+    content: h`
+      <div class="card card--tinted" style="text-align:center; align-items:center; padding:28px 20px;">
+        <div style="font-size:32px;">&#9989;</div>
+        <div class="t-headline-md">You've been added to Trip ${MOCK_GUEST_TRIP.id} by ${MOCK_PLANNER_RECORD.carrier}</div>
+        <div class="t-body-sm t-muted">Shown first, before anything else — so it's immediately clear who this is from and why.</div>
+      </div>
+    `,
+    footer: () => h`<button class="btn btn-primary" onclick="App.nav('guest-scoped')">Continue</button>`,
+  }),
+
+  'guest-scoped': () => ({
+    content: h`
+      <div class="center-state">
+        <div class="center-state__icon center-state__icon--success">&#128274;</div>
+        <div class="t-headline-md">Scoped single-trip access</div>
+        <div class="t-body-md t-muted">No email, no password, no account created. Access ends automatically when the trip is complete.</div>
+        ${tripCard(MOCK_GUEST_TRIP, false)}
+      </div>
+    `,
+    footer: () => h`<button class="btn btn-primary" onclick="App.set('dashboardMode','guest'); App.nav('dashboard')">Continue to trip</button>`,
+  }),
+
+  /* ---------------- SHARED DASHBOARD ---------------- */
+
+  'dashboard': () => {
+    if (state.dashboardMode === 'locked') {
+      return {
+        content: h`
+          <div class="center-state">
+            <div class="center-state__icon center-state__icon--warning">&#128274;</div>
+            <div class="t-headline-md">Profile only</div>
+            <span class="badge badge--warning">Trips locked until approved</span>
+            <div class="card" style="text-align:left; width:100%;">
+              <div class="t-label-md">${state.firstName || 'New'} ${state.lastName || 'Driver'}</div>
+              <div class="t-body-sm t-muted">Awaiting carrier assignment</div>
+            </div>
+          </div>
+        `,
+        footer: () => h`
+          <button class="btn btn-text" onclick="App.approveDashboard()">&#128295; Simulate: ops approved my account</button>
+          <button class="btn btn-subtle" onclick="App.restartFlow()">Restart this flow</button>
+        `,
+      };
+    }
+    if (state.dashboardMode === 'guest') {
+      return {
+        content: h`
+          <span class="badge badge--info">Guest access — this trip only</span>
+          <div class="t-headline-sm" style="margin-top:4px;">Your trip</div>
+          ${tripCard(MOCK_GUEST_TRIP, true)}
+          <div class="card" style="margin-top:4px;">
+            <div class="t-body-sm t-muted">This access ends automatically once the trip is marked complete — nothing to clean up.</div>
+          </div>
+        `,
+        footer: () => h`<button class="btn btn-subtle" onclick="App.restartFlow()">Restart this flow</button>`,
+      };
+    }
+    // full
+    const name = state.activeFlow === 'self-reg' ? `${state.firstName} ${state.lastName}`
+      : state.activeFlow === 'returning' ? `${MOCK_RETURNING_DRIVER.firstName} ${MOCK_RETURNING_DRIVER.lastName}`
+      : `${MOCK_PLANNER_RECORD.firstName} ${MOCK_PLANNER_RECORD.lastName}`;
+    const carrier = state.activeFlow === 'self-reg' ? MOCK_PLANNER_RECORD.carrier
+      : state.activeFlow === 'returning' ? MOCK_RETURNING_DRIVER.carrier
+      : MOCK_PLANNER_RECORD.carrier;
+    return {
+      content: h`
+        <div class="t-headline-md">Welcome, ${name.split(' ')[0] || 'driver'}</div>
+        <div class="t-body-sm t-muted">${carrier}</div>
+        <span class="badge badge--success">Full trip visibility</span>
+        <div class="t-headline-sm" style="margin-top:8px;">Your trips</div>
+        <div class="t-body-sm t-caption">Non-sequential list — tap any trip for details.</div>
+        ${MOCK_TRIPS.map(t => tripCard(t, true)).join('')}
+      `,
+      footer: () => h`<button class="btn btn-subtle" onclick="App.restartFlow()">Restart this flow</button>`,
+    };
+  },
+
+  'trip-detail': () => {
+    const trip = MOCK_TRIPS.concat([MOCK_GUEST_TRIP]).find(t => t.id === state.selectedTripId) || MOCK_TRIPS[0];
+    return {
+      content: h`
+        <span class="badge badge--${trip.badge}">${trip.status}</span>
+        <div class="card" style="width:100%;">
+          <div class="t-label-lg">${trip.id}</div>
+          <div class="t-body-md">${trip.pickup}</div>
+          <div class="t-body-sm t-caption">&#8595; pickup</div>
+          <div class="t-body-md">${trip.dropoff}</div>
+          <div class="t-body-sm t-caption">&#8593; drop-off</div>
+        </div>
+        <div class="card">
+          <div class="t-label-md">ETA</div>
+          <div class="t-body-sm t-muted">${trip.eta}</div>
+        </div>
+        <div class="card card--tinted">
+          <div class="t-body-sm t-muted">Milestone confirmation, structured exception reporting, and back-office communication for this trip are Phase 2 — not in this prototype yet.</div>
+        </div>
+      `,
+      footer: () => h`<button class="btn btn-subtle" onclick="App.back()">Back to dashboard</button>`,
+    };
+  },
+};
+
+function pinScreen() {
+  return {
     content: h`
       <div class="t-body-md t-muted" style="text-align:center;">Set a 4-digit PIN for quick sign-in next time (optional).</div>
       <div class="pin-dots">
@@ -385,41 +651,9 @@ const SCREENS = {
         <button class="pin-key" onclick="App.pinBackspace()">&#9003;</button>
       </div>
     `,
-    footer: () => h`<button class="btn btn-text" onclick="App.set('pinSkipped', true); App.nav('portal-gdpr')">Skip for now</button>`,
-  }),
-
-  'portal-gdpr': () => gdprScreen('portal-complete', 'portalGdprAccepted'),
-
-  'portal-complete': () => ({
-    content: h`
-      <div class="center-state">
-        <div class="center-state__icon center-state__icon--success">&#10003;</div>
-        <div class="t-headline-md">Onboarding complete</div>
-        <div class="t-body-md t-muted">You're already associated with <strong>${MOCK_PLANNER_RECORD.carrier}</strong> — no separate approval needed.</div>
-      </div>
-    `,
-    footer: () => h`<button class="btn btn-primary" onclick="App.nav('portal-dashboard')">Go to dashboard</button>`,
-  }),
-
-  'portal-dashboard': () => ({
-    content: h`
-      <div class="center-state">
-        <div class="center-state__icon center-state__icon--success">&#128663;</div>
-        <div class="t-headline-md">Welcome, ${MOCK_PLANNER_RECORD.firstName}</div>
-        <span class="badge badge--success">Full trip visibility</span>
-        <div class="card" style="text-align:left; width:100%;">
-          <div class="t-label-md">${MOCK_PLANNER_RECORD.firstName} ${MOCK_PLANNER_RECORD.lastName}</div>
-          <div class="t-body-sm t-muted">${MOCK_PLANNER_RECORD.carrier}</div>
-        </div>
-        <div class="card" style="text-align:left; width:100%;">
-          <div class="t-label-md">No trips assigned yet</div>
-          <div class="t-body-sm t-muted">Your dashboard will show assigned trips here as a non-sequential list once dispatch assigns one.</div>
-        </div>
-      </div>
-    `,
-    footer: () => h`<button class="btn btn-subtle" onclick="App.restartFlow()">Restart this flow</button>`,
-  }),
-};
+    footer: () => h`<button class="btn btn-text" onclick="App.nav(state.pinTarget)">Skip for now</button>`,
+  };
+}
 
 function gdprScreen(nextRoute, stateKey) {
   return {
@@ -449,29 +683,29 @@ function gdprScreen(nextRoute, stateKey) {
 function updateFooterState() {
   const footerEl = document.querySelector('.app-footer');
   const screen = SCREENS[currentRoute()];
-  if (footerEl && screen && screen().footer) {
-    footerEl.innerHTML = screen().footer();
+  if (footerEl && screen) {
+    const rendered = screen();
+    if (rendered.footer) footerEl.innerHTML = rendered.footer();
   }
 }
 
 function render() {
   const route = currentRoute();
   const screen = SCREENS[route] ? SCREENS[route]() : SCREENS['welcome']();
-  const flow = flowOf(route);
-  const canGoBack = flow ? flow.indexOf(route) > 0 : false;
+  const meta = ROUTE_META[route];
+  const canGoBack = route !== 'welcome';
 
   let headerHtml = '';
   if (!screen.hideHeader) {
-    const stepIndex = flow ? flow.indexOf(route) : -1;
-    const progressPct = flow ? Math.round(((stepIndex + 1) / flow.length) * 100) : 0;
+    const progressPct = meta ? Math.round((meta.step / meta.total) * 100) : 0;
     headerHtml = h`
       <div class="app-header">
         <div class="app-header__row">
           <button class="app-header__back" onclick="App.back()" ${canGoBack ? '' : 'style="visibility:hidden"'}>&#8592;</button>
           <div class="app-header__title t-headline-md">${TITLES[route] || ''}</div>
-          ${flow ? h`<div class="app-header__step t-body-sm">${stepIndex + 1} / ${flow.length}</div>` : ''}
+          ${meta ? h`<div class="app-header__step t-body-sm">${meta.step} / ${meta.total}</div>` : ''}
         </div>
-        ${flow ? h`<div class="app-progress"><div class="app-progress__fill" style="width:${progressPct}%"></div></div>` : ''}
+        ${meta ? h`<div class="app-progress"><div class="app-progress__fill" style="width:${progressPct}%"></div></div>` : ''}
       </div>
     `;
   }
@@ -485,10 +719,15 @@ function render() {
   `;
 
   document.querySelectorAll('.proto-flow-btn').forEach(btn => {
-    const isActive = (btn.dataset.flow === 'self-reg' && SELF_REG_FLOW.includes(route))
-      || (btn.dataset.flow === 'portal' && PORTAL_FLOW.includes(route));
-    btn.classList.toggle('is-active', isActive);
+    btn.classList.toggle('is-active', state.activeFlow === btn.dataset.flow);
   });
+
+  const themeBtn = document.querySelector('.proto-theme-btn');
+  if (themeBtn) {
+    const isDark = document.documentElement.classList.contains('dark');
+    themeBtn.textContent = isDark ? '☀️ Light' : '🌙 Dark';
+    themeBtn.title = isDark ? 'Switch to light theme' : 'Switch to dark theme';
+  }
 }
 
 window.addEventListener('hashchange', render);
