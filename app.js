@@ -36,6 +36,7 @@ function currentPortalRecord() {
 /* Route metadata: { flow, step, total } for progress display. null = terminal/no-flow screen. */
 const ROUTE_META = {
   'welcome': null,
+  'self-reg-welcome': null,
   'self-reg-signup': { flow: 'self-reg', step: 1, total: 7 },
   'self-reg-otp': { flow: 'self-reg', step: 2, total: 7 },
   'self-reg-password': { flow: 'self-reg', step: 3, total: 7 },
@@ -63,11 +64,12 @@ const ROUTE_META = {
   'trip-detail': null,
 };
 
-const FLOW_FIRST_ROUTE = { 'self-reg': 'self-reg-signup', 'portal': 'portal-sms', 'returning': 'returning-entry', 'guest': 'guest-sms' };
+const FLOW_FIRST_ROUTE = { 'self-reg': 'self-reg-welcome', 'portal': 'portal-sms', 'returning': 'returning-entry', 'guest': 'guest-sms' };
 const FLOW_LABELS = { 'self-reg': 'Self-Registration', 'portal': 'Portal-Based (Magic Link)', 'returning': 'Returning Driver', 'guest': 'Guest / One-Off' };
 
 const TITLES = {
   'welcome': '',
+  'self-reg-welcome': '',
   'self-reg-signup': 'Create your account',
   'self-reg-otp': 'Verify your number',
   'self-reg-password': 'Set a password',
@@ -288,6 +290,28 @@ const SCREENS = {
   }),
 
   /* ---------------- SELF-REGISTRATION ---------------- */
+
+  'self-reg-welcome': () => ({
+    hideHeader: true,
+    transparentStatusBar: true,
+    content: h`
+      <div class="launch-hero">
+        <div class="launch-hero__sheen"></div>
+        <div class="launch-hero__body">
+          <div class="launch-hero__mark">
+            <span class="launch-hero__mark-ring"></span>
+            <img class="launch-hero__icon" src="assets/logo-icon-white.svg" alt="" />
+          </div>
+          <div class="launch-hero__wordmark">CtrlChain</div>
+          <div class="launch-hero__tagline">Moving transport forward</div>
+        </div>
+        <div class="launch-hero__actions">
+          <button class="btn btn-primary" onclick="App.nav('self-reg-signup')">Get started</button>
+          <button class="btn-link launch-hero__signin" onclick="App.switchFlow('returning')">Already have an account? Sign in</button>
+        </div>
+      </div>
+    `,
+  }),
 
   'self-reg-signup': () => ({
     content: h`
@@ -746,6 +770,9 @@ function render() {
   }
 
   const footerHtml = screen.footer ? h`<div class="app-footer">${screen.footer()}</div>` : '';
+
+  const statusBar = document.querySelector('.status-bar');
+  if (statusBar) statusBar.classList.toggle('status-bar--overlay', !!screen.transparentStatusBar);
 
   document.getElementById('app').innerHTML = h`
     ${headerHtml}

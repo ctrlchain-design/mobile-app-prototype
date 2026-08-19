@@ -179,6 +179,13 @@ button { font-family: inherit; }
   min-height: 0;
   background: var(--surface-neutral-light);
 }
+.status-bar--overlay {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  background: transparent;
+  color: #fff;
+  z-index: 5;
+}
 
 /* ---------- App header (back / title / progress) ---------- */
 .app-header {
@@ -463,6 +470,97 @@ button { font-family: inherit; }
 }
 .hero__logo { width: 168px; height: auto; }
 .hero__tagline { color: var(--color-green-300); }
+
+/* ---------- Launch hero (Self-Registration entry — full-bleed, edge-to-edge) ---------- */
+.launch-hero {
+  position: relative;
+  margin: -4px calc(-1 * var(--space-screen-margin)) calc(-1 * var(--space-section-gap));
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  color: #fff;
+  text-align: center;
+}
+.launch-hero::before {
+  content: '';
+  position: absolute;
+  inset: -6%;
+  background-image: url('assets/hero-truck.jpeg');
+  background-size: cover;
+  background-position: center 55%;
+  animation: launch-hero-zoom 24s ease-in-out infinite alternate;
+  z-index: 0;
+}
+.launch-hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(6,12,9,0.25) 0%, rgba(6,12,9,0.55) 55%, rgba(6,12,9,0.94) 100%);
+  z-index: 1;
+}
+@keyframes launch-hero-zoom {
+  0% { transform: scale(1); }
+  100% { transform: scale(1.12); }
+}
+.launch-hero__sheen {
+  position: absolute;
+  inset: -20% -60%;
+  background: linear-gradient(115deg, transparent 40%, rgba(255,255,255,0.10) 48%, rgba(255,255,255,0.18) 50%, rgba(255,255,255,0.10) 52%, transparent 60%);
+  animation: launch-hero-sheen 7s ease-in-out infinite;
+  z-index: 1;
+  pointer-events: none;
+}
+@keyframes launch-hero-sheen {
+  0%, 100% { transform: translateX(-35%); }
+  50% { transform: translateX(35%); }
+}
+.launch-hero__body {
+  position: relative;
+  z-index: 2;
+  padding: 80px 28px 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+.launch-hero__mark {
+  position: relative;
+  width: 76px;
+  height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.launch-hero__mark-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255,255,255,0.55);
+  animation: launch-hero-pulse 2.6s ease-out infinite;
+}
+@keyframes launch-hero-pulse {
+  0% { transform: scale(0.85); opacity: 0.9; }
+  70% { transform: scale(1.6); opacity: 0; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+.launch-hero__icon { width: 40px; height: 40px; position: relative; z-index: 1; }
+.launch-hero__wordmark { font-size: 30px; font-weight: 700; letter-spacing: -0.01em; }
+.launch-hero__tagline { color: var(--color-green-300); font-size: var(--type-body-md-size); }
+.launch-hero__actions {
+  position: relative;
+  z-index: 2;
+  padding: 0 24px 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.launch-hero__actions .btn-primary { box-shadow: 0 8px 24px rgba(0,0,0,0.35); }
+.launch-hero__signin { color: #fff; text-decoration: underline; margin: 0 auto; }
 
 /* ---------- Trip cards (dashboard) ---------- */
 .trip-card { cursor: pointer; gap: 4px; }
