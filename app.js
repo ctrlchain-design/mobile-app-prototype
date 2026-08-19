@@ -90,6 +90,10 @@ const ROUTE_META = {
   'guest-sms': { flow: 'guest', step: 1, total: 3 },
   'guest-trust': { flow: 'guest', step: 2, total: 3 },
   'guest-scoped': { flow: 'guest', step: 3, total: 3 },
+  'location-priming': null,
+  'location-os-prompt-1': null,
+  'location-os-prompt-2': null,
+  'location-denied': null,
   'dashboard': null,
   'trip-detail': null,
 };
@@ -149,6 +153,7 @@ function freshState() {
     returningPassword: '',
     reactivating: false,
     selectedTripId: null,
+    locationPermission: null, // null | 'always' | 'while-using' | 'denied'
   };
 }
 
@@ -234,7 +239,13 @@ const App = {
     if (state.pin.length >= 4) return;
     state.pin += String(digit);
     if (state.pin.length === 4) {
-      setTimeout(() => this.nav(state.pinTarget), 350);
+      setTimeout(() => {
+        if (state.pinTarget === 'dashboard') {
+          this.enterDashboard(state.dashboardMode);
+        } else {
+          this.nav(state.pinTarget);
+        }
+      }, 350);
     }
     render();
   },
@@ -251,7 +262,23 @@ const App = {
 
   approveDashboard() {
     state.dashboardMode = 'full';
-    render();
+    if (!state.locationPermission) {
+      this.nav('location-priming');
+    } else {
+      render();
+    }
+  },
+
+  /* Single entry point for "land on the dashboard" — the moment of first real
+     trip visibility, and per permission-priming best practice, the right moment
+     to ask for location access rather than asking blindly during onboarding. */
+  enterDashboard(mode) {
+    state.dashboardMode = mode;
+    if (!state.locationPermission) {
+      this.nav('location-priming');
+    } else {
+      this.nav('dashboard');
+    }
   },
 };
 
@@ -553,7 +580,7 @@ const SCREENS = {
           <div class="t-body-md t-muted">You're ${state.reactivating ? 'back in, still' : 'already'} associated with <strong>${record.carrier}</strong> — no separate approval needed.</div>
         </div>
       `,
-      footer: () => h`<button class="btn btn-primary" onclick="App.set('dashboardMode','full'); App.nav('dashboard')">Go to dashboard</button>`,
+      footer: () => h`<button class="btn btn-primary" onclick="App.enterDashboard('full')">Go to dashboard</button>`,
     };
   },
 
@@ -595,7 +622,7 @@ const SCREENS = {
       </div>
       <button class="btn-link">Forgot password?</button>
     `,
-    footer: () => h`<button class="btn btn-primary" ${(state.returningEmail.includes('@') && state.returningPassword.length >= 4) ? '' : 'disabled'} onclick="App.set('dashboardMode','full'); App.nav('dashboard')">Sign in</button>`,
+    footer: () => h`<button class="btn btn-primary" ${(state.returningEmail.includes('@') && state.returningPassword.length >= 4) ? '' : 'disabled'} onclick="App.enterDashboard('full')">Sign in</button>`,
   }),
 
   'returning-request-activation': () => ({
@@ -656,7 +683,80 @@ const SCREENS = {
         ${tripCard(MOCK_GUEST_TRIP, false)}
       </div>
     `,
-    footer: () => h`<button class="btn btn-primary" onclick="App.set('dashboardMode','guest'); App.nav('dashboard')">Continue to trip</button>`,
+    footer: () => h`<button class="btn btn-primary" onclick="App.enterDashboard('guest')">Continue to trip</button>`,
+  }),
+
+  /* ---------------- LOCATION PERMISSION PRIMING ----------------
+     Shown once, contextually, the first time a driver would actually see a
+     real trip — not blindly during onboarding. Requests "Always" because V1's
+     geofence-assisted arrival detection only works with the app backgrounded;
+     "While Using" can't support that. The native-style screens deliberately
+     model iOS's real two-step Always flow (first ask never offers Always
+     outright) since that's exactly what CtrlChain's own app has shipped bugs
+     around before (re-prompting after already granted, going "active" without
+     real permission) — see onboarding-design-decisions.md. */
+
+  'location-priming': () => ({
+    hideHeader: true,
+    content: h`
+      <div class="center-state">
+        <div class="center-state__icon center-state__icon--success">&#128205;</div>
+        <div class="t-headline-md">Enable location for automatic tracking</div>
+        <div class="t-body-md t-muted">CtrlChain uses your location to automatically detect pickup arrival and share live ETA — so you're not manually updating every milestone. Updates are sent periodically, not continuously, to save battery.</div>
+      </div>
+    `,
+    footer: () => h`
+      <button class="btn btn-primary" onclick="App.nav('location-os-prompt-1')">Enable location</button>
+      <button class="btn-text" onclick="App.set('locationPermission','while-using'); App.nav('dashboard')">Not now</button>
+    `,
+  }),
+
+  'location-os-prompt-1': () => ({
+    hideHeader: true,
+    content: h`
+      <div class="os-alert-backdrop">
+        <div class="os-alert">
+          <div class="os-alert__title">Allow &ldquo;CtrlChain&rdquo; to use your location?</div>
+          <div class="os-alert__message">Your location is used to detect pickup arrival and share live trip updates with your carrier.</div>
+          <div class="os-alert__actions">
+            <button class="os-alert__btn" onclick="App.set('locationPermission','while-using'); App.nav('location-os-prompt-2')">Allow Once</button>
+            <button class="os-alert__btn" onclick="App.set('locationPermission','while-using'); App.nav('location-os-prompt-2')">Allow While Using App</button>
+            <button class="os-alert__btn os-alert__btn--muted" onclick="App.set('locationPermission','denied'); App.nav('location-denied')">Don't Allow</button>
+          </div>
+        </div>
+      </div>
+    `,
+  }),
+
+  'location-os-prompt-2': () => ({
+    hideHeader: true,
+    content: h`
+      <div class="os-alert-backdrop">
+        <div class="os-alert">
+          <div class="os-alert__title">Allow &ldquo;CtrlChain&rdquo; to also access your location even when you're not using the app?</div>
+          <div class="os-alert__message">This lets CtrlChain detect your arrival automatically, even if the app isn't open while you're driving.</div>
+          <div class="os-alert__actions">
+            <button class="os-alert__btn os-alert__btn--muted" onclick="App.nav('dashboard')">Keep Only While Using</button>
+            <button class="os-alert__btn" onclick="App.set('locationPermission','always'); App.nav('dashboard')">Change to Always Allow</button>
+          </div>
+        </div>
+      </div>
+    `,
+  }),
+
+  'location-denied': () => ({
+    hideHeader: true,
+    content: h`
+      <div class="center-state">
+        <div class="center-state__icon center-state__icon--warning">&#9888;</div>
+        <div class="t-headline-md">Location access needed</div>
+        <div class="t-body-md t-muted">Without location access, arrival and ETA won't update automatically — you'll need to confirm each milestone manually. You can enable it anytime in Settings.</div>
+      </div>
+    `,
+    footer: () => h`
+      <button class="btn btn-primary" onclick="App.nav('location-priming')">&#128241; Simulate: return from Settings, try again</button>
+      <button class="btn-text" onclick="App.nav('dashboard')">Continue without location</button>
+    `,
   }),
 
   /* ---------------- SHARED DASHBOARD ---------------- */
@@ -684,6 +784,7 @@ const SCREENS = {
     if (state.dashboardMode === 'guest') {
       return {
         content: h`
+          ${trackingStatusBanner()}
           <span class="badge badge--info">Guest access — this trip only</span>
           <div class="t-headline-sm" style="margin-top:4px;">Your trip</div>
           ${tripCard(MOCK_GUEST_TRIP, true)}
@@ -703,6 +804,7 @@ const SCREENS = {
       : MOCK_PLANNER_RECORD.carrier;
     return {
       content: h`
+        ${trackingStatusBanner()}
         <div class="t-headline-md">Welcome, ${name.split(' ')[0] || 'driver'}</div>
         <div class="t-body-sm t-muted">${carrier}</div>
         <span class="badge badge--success">Full trip visibility</span>
@@ -820,6 +922,18 @@ function oauthConsentScreen(provider) {
       </div>
     `,
   };
+}
+
+function trackingStatusBanner() {
+  if (state.locationPermission === 'always') {
+    return h`<div class="tracking-pill tracking-pill--active">&#128205; Automatic tracking active</div>`;
+  }
+  return h`
+    <div class="tracking-pill tracking-pill--limited">
+      <span>&#9888; Background tracking limited — arrival won't auto-detect.</span>
+      <button type="button" class="tracking-pill__fix" onclick="App.nav('location-priming')">Fix</button>
+    </div>
+  `;
 }
 
 /* ---------------------------------------------------------------- */
