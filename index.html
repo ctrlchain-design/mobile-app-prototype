@@ -18,9 +18,12 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet" />
 <link rel="icon" href="assets/logo-icon.svg" />
-<link rel="stylesheet" href="colors.css" />
-<link rel="stylesheet" href="themes.css" />
-<link rel="stylesheet" href="styles.css" />
+<!-- GitHub Pages caches these for 10 min (Cache-Control: max-age=600). Bump ?v=N
+     on every deploy that changes styles.css/app.js so reviewers don't see stale
+     content right after an update. -->
+<link rel="stylesheet" href="colors.css?v=3" />
+<link rel="stylesheet" href="themes.css?v=3" />
+<link rel="stylesheet" href="styles.css?v=3" />
 </head>
 <body>
 
@@ -46,6 +49,6 @@
 
   <p class="proto-footnote">CtrlChain Driver App — onboarding prototype for stakeholder review. Not production code.</p>
 
-<script src="app.js"></script>
+<script src="app.js?v=3"></script>
 </body>
 </html>
