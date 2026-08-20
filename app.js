@@ -59,22 +59,24 @@ function deliveryStages(etaTime) {
 /* The one trip a driver is actually transporting right now. Modelled as an array
    (see activeTripSection()) so the UI scales to more than one — Samuel's call,
    even though V1 only ever has a single truck / single active trip in practice.
-   TRIP2026-000123 tells one coherent story: stop 1 fully done, stop 2 mid-flight
-   (arrived, awaiting confirm — everything after it is genuinely blocked), stop 3
-   not yet reached. */
+   TRIP2026-000123 tells one coherent story, and — per the kickoff doc, V1
+   scope is the *pickup* flow specifically — the default active stop is the
+   pickup, mid-flight (arrived, awaiting confirm), not a later delivery stop:
+   that's the moment V1's milestone confirmation/geofence-validation work is
+   actually about. Everything downstream of it is genuinely still blocked. */
 const MOCK_ACTIVE_TRIPS = [
   {
     id: 'TRIP2026-000123',
-    activeStopId: 'STOP-2',
+    activeStopId: 'STOP-1',
     stops: [
       {
         id: 'STOP-1', type: 'pickup', location: 'Meridian Distribution Centre, Coventry', appointment: 'Today, 08:00',
         orders: [{ id: 'ORD-8841937', ref: 'PO-33210' }],
         milestones: (() => {
           const s = pickupStages('07:55');
-          s[1].status = 'confirmed'; s[1].source = 'automated'; s[1].timestamp = '08:02';
-          s[2].status = 'confirmed'; s[2].source = 'manual'; s[2].timestamp = '08:20';
-          s[3].status = 'confirmed'; s[3].source = 'automated'; s[3].timestamp = '08:30';
+          // Geofence fired 2 minutes early against the calculated ETA — a real
+          // case for the timestamp-edit feature, not just a round number.
+          s[1].status = 'proposed'; s[1].source = 'automated'; s[1].timestamp = '08:02';
           return s;
         })(),
         exceptions: [],
@@ -85,13 +87,7 @@ const MOCK_ACTIVE_TRIPS = [
           { id: 'ORD-8841937', ref: 'PO-33210', podUploaded: false },
           { id: 'ORD-8841938', ref: 'PO-33211', podUploaded: false },
         ],
-        milestones: (() => {
-          const s = deliveryStages('14:30');
-          // Geofence fired 2 minutes early against the calculated ETA — a real
-          // case for the timestamp-edit feature, not just a round number.
-          s[1].status = 'proposed'; s[1].source = 'automated'; s[1].timestamp = '14:28';
-          return s;
-        })(),
+        milestones: deliveryStages('14:30'),
         exceptions: [],
       },
       {
@@ -119,16 +115,14 @@ const MOCK_TRIP_HISTORY = [
 
 const MOCK_GUEST_TRIP = {
   id: 'TRIP2026-000142',
-  activeStopId: 'STOP-G2',
+  activeStopId: 'STOP-G1',
   stops: [
     {
       id: 'STOP-G1', type: 'pickup', location: 'Heathrow Cargo Terminal', appointment: 'Today, 13:00',
       orders: [{ id: 'ORD-9001', ref: 'GT-142' }],
       milestones: (() => {
         const s = pickupStages('12:55');
-        s[1].status = 'confirmed'; s[1].source = 'automated'; s[1].timestamp = '13:04';
-        s[2].status = 'confirmed'; s[2].source = 'manual'; s[2].timestamp = '13:30';
-        s[3].status = 'confirmed'; s[3].source = 'automated'; s[3].timestamp = '13:35';
+        s[1].status = 'proposed'; s[1].source = 'automated'; s[1].timestamp = '13:04';
         return s;
       })(),
       exceptions: [],
@@ -136,11 +130,7 @@ const MOCK_GUEST_TRIP = {
     {
       id: 'STOP-G2', type: 'delivery', location: 'Southampton Docks', appointment: 'Today, 16:00',
       orders: [{ id: 'ORD-9001', ref: 'GT-142', podUploaded: false }],
-      milestones: (() => {
-        const s = deliveryStages('16:00');
-        s[1].status = 'proposed'; s[1].source = 'automated'; s[1].timestamp = '15:58';
-        return s;
-      })(),
+      milestones: deliveryStages('16:00'),
       exceptions: [],
     },
   ],
