@@ -962,6 +962,15 @@ button { font-family: inherit; }
 .approval-banner__icon { font-size: 22px; line-height: 1; flex-shrink: 0; }
 .approval-banner__text { display: flex; flex-direction: column; gap: 2px; }
 .approval-banner__text .t-body-sm { color: var(--warning-text); }
+.approval-banner__ref {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--warning-border-light);
+  font-size: var(--type-body-sm-size);
+  font-weight: 600;
+  color: var(--warning-text);
+}
+.approval-banner__ref .t-caption { font-weight: 400; }
 
 .empty-state {
   display: flex;
@@ -1021,16 +1030,22 @@ button { font-family: inherit; }
    once "Pickup · <long shipper name>, <city>" wraps to two lines, a dot fixed
    at top:6px no longer sits anywhere near the title's actual vertical center. */
 .stop-item::before {
-  content: ''; position: absolute; left: 4px; top: 0; bottom: -2px; width: 2px;
+  content: ''; position: absolute; left: 7px; top: 0; bottom: -2px; width: 2px;
   background: var(--border-neutral-default);
 }
 .stop-item:last-child::before { display: none; }
+/* Bigger than the nested stage dots (16px vs 8px) so the outer/inner
+   hierarchy is legible at a glance, not just implied by indentation. A
+   completed stop gets an actual checkmark glyph inside it, not just a color
+   change — color alone reads as a rendering glitch as easily as a status. */
 .stop-item__dot {
-  width: 10px; height: 10px; flex-shrink: 0;
+  width: 16px; height: 16px; flex-shrink: 0;
   margin-left: -20px; /* pull back into the line's gutter, out of the summary's own padding */
   border-radius: 50%; background: var(--color-neutrals-300); border: 2px solid var(--surface-neutral-light);
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 10px;
 }
-.stop-item--active .stop-item__dot { background: var(--surface-brand-default); }
+.stop-item--active .stop-item__dot { background: var(--surface-brand-default); box-shadow: 0 0 0 3px var(--surface-brand-lighter); }
 .stop-item--completed .stop-item__dot { background: var(--success-surface); }
 
 .stop-summary { display: flex; align-items: center; gap: 10px; cursor: pointer; width: 100%; padding: 6px 0; }
@@ -1060,7 +1075,7 @@ button { font-family: inherit; }
 .stage-item__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .stage-item__label-line { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .stage-item__action { flex-shrink: 0; }
-.stage-item__check { color: var(--success-text); font-weight: 600; }
+.stage-item__check { color: var(--success-text); font-size: 20px; }
 .stage-item__sub { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
 
 /* Pallet-exchange mismatch — Corax's extracted count vs what was expected,

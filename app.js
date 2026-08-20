@@ -167,6 +167,13 @@ function deepClone(value) {
 /* 8 digits, not 6 — backend preference, harder to brute-force than a 6-digit code. */
 const MOCK_ACTIVATION_CODE = '48213976';
 
+/* Sent by email/SMS the moment self-registration completes, alongside the
+   confirmation that ops now has the driver's details to review — this is
+   the one concrete thing a driver can act on while waiting: quote it if
+   they contact their carrier's back office about a delay, rather than
+   having no way to reference the request at all. */
+const MOCK_REGISTRATION_REF = 'REG2026-48213';
+
 /* Mocked native OAuth account-chooser sheets — one per social provider, styled after
    each provider's real embedded sign-in UI rather than CCA's own visual system. */
 const OAUTH_PROVIDERS = {
@@ -211,11 +218,10 @@ const ROUTE_META = {
   // in CtrlChain's own onboarding, so neither gets progress-bar chrome.
   'portal-sms': null,
   'portal-install': null,
-  'portal-code': { flow: 'portal', step: 1, total: 5 },
-  'portal-confirm': { flow: 'portal', step: 2, total: 5 },
-  'portal-pin': { flow: 'portal', step: 3, total: 5 },
-  'portal-gdpr': { flow: 'portal', step: 4, total: 5 },
-  'portal-complete': { flow: 'portal', step: 5, total: 5 },
+  'portal-code': { flow: 'portal', step: 1, total: 4 },
+  'portal-confirm': { flow: 'portal', step: 2, total: 4 },
+  'portal-pin': { flow: 'portal', step: 3, total: 4 },
+  'portal-gdpr': { flow: 'portal', step: 4, total: 4 },
   'returning-entry': { flow: 'returning', step: 1, total: 2 },
   'returning-pin': { flow: 'returning', step: 2, total: 2 },
   'returning-password': { flow: 'returning', step: 2, total: 2 },
@@ -251,7 +257,6 @@ const TITLES = {
   'portal-confirm': 'Confirm your details',
   'portal-pin': 'Secure your account',
   'portal-gdpr': 'Terms & privacy',
-  'portal-complete': "You're all set",
   'returning-entry': 'Welcome back',
   'returning-pin': 'Quick sign-in',
   'returning-password': 'Session expired',
@@ -339,6 +344,11 @@ const App = {
     state = freshState();
     navHistory = [];
     state.activeFlow = flow;
+    // A returning driver already granted location on their first onboarding —
+    // that grant persists at the OS level, so there's nothing to (re-)ask on
+    // a normal sign-in. See the reviewer note on returning-entry for the
+    // actual conditions that would retrigger it for real.
+    if (flow === 'returning') state.locationPermission = 'always';
     // setHash, not this.nav — nav() would push the pre-reset route onto the
     // (just-cleared) history, letting "back" step into a screen this fresh
     // state no longer matches.
@@ -352,6 +362,7 @@ const App = {
     navHistory = [];
     if (flow) {
       state.activeFlow = flow;
+      if (flow === 'returning') state.locationPermission = 'always';
       setHash(FLOW_FIRST_ROUTE[flow]);
     } else {
       setHash('self-reg-welcome');
@@ -678,6 +689,7 @@ function completeMilestone(trip, stop, index) {
   const m = stop.milestones[index];
   m.status = 'confirmed';
   if (!m.timestamp) m.timestamp = formatNowTime();
+  if (m.kind === 'manual' && !m.source) m.source = 'manual';
 
   const next = stop.milestones[index + 1];
   if (next && next.status === 'pending') {
@@ -770,14 +782,15 @@ function stopItem(trip, stop) {
     <div class="stop-item stop-item--${status}">
       <sl-details ${expanded ? 'open' : ''} onclick="if (event.target.closest('sl-details') === this && event.target.closest('[data-role=summary]')) App.toggleExpand('${stop.id}', ${expanded})">
         <div slot="summary" data-role="summary" class="stop-summary">
-          <span class="stop-item__dot"></span>
+          <span class="stop-item__dot">${status === 'completed' ? h`<sl-icon name="check-lg"></sl-icon>` : ''}</span>
           <div class="stop-summary__main">
             <div class="stop-summary__title">
               <span class="t-label-md">${stop.type === 'pickup' ? 'Pickup' : 'Delivery'} &middot; ${stop.location}</span>
-              ${stop.exceptions.length ? h`<span class="exception-flag" title="Exception reported">&#9888;</span>` : ''}
+              ${stop.exceptions.length ? h`<sl-icon class="exception-flag" name="exclamation-triangle" title="Exception reported"></sl-icon>` : ''}
             </div>
             <div class="stop-summary__meta">
               <span class="t-body-sm t-caption">${stop.appointment}</span>
+              ${status === 'completed' ? h`<span class="badge badge--success">Completed</span>` : ''}
               ${orderCount > 1 ? h`<span class="badge badge--info">${orderCount} orders</span>` : ''}
             </div>
           </div>
@@ -785,12 +798,23 @@ function stopItem(trip, stop) {
         <div class="stop-body">
           <div class="stage-list">${stop.milestones.map(m => stageItem(trip, stop, m)).join('')}</div>
           <button type="button" class="report-issue-link" onclick="App.openExceptionSheet('${trip.id}','${stop.id}')">
-            <span aria-hidden="true">&#9888;</span> Report an issue with this stop
+            <sl-icon name="exclamation-triangle" aria-hidden="true"></sl-icon> Report an issue with this stop
           </button>
         </div>
       </sl-details>
     </div>
   `;
+}
+
+/* "Automated" was papering over two genuinely different mechanisms: a
+   geofence detecting arrival/departure vs. Corax extracting a pallet count
+   from paperwork. Naming the actual mechanism is more meaningful to a driver
+   than the generic word — and more honest, since they're really not the same
+   thing under the hood. */
+function stageSourceLabel(m) {
+  if (m.source === 'manual') return 'Manual';
+  if (m.source === 'automated') return m.kind === 'auto' ? 'Geofence' : 'Automated';
+  return '';
 }
 
 /* One stage in a stop's lifecycle — see pickupStages()/deliveryStages() for
@@ -822,17 +846,20 @@ function stageItem(trip, stop, m) {
       </div>
     `;
   } else if (m.kind === 'eta') {
-    right = h`<span class="t-body-sm t-caption">${m.timestamp}</span>`;
+    // Still a system-calculated estimate, not a detected event — but a
+    // driver on the road often knows better than the ETA engine, so it's
+    // editable like everything else, just labeled for what it actually is.
+    right = h`<span class="t-body-sm t-caption"><button type="button" class="timestamp-btn" onclick="App.startEditTimestamp('${stop.id}','${m.id}')">${m.timestamp}</button> &middot; System calculated</span>`;
   } else if (m.status === 'pending') {
     right = h`<span class="t-body-sm t-caption">Not yet reached</span>`;
   } else if (!m.timestamp) {
     right = h`<span class="t-body-sm t-caption">Awaiting driver</span>`;
   } else if (m.kind === 'pallet-exchange') {
     const sourceLabel = m.source === 'automated' ? 'Automated match' : 'Driver-confirmed';
-    right = h`<span class="t-body-sm t-caption">${m.actualCount} pallets &middot; ${sourceLabel} &middot; <button type="button" class="timestamp-btn" onclick="App.startEditTimestamp('${stop.id}','${m.id}')">${m.timestamp}</button></span>`;
+    right = h`<span class="t-body-sm t-caption"><button type="button" class="timestamp-btn" onclick="App.startEditTimestamp('${stop.id}','${m.id}')">${m.timestamp}</button> &middot; ${sourceLabel} &middot; ${m.actualCount} pallets</span>`;
   } else {
-    const sourceLabel = m.source === 'automated' ? 'Automated' : m.source === 'manual' ? 'Manual' : '';
-    right = h`<span class="t-body-sm t-caption">${sourceLabel ? sourceLabel + ' &middot; ' : ''}<button type="button" class="timestamp-btn" onclick="App.startEditTimestamp('${stop.id}','${m.id}')">${m.timestamp}</button></span>`;
+    const sourceLabel = stageSourceLabel(m);
+    right = h`<span class="t-body-sm t-caption"><button type="button" class="timestamp-btn" onclick="App.startEditTimestamp('${stop.id}','${m.id}')">${m.timestamp}</button>${sourceLabel ? ' &middot; ' + sourceLabel : ''}</span>`;
   }
 
   let action = '';
@@ -844,7 +871,7 @@ function stageItem(trip, stop, m) {
     } else if (m.status === 'ready' && m.kind === 'manual') {
       action = h`<sl-button size="small" variant="primary" onclick="App.markManualDone('${trip.id}','${stop.id}','${m.id}')">Mark done</sl-button>`;
     } else if (m.status === 'confirmed') {
-      action = h`<span class="stage-item__check">&#10003;</span>`;
+      action = h`<sl-icon class="stage-item__check" name="check-circle-fill" title="Done"></sl-icon>`;
     }
   }
 
@@ -873,7 +900,7 @@ function orderRow(trip, stop, order) {
         <span class="t-body-sm t-caption">${order.podUploaded ? 'POD uploaded' : 'POD not yet uploaded'}</span>
       </div>
       ${order.podUploaded
-        ? h`<span class="badge badge--success">&#10003; Done</span>`
+        ? h`<span class="badge badge--success"><sl-icon name="check2"></sl-icon> Done</span>`
         : h`<sl-button size="small" onclick="App.openPodSheet('${trip.id}','${stop.id}','${order.id}')">Upload POD</sl-button>`}
     </div>
   `;
@@ -1012,16 +1039,16 @@ function notificationItems() {
     trip.stops.forEach(stop => {
       stop.milestones.forEach(m => {
         if (m.status === 'proposed') {
-          items.push({ icon: '📍', tone: 'warning', text: `${m.label} detected at ${stop.location} — confirm to continue`, time: m.timestamp });
+          items.push({ icon: 'geo-alt', tone: 'warning', text: `${m.label} detected at ${stop.location} — confirm to continue`, time: m.timestamp });
         }
       });
       stop.exceptions.forEach(e => {
-        items.push({ icon: '⚠️', tone: 'critical', text: `${e.type} reported at ${stop.location}`, time: '' });
+        items.push({ icon: 'exclamation-triangle', tone: 'critical', text: `${e.type} reported at ${stop.location}`, time: '' });
       });
     });
   });
   state.scheduledTrips.forEach(t => {
-    items.push({ icon: '📅', tone: 'info', text: `Trip ${t.id} scheduled — ${t.pickup} → ${t.dropoff}`, time: t.eta });
+    items.push({ icon: 'calendar-event', tone: 'info', text: `Trip ${t.id} scheduled — ${t.pickup} → ${t.dropoff}`, time: t.eta });
   });
   return items;
 }
@@ -1029,7 +1056,7 @@ function notificationItems() {
 function notificationRow(item) {
   return h`
     <div class="card notification-row">
-      <span class="notification-row__icon">${item.icon}</span>
+      <sl-icon class="notification-row__icon" name="${item.icon}"></sl-icon>
       <div class="notification-row__body">
         <div class="t-body-md">${item.text}</div>
         ${item.time ? h`<div class="t-body-sm t-caption">${item.time}</div>` : ''}
@@ -1043,10 +1070,10 @@ function notificationRow(item) {
    guest access stays deliberately minimal (single trip, no account, no nav),
    and the locked/pending-approval state has nothing yet to navigate to. */
 const TAB_ITEMS = [
-  { route: 'dashboard', icon: '🏠', label: 'Dashboard' },
-  { route: 'nav-trips', icon: '📋', label: 'My Trips' },
-  { route: 'nav-chats', icon: '💬', label: 'Chats' },
-  { route: 'nav-profile', icon: '👤', label: 'Profile' },
+  { route: 'dashboard', icon: 'house', label: 'Dashboard' },
+  { route: 'nav-trips', icon: 'clipboard-check', label: 'My Trips' },
+  { route: 'nav-chats', icon: 'chat-dots', label: 'Chats' },
+  { route: 'nav-profile', icon: 'person', label: 'Profile' },
 ];
 const TAB_ROUTES = TAB_ITEMS.map(t => t.route);
 
@@ -1055,7 +1082,7 @@ function tabBarMarkup(activeRoute) {
     <div class="app-tabbar">
       ${TAB_ITEMS.map(item => h`
         <button type="button" class="app-tabbar__item ${item.route === activeRoute ? 'is-active' : ''}" onclick="App.goTab('${item.route}')">
-          <span class="app-tabbar__icon">${item.icon}</span>
+          <sl-icon class="app-tabbar__icon" name="${item.icon}"></sl-icon>
           <span class="app-tabbar__label">${item.label}</span>
         </button>
       `).join('')}
@@ -1123,7 +1150,7 @@ const SCREENS = {
             </button>
             <div class="phone-input__number-wrap">
               <input class="phone-input__number" type="tel" inputmode="numeric" placeholder="6 12345678" value="${state.phone}" oninput="App.set('phone', this.value); this.nextElementSibling.style.visibility = this.value ? 'visible' : 'hidden'; updateFooterState();" />
-              <button type="button" class="phone-input__clear" aria-label="Clear" style="visibility:${state.phone ? 'visible' : 'hidden'}" onclick="App.setAndRerender('phone','')">&#10005;</button>
+              <button type="button" class="phone-input__clear" aria-label="Clear" style="visibility:${state.phone ? 'visible' : 'hidden'}" onclick="App.setAndRerender('phone','')"><sl-icon name="x-lg"></sl-icon></button>
             </div>
           </div>
         </div>
@@ -1267,20 +1294,13 @@ const SCREENS = {
 
   'portal-pin': () => pinScreen('setup'),
 
-  'portal-gdpr': () => gdprScreen('portal-complete', 'portalGdprAccepted'),
-
-  'portal-complete': () => {
-    const record = currentPortalRecord();
-    return {
-      content: h`
-        <div class="center-state">
-          <div class="center-state__icon center-state__icon--success">&#10003;</div>
-          <div class="t-headline-md">${state.reactivating ? 'Access restored' : 'Onboarding complete'}</div>
-          <div class="t-body-md t-muted">You're ${state.reactivating ? 'back in, still' : 'already'} associated with <strong>${record.carrier}</strong> — no separate approval needed.</div>
-        </div>
-      `,
-      footer: () => h`<button class="btn btn-primary" onclick="App.enterDashboard('full')">Go to dashboard</button>`,
-    };
+  /* No separate "you're all set" screen — a Portal-Based driver is already
+     vetted by ops (that's the whole point of this path), so there's nothing
+     left to confirm once GDPR is accepted. Straight to the dashboard. */
+  'portal-gdpr': () => {
+    const screen = gdprScreen('dashboard', 'portalGdprAccepted');
+    screen.footer = () => h`<button class="btn btn-primary" ${state.portalGdprAccepted ? '' : 'disabled'} onclick="App.enterDashboard('full')">Accept &amp; continue</button>`;
+    return screen;
   },
 
   /* ---------------- RETURNING DRIVER ---------------- */
@@ -1289,7 +1309,7 @@ const SCREENS = {
     hideHeader: true,
     content: h`
       <div class="center-state">
-        <div class="center-state__icon center-state__icon--success">&#128241;</div>
+        <sl-icon class="center-state__icon center-state__icon--success" name="phone"></sl-icon>
         <div class="t-headline-md">Welcome back</div>
         <div class="t-body-md t-muted">Checking your session&hellip;</div>
       </div>
@@ -1303,6 +1323,8 @@ const SCREENS = {
       <div class="t-body-sm" style="margin-top:10px; font-weight:600;">Session state</div>
       <button type="button" class="reviewer-sticky__action" onclick="App.set('pinTarget','dashboard'); App.set('dashboardMode','full'); App.nav('returning-pin')">Session still valid</button>
       <button type="button" class="reviewer-sticky__action" onclick="App.nav(state.returningOrigin === 'portal' ? 'returning-request-activation' : 'returning-password')">Session expired</button>
+      <div class="t-body-sm" style="margin-top:10px; font-weight:600;">Why no location prompt here</div>
+      <div class="t-body-sm">Already granted on first onboarding, and that persists at the OS level. It would only ask again if: permission was revoked in Settings, or the app later needs a stronger level than what's already granted (e.g. upgrading While Using to Always).</div>
     `,
   }),
 
@@ -1373,7 +1395,7 @@ const SCREENS = {
     hideBack: true,
     content: h`
       <div class="card card--tinted" style="text-align:center; align-items:center; padding:28px 20px;">
-        <div style="font-size:32px;">&#9989;</div>
+        <sl-icon name="check-circle-fill" style="font-size:32px; color:var(--success-text);"></sl-icon>
         <div class="t-headline-md">You've been added to Trip ${MOCK_GUEST_TRIP.id} by ${MOCK_PLANNER_RECORD.carrier}</div>
         <div class="t-body-sm t-muted">You can confirm this with ${MOCK_PLANNER_RECORD.carrier} directly if anything looks off.</div>
       </div>
@@ -1400,7 +1422,7 @@ const SCREENS = {
     hideHeader: true,
     content: h`
       <div class="center-state">
-        <div class="center-state__icon center-state__icon--success">&#128205;</div>
+        <sl-icon class="center-state__icon center-state__icon--success" name="geo-alt"></sl-icon>
         <div class="t-headline-md">Enable location for automatic tracking</div>
         <div class="t-body-md t-muted">CtrlChain uses your location to automatically detect pickup arrival and share live ETA — so you're not manually updating every milestone. Updates are sent periodically, not continuously, to save battery.</div>
       </div>
@@ -1451,7 +1473,7 @@ const SCREENS = {
     hideHeader: true,
     content: h`
       <div class="center-state">
-        <div class="center-state__icon center-state__icon--warning">&#9888;</div>
+        <sl-icon class="center-state__icon center-state__icon--warning" name="exclamation-triangle"></sl-icon>
         <div class="t-headline-md">Location access needed</div>
         <div class="t-body-md t-muted">Without location access, arrival and ETA won't update automatically — you'll need to confirm each milestone manually. You can enable it anytime in Settings.</div>
       </div>
@@ -1467,23 +1489,24 @@ const SCREENS = {
   'dashboard': () => {
     if (state.dashboardMode === 'locked') {
       return {
-        hideHeader: true,
+        hideBack: true,
         content: h`
           <div class="dash-header">
             <div class="t-headline-md">${greeting()}, ${state.firstName || 'there'}</div>
             <div class="t-body-sm t-muted">${MOCK_PLANNER_RECORD.carrier}</div>
           </div>
           <div class="approval-banner">
-            <span class="approval-banner__icon">&#8987;</span>
+            <sl-icon class="approval-banner__icon" name="hourglass-split"></sl-icon>
             <div class="approval-banner__text">
               <div class="t-label-md">Registration pending Ops approval</div>
               <div class="t-body-sm">Usually takes about 30 minutes — you'll get a notification the moment it's done.</div>
+              <div class="approval-banner__ref">Reference ${MOCK_REGISTRATION_REF} <span class="t-caption">— sent to your email and phone. Quote it if you contact ${MOCK_PLANNER_RECORD.carrier} about a delay.</span></div>
             </div>
           </div>
           <div class="dash-section">
             <div class="t-label-sm t-caption dash-section__label">ACTIVE TRIP</div>
             <div class="empty-state">
-              <div class="empty-state__icon">&#128203;</div>
+              <sl-icon class="empty-state__icon" name="clipboard"></sl-icon>
               <div class="t-body-md t-muted">No trips yet</div>
               <div class="t-body-sm t-caption">Trips appear here once your registration is approved.</div>
             </div>
@@ -1498,6 +1521,7 @@ const SCREENS = {
     }
     if (state.dashboardMode === 'guest') {
       return {
+        hideBack: true,
         content: h`
           <div class="dash-header">
             <div class="t-headline-md">${greeting()}</div>
@@ -1517,7 +1541,6 @@ const SCREENS = {
     const { name, carrier } = currentDriverIdentity();
     const unreadCount = notificationItems().length;
     return {
-      hideHeader: true,
       content: h`
         <div class="dash-hero">
           <div class="dash-hero__top">
@@ -1526,7 +1549,7 @@ const SCREENS = {
               <div class="dash-hero__sub t-body-sm">${carrier} &middot; Full trip visibility</div>
             </div>
             <button type="button" class="dash-hero__bell" onclick="App.goTab('nav-notifications')" aria-label="Notifications">
-              &#128276;
+              <sl-icon name="bell"></sl-icon>
               ${unreadCount ? h`<span class="dash-hero__bell-dot"></span>` : ''}
             </button>
           </div>
@@ -1600,7 +1623,7 @@ const SCREENS = {
   'nav-chats': () => ({
     content: h`
       <div class="center-state">
-        <div class="center-state__icon center-state__icon--warning">&#128172;</div>
+        <sl-icon class="center-state__icon center-state__icon--warning" name="chat-dots"></sl-icon>
         <div class="t-headline-md">Chat with back-office</div>
         <div class="t-body-md t-muted">Structured messaging with your carrier's back office is planned but not yet defined for this prototype.</div>
       </div>
@@ -1633,7 +1656,7 @@ function pinScreen(mode) {
         ${[1,2,3,4,5,6,7,8,9].map(n => h`<button class="pin-key" onclick="App.pinPress(${n})">${n}</button>`).join('')}
         <div class="pin-key pin-key--ghost"></div>
         <button class="pin-key" onclick="App.pinPress(0)">0</button>
-        <button class="pin-key" onclick="App.pinBackspace()">&#9003;</button>
+        <button class="pin-key" onclick="App.pinBackspace()"><sl-icon name="backspace"></sl-icon></button>
       </div>
       ${isSetup ? h`<div class="t-body-sm t-caption" style="text-align:center;">Required — this is how you'll sign back in on this device.</div>` : ''}
     `,
@@ -1657,7 +1680,7 @@ function gdprScreen(nextRoute, stateKey, pinTargetToSet) {
         </div>
       </div>
       <div class="check-row" onclick="App.toggle('${stateKey}')">
-        <div class="check-box ${state[stateKey] ? 'is-checked' : ''}">${state[stateKey] ? '&#10003;' : ''}</div>
+        <div class="check-box ${state[stateKey] ? 'is-checked' : ''}">${state[stateKey] ? h`<sl-icon name="check2"></sl-icon>` : ''}</div>
         <div class="t-body-md">I have read and accept the Terms of Service and Privacy Policy.</div>
       </div>
     `,
@@ -1667,7 +1690,14 @@ function gdprScreen(nextRoute, stateKey, pinTargetToSet) {
 
 function oauthConsentScreen(provider) {
   const p = OAUTH_PROVIDERS[provider];
-  const choose = (email) => `App.set('loginMethod','social'); App.set('email','${email}'); App.set('phone','${provider}-account'); App.nav('self-reg-details')`;
+  // The whole point of social login is not re-asking for what the provider
+  // already gave us — name included, not just email.
+  const choose = (email, name) => {
+    const parts = (name || '').trim().split(' ');
+    const first = parts[0] || '';
+    const last = parts.slice(1).join(' ');
+    return `App.set('loginMethod','social'); App.set('email','${email}'); App.set('phone','${provider}-account'); App.set('firstName','${first}'); App.set('lastName','${last}'); App.nav('self-reg-details')`;
+  };
   return {
     hideHeader: true,
     content: h`
@@ -1684,7 +1714,7 @@ function oauthConsentScreen(provider) {
           <div class="oauth-sheet__title">Choose an account</div>
           <div class="oauth-sheet__subtitle">to continue to <strong>CtrlChain</strong></div>
           ${p.accounts.map(a => h`
-            <div class="oauth-account" onclick="${choose(a.email)}">
+            <div class="oauth-account" onclick="${choose(a.email, a.name)}">
               <div class="oauth-account__avatar" style="background:${a.color};">${a.initial}</div>
               <div class="oauth-account__body">
                 <div class="oauth-account__name">${a.name}</div>
@@ -1779,7 +1809,7 @@ function render() {
     headerHtml = h`
       <div class="app-header">
         <div class="app-header__row">
-          <button class="app-header__back" onclick="App.back()" ${canGoBack ? '' : 'style="visibility:hidden"'}>&#8592;</button>
+          <button class="app-header__back" onclick="App.back()" ${canGoBack ? '' : 'style="visibility:hidden"'}><sl-icon name="arrow-left"></sl-icon></button>
           <div class="app-header__title t-headline-md">${TITLES[route] || ''}</div>
           ${meta ? h`<div class="app-header__step t-body-sm">${meta.step} / ${meta.total}</div>` : h`<div class="app-header__spacer"></div>`}
         </div>
