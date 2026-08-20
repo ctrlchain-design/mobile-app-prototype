@@ -200,13 +200,12 @@ const ROUTE_META = {
   'self-reg-welcome': null,
   'self-reg-social-google': null,
   'self-reg-social-apple': null,
-  'self-reg-signup': { flow: 'self-reg', step: 1, total: 7 },
-  'self-reg-otp': { flow: 'self-reg', step: 2, total: 7 },
-  'self-reg-password': { flow: 'self-reg', step: 3, total: 7 },
-  'self-reg-details': { flow: 'self-reg', step: 4, total: 7 },
-  'self-reg-gdpr': { flow: 'self-reg', step: 5, total: 7 },
-  'self-reg-pin': { flow: 'self-reg', step: 6, total: 7 },
-  'self-reg-pending': { flow: 'self-reg', step: 7, total: 7 },
+  'self-reg-signup': { flow: 'self-reg', step: 1, total: 6 },
+  'self-reg-otp': { flow: 'self-reg', step: 2, total: 6 },
+  'self-reg-password': { flow: 'self-reg', step: 3, total: 6 },
+  'self-reg-details': { flow: 'self-reg', step: 4, total: 6 },
+  'self-reg-gdpr': { flow: 'self-reg', step: 5, total: 6 },
+  'self-reg-pin': { flow: 'self-reg', step: 6, total: 6 },
   // portal-sms and portal-install both happen before the driver has the app
   // open at all (a text message, then either the App Store or manually
   // switching to an already-installed app) — neither is a real numbered step
@@ -249,7 +248,6 @@ const TITLES = {
   'self-reg-details': 'Your details',
   'self-reg-gdpr': 'Terms & privacy',
   'self-reg-pin': 'Secure your account',
-  'self-reg-pending': 'Almost there',
   'portal-sms': "You've been invited",
   'portal-install': 'Get the app',
   'portal-code': 'Enter your code',
@@ -1192,10 +1190,10 @@ const SCREENS = {
       <div class="otp-row">
         ${[0,1,2,3,4,5].map(i => h`<input class="otp-box" inputmode="numeric" maxlength="1" oninput="App.otpInput(this, ${i}, '.otp-box', 'otp')" onkeydown="App.otpKeydown(event, ${i}, '.otp-box')" />`).join('')}
       </div>
-      <div class="t-body-sm t-caption">Demo: any 6 digits will verify.</div>
       <button class="btn-link">Resend code</button>
     `,
     footer: () => h`<button class="btn btn-primary" ${state.otp.length === 6 ? '' : 'disabled'} onclick="App.nav('self-reg-password')">Verify</button>`,
+    reviewerNote: h`<div class="reviewer-sticky__title">Reviewer note</div>No real SMS is sent — any 6 digits will verify.`,
   }),
 
   'self-reg-password': () => ({
@@ -1225,25 +1223,13 @@ const SCREENS = {
     footer: () => h`<button class="btn btn-primary" ${(state.firstName && state.lastName) ? '' : 'disabled'} onclick="App.nav('self-reg-gdpr')">Continue</button>`,
   }),
 
-  'self-reg-gdpr': () => gdprScreen('self-reg-pin', 'gdprAccepted', 'self-reg-pending'),
+  'self-reg-gdpr': () => {
+    const screen = gdprScreen('self-reg-pin', 'gdprAccepted');
+    screen.footer = () => h`<button class="btn btn-primary" ${state.gdprAccepted ? '' : 'disabled'} onclick="App.set('pinTarget','dashboard'); App.set('dashboardMode','locked'); App.nav('self-reg-pin')">Accept &amp; continue</button>`;
+    return screen;
+  },
 
   'self-reg-pin': () => pinScreen('setup'),
-
-  'self-reg-pending': () => ({
-    content: h`
-      <div class="center-state">
-        <div class="center-state__icon center-state__icon--warning">&#8987;</div>
-        <div class="t-headline-md">Account created</div>
-        <span class="badge badge--warning">Pending carrier/ops verification</span>
-        <div class="t-body-md t-muted">Estimated review time: <strong>~30 minutes</strong>. You'll get a push notification the moment it's approved — you don't need to keep checking.</div>
-        <div class="card card--tinted" style="text-align:left; width:100%;">
-          <div class="t-label-md">What happens next</div>
-          <div class="t-body-sm t-muted">Ops reviews your details and assigns you to ${MOCK_PLANNER_RECORD.carrier}'s carrier group. Your profile is visible now — trip data unlocks once approved.</div>
-        </div>
-      </div>
-    `,
-    footer: () => h`<button class="btn btn-primary" onclick="App.set('dashboardMode','locked'); App.nav('dashboard')">Continue to dashboard</button>`,
-  }),
 
   /* ---------------- PORTAL-BASED (MAGIC LINK) ---------------- */
 
@@ -1252,7 +1238,10 @@ const SCREENS = {
     body: h`You've been added as a driver by <strong>${MOCK_PLANNER_RECORD.carrier}</strong> on CtrlChain. Your activation code: <strong>${MOCK_ACTIVATION_CODE}</strong><br/>`,
     link: 'app.ctrlchain.com/invite/8f2a1c&hellip;',
     onLinkTap: "App.nav('portal-install')",
-    note: "Prototype: tap the link above to continue. (Token is hashed, single-use, ~10-15 min validity.)",
+    reviewerNote: h`
+      <div class="reviewer-sticky__title">Why this looks like Messages</div>
+      A real invite SMS opens the phone's own Messages app, not CtrlChain's UI — styled that way on purpose so it's never mistaken for an in-app screen. Tap the link bubble to continue. Token is single-use, ~10-15 min validity.
+    `,
   }),
 
   // A plain app-store link, sent separately from the code — no deferred
@@ -1272,10 +1261,14 @@ const SCREENS = {
           <div class="appstore-mock__subtitle">Business</div>
           <button type="button" class="appstore-mock__get" onclick="App.nav('portal-code')">GET</button>
         </div>
-        <div class="appstore-mock__caption">A plain app-store link is sent separately from the code — no deferred deep-linking dependency.</div>
+        <div class="appstore-mock__caption">Track pickups, confirm milestones, and manage trips on the go.</div>
       </div>
     `,
-    footer: () => h`<div class="messages-mock__note">Prototype: tap GET to simulate installing and opening the app. Already installed? <a class="btn-link" onclick="App.nav('portal-code')">Skip straight to the app</a>.</div>`,
+    reviewerNote: h`
+      <div class="reviewer-sticky__title">Reviewer shortcut</div>
+      A returning driver who already has the app wouldn't see this screen at all.
+      <button type="button" class="reviewer-sticky__action" onclick="App.nav('portal-code')">Skip straight to the code</button>
+    `,
   }),
 
   'portal-code': () => ({
@@ -1284,8 +1277,8 @@ const SCREENS = {
       <div class="otp-row otp-row--compact">
         ${[0,1,2,3,4,5,6,7].map(i => h`<input class="otp-box" inputmode="numeric" maxlength="1" oninput="App.otpInput(this, ${i}, '.otp-box', 'portalCode')" onkeydown="App.otpKeydown(event, ${i}, '.otp-box')" />`).join('')}
       </div>
-      <div class="t-body-sm t-caption">Demo: any 8 digits will work.</div>
     `,
+    reviewerNote: h`<div class="reviewer-sticky__title">Reviewer note</div>No real SMS is sent — any 8 digits will work.`,
     footer: () => h`<button class="btn btn-primary" ${state.portalCode.length === 8 ? '' : 'disabled'} onclick="App.nav('portal-confirm')">Continue</button>`,
   }),
 
@@ -1336,23 +1329,23 @@ const SCREENS = {
   /* ---------------- RETURNING DRIVER ---------------- */
 
   'returning-entry': () => ({
+    hideHeader: true,
     content: h`
       <div class="center-state">
         <div class="center-state__icon center-state__icon--success">&#128241;</div>
-        <div class="t-headline-md">Open app</div>
-        <div class="t-body-md t-muted">The app checks your session automatically. For this prototype, pick which case to explore — matches the "Session Expired?" check already in the current app:</div>
-      </div>
-      <div class="field">
-        <label class="field__label">Simulate: how did this driver originally sign up?</label>
-        <div class="segmented">
-          <div class="segmented__opt ${state.returningOrigin === 'self-reg' ? 'is-selected' : ''}" onclick="App.setAndRerender('returningOrigin','self-reg')">Self-Registered</div>
-          <div class="segmented__opt ${state.returningOrigin === 'portal' ? 'is-selected' : ''}" onclick="App.setAndRerender('returningOrigin','portal')">Portal-Based</div>
-        </div>
+        <div class="t-headline-md">Welcome back</div>
+        <div class="t-body-md t-muted">Checking your session&hellip;</div>
       </div>
     `,
-    footer: () => h`
-      <button class="btn btn-primary" onclick="App.set('pinTarget','dashboard'); App.set('dashboardMode','full'); App.nav('returning-pin')">&#128274; Simulate: session not expired</button>
-      <button class="btn btn-secondary" onclick="App.nav(state.returningOrigin === 'portal' ? 'returning-request-activation' : 'returning-password')">&#8987; Simulate: session expired</button>
+    reviewerNote: h`
+      <div class="reviewer-sticky__title">Reviewer controls</div>
+      A real app checks the session silently and lands straight on the right screen. Pick a scenario:
+      <div class="t-body-sm" style="margin-top:8px; font-weight:600;">Originally signed up via</div>
+      <button type="button" class="reviewer-sticky__action" onclick="App.setAndRerender('returningOrigin','self-reg')">Self-Registered${state.returningOrigin === 'self-reg' ? ' &#10003;' : ''}</button>
+      <button type="button" class="reviewer-sticky__action" onclick="App.setAndRerender('returningOrigin','portal')">Portal-Based${state.returningOrigin === 'portal' ? ' &#10003;' : ''}</button>
+      <div class="t-body-sm" style="margin-top:10px; font-weight:600;">Session state</div>
+      <button type="button" class="reviewer-sticky__action" onclick="App.set('pinTarget','dashboard'); App.set('dashboardMode','full'); App.nav('returning-pin')">Session still valid</button>
+      <button type="button" class="reviewer-sticky__action" onclick="App.nav(state.returningOrigin === 'portal' ? 'returning-request-activation' : 'returning-password')">Session expired</button>
     `,
   }),
 
@@ -1395,10 +1388,10 @@ const SCREENS = {
       <div class="otp-row otp-row--compact">
         ${[0,1,2,3,4,5,6,7].map(i => h`<input class="otp-box" inputmode="numeric" maxlength="1" oninput="App.otpInput(this, ${i}, '.otp-box', 'reactivationCode')" onkeydown="App.otpKeydown(event, ${i}, '.otp-box')" />`).join('')}
       </div>
-      <div class="t-body-sm t-caption">Demo: any 8 digits will verify.</div>
       <button class="btn-link">Resend code</button>
     `,
     footer: () => h`<button class="btn btn-primary" ${state.reactivationCode.length === 8 ? '' : 'disabled'} onclick="App.set('reactivating', true); App.nav('portal-confirm')">Verify</button>`,
+    reviewerNote: h`<div class="reviewer-sticky__title">Reviewer note</div>No real SMS is sent — any 8 digits will verify.`,
   }),
 
   /* ---------------- GUEST / ONE-OFF DRIVER ---------------- */
@@ -1408,7 +1401,10 @@ const SCREENS = {
     body: h`You've been given temporary access to <strong>Trip ${MOCK_GUEST_TRIP.id}</strong> by <strong>${MOCK_PLANNER_RECORD.carrier}</strong>.<br/>`,
     link: `app.ctrlchain.com/trip/${MOCK_GUEST_TRIP.id}?t=e91a&hellip;`,
     onLinkTap: "App.nav('guest-trust')",
-    note: "Prototype: tap the link above to continue. (Hashed, single-use token, ~10-15 min validity — app-store link sent separately if not yet installed.)",
+    reviewerNote: h`
+      <div class="reviewer-sticky__title">Why this looks like Messages</div>
+      Styled like the phone's own Messages app, not CtrlChain's UI, so it's never mistaken for an in-app screen. Tap the link bubble to continue. Token is single-use, ~10-15 min validity.
+    `,
   }),
 
   'guest-trust': () => ({
@@ -1416,7 +1412,7 @@ const SCREENS = {
       <div class="card card--tinted" style="text-align:center; align-items:center; padding:28px 20px;">
         <div style="font-size:32px;">&#9989;</div>
         <div class="t-headline-md">You've been added to Trip ${MOCK_GUEST_TRIP.id} by ${MOCK_PLANNER_RECORD.carrier}</div>
-        <div class="t-body-sm t-muted">Shown first, before anything else — so it's immediately clear who this is from and why.</div>
+        <div class="t-body-sm t-muted">You can confirm this with ${MOCK_PLANNER_RECORD.carrier} directly if anything looks off.</div>
       </div>
     `,
     footer: () => h`<button class="btn btn-primary" onclick="App.nav('guest-scoped')">Continue</button>`,
@@ -1505,7 +1501,7 @@ const SCREENS = {
       </div>
     `,
     footer: () => h`
-      <button class="btn btn-primary" onclick="App.nav('location-priming')">&#128241; Simulate: return from Settings, try again</button>
+      <button class="btn btn-primary" onclick="App.nav('location-priming')">Open Settings</button>
       <button class="btn-text" onclick="App.nav('dashboard')">Continue without location</button>
     `,
   }),
@@ -1515,20 +1511,32 @@ const SCREENS = {
   'dashboard': () => {
     if (state.dashboardMode === 'locked') {
       return {
+        hideHeader: true,
         content: h`
-          <div class="center-state">
-            <div class="center-state__icon center-state__icon--warning">&#128274;</div>
-            <div class="t-headline-md">Profile only</div>
-            <span class="badge badge--warning">Trips locked until approved</span>
-            <div class="card" style="text-align:left; width:100%;">
-              <div class="t-label-md">${state.firstName || 'New'} ${state.lastName || 'Driver'}</div>
-              <div class="t-body-sm t-muted">Awaiting carrier assignment</div>
+          <div class="dash-header">
+            <div class="t-headline-md">${greeting()}, ${state.firstName || 'there'}</div>
+            <div class="t-body-sm t-muted">${MOCK_PLANNER_RECORD.carrier}</div>
+          </div>
+          <div class="approval-banner">
+            <span class="approval-banner__icon">&#8987;</span>
+            <div class="approval-banner__text">
+              <div class="t-label-md">Registration pending Ops approval</div>
+              <div class="t-body-sm">Usually takes about 30 minutes — you'll get a notification the moment it's done.</div>
+            </div>
+          </div>
+          <div class="dash-section">
+            <div class="t-label-sm t-caption dash-section__label">ACTIVE TRIP</div>
+            <div class="empty-state">
+              <div class="empty-state__icon">&#128203;</div>
+              <div class="t-body-md t-muted">No trips yet</div>
+              <div class="t-body-sm t-caption">Trips appear here once your registration is approved.</div>
             </div>
           </div>
         `,
-        footer: () => h`
-          <button class="btn btn-text" onclick="App.approveDashboard()">&#128295; Simulate: ops approved my account</button>
-          <button class="btn btn-subtle" onclick="App.restartFlow()">Restart this flow</button>
+        reviewerNote: h`
+          <div class="reviewer-sticky__title">Reviewer shortcut</div>
+          A real driver has no way to self-approve — Ops does this from the back office.
+          <button type="button" class="reviewer-sticky__action" onclick="App.approveDashboard()">Simulate Ops approval</button>
         `,
       };
     }
@@ -1547,7 +1555,6 @@ const SCREENS = {
           ${podSheetMarkup()}
           ${exceptionSheetMarkup()}
         `,
-        footer: () => h`<button class="btn btn-subtle" onclick="App.restartFlow()">Restart this flow</button>`,
       };
     }
     // full
@@ -1745,7 +1752,7 @@ function oauthConsentScreen(provider) {
    UI (no header, no brand colors) so reviewers don't mistake "a text message
    arrives" for an in-app screen. Tapping the link (or the whole bubble, for
    forgiveness) is the only interactive element; the rest is inert chrome. */
-function messagesAppScreen({ sender, body, link, onLinkTap, note }) {
+function messagesAppScreen({ sender, body, link, onLinkTap, reviewerNote }) {
   return {
     hideHeader: true,
     content: h`
@@ -1764,7 +1771,7 @@ function messagesAppScreen({ sender, body, link, onLinkTap, note }) {
         </div>
       </div>
     `,
-    footer: () => h`<div class="messages-mock__note">${note}</div>`,
+    reviewerNote,
   };
 }
 
@@ -1862,6 +1869,19 @@ function render() {
     const isDark = document.documentElement.classList.contains('dark');
     themeBtn.textContent = isDark ? '☀️' : '🌙';
     themeBtn.title = isDark ? 'Switch to light theme' : 'Switch to dark theme';
+  }
+
+  // Anything a reviewer needs — but a real driver never would — lives in this
+  // sticky outside the device, never inside the simulated screen itself.
+  const sticky = document.getElementById('reviewer-sticky');
+  if (sticky) {
+    if (screen.reviewerNote) {
+      sticky.innerHTML = screen.reviewerNote;
+      sticky.style.display = 'block';
+    } else {
+      sticky.innerHTML = '';
+      sticky.style.display = 'none';
+    }
   }
 }
 

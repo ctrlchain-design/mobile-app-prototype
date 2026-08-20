@@ -199,6 +199,69 @@ button { font-family: inherit; }
   color: var(--color-neutrals-600);
 }
 
+/* ---------- Reviewer sticky note ----------
+   Anything a reviewer needs to know that a real driver never would (why a
+   screen behaves a certain way, a shortcut to force a state a real backend
+   would normally drive) lives here — outside the simulated device — so the
+   screens inside the phone frame only ever show real, in-character app copy.
+   Fixed relative to the viewport, anchored just right of the centered
+   .phone-frame regardless of viewport width. */
+.reviewer-sticky {
+  position: fixed;
+  left: calc(50% + 207px);
+  top: 160px;
+  width: 190px;
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
+  background: #fff6b7;
+  color: #4a4110;
+  padding: 12px 14px;
+  border-radius: 2px;
+  box-shadow: 0 10px 24px rgba(0,0,0,0.22);
+  transform: rotate(-2deg);
+  font-family: var(--font-family);
+  font-size: 12.5px;
+  line-height: 1.4;
+  z-index: 50;
+}
+/* Not enough room beside the phone frame to avoid running off-screen —
+   dock it along the bottom instead rather than clipping. */
+@media (max-width: 900px) {
+  .reviewer-sticky {
+    position: fixed;
+    left: 50%;
+    top: auto;
+    bottom: 16px;
+    transform: translateX(-50%) rotate(0deg);
+    width: min(340px, calc(100vw - 32px));
+    max-height: 30vh;
+  }
+}
+.reviewer-sticky__title {
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.65;
+  margin-bottom: 6px;
+}
+.reviewer-sticky__action {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 7px 10px;
+  border: 1.5px solid #4a4110;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.35);
+  color: #4a4110;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+}
+.reviewer-sticky__action:hover { background: rgba(255,255,255,0.6); }
+
 /* ---------- Phone frame ---------- */
 .phone-frame {
   width: 390px;
@@ -933,6 +996,34 @@ button { font-family: inherit; }
 .dash-section__label { letter-spacing: 0.04em; }
 .dash-empty-note { padding: 4px 2px; }
 
+/* Registration-pending banner — deliberately more prominent than the compact
+   tracking-status row, since this genuinely blocks the driver from anything
+   beyond viewing their own profile, not just a background-tracking nicety. */
+.approval-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  border-radius: var(--radius-md);
+  background: var(--warning-surface-lighter);
+  border: 1px solid var(--warning-border-light);
+}
+.approval-banner__icon { font-size: 22px; line-height: 1; flex-shrink: 0; }
+.approval-banner__text { display: flex; flex-direction: column; gap: 2px; }
+.approval-banner__text .t-body-sm { color: var(--warning-text); }
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 4px;
+  padding: 32px 16px;
+  border: 1px dashed var(--border-neutral-default);
+  border-radius: var(--radius-md);
+}
+.empty-state__icon { font-size: 28px; margin-bottom: 6px; opacity: 0.6; }
+
 /* ---------- Active Trip (collapsible, vertical stop timeline) ----------
    Built on <sl-details> (accordion behavior, a11y, focus handling) rather
    than a bespoke expand/collapse — see the Shoelace theme bridge above for
@@ -1103,12 +1194,6 @@ button { font-family: inherit; }
 }
 .messages-mock__bubble strong { font-weight: 600; }
 .messages-mock__link { color: #007aff; text-decoration: underline; word-break: break-all; }
-.messages-mock__note {
-  font-size: var(--type-body-sm-size);
-  color: var(--text-neutral-caption);
-  text-align: center;
-  padding: 4px 8px;
-}
 
 /* ---------- Mocked App Store page ----------
    Same reasoning as .messages-mock and .oauth-sheet: this happens before the
