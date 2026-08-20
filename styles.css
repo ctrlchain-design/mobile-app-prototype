@@ -453,6 +453,8 @@ button { font-family: inherit; }
   color: var(--form-value);
 }
 .otp-box:focus { outline: none; border-color: var(--form-border-focus); }
+.otp-row--compact { gap: 6px; }
+.otp-row--compact .otp-box { width: 36px; height: 48px; font-size: 17px; }
 
 /* ---------- PIN pad ---------- */
 .pin-dots { display: flex; gap: 14px; justify-content: center; margin: 8px 0; }

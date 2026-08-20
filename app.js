@@ -123,7 +123,7 @@ const TITLES = {
   'returning-pin': 'Quick sign-in',
   'returning-password': 'Session expired',
   'returning-request-activation': 'Reactivate your account',
-  'returning-activation-sent': 'Link sent',
+  'returning-activation-sent': 'Enter code',
   'guest-sms': 'Guest access',
   'guest-trust': "You've been added",
   'guest-scoped': 'Single-trip access',
@@ -151,6 +151,8 @@ function freshState() {
     returningOrigin: 'self-reg', // 'self-reg' | 'portal' — which onboarding path this returning driver used
     returningEmail: '',
     returningPassword: '',
+    reactivationContact: '',
+    reactivationCode: '',
     reactivating: false,
     selectedTripId: null,
     locationPermission: null, // null | 'always' | 'while-using' | 'denied'
@@ -646,24 +648,29 @@ const SCREENS = {
 
   'returning-request-activation': () => ({
     content: h`
-      <div class="t-body-md t-muted">Portal-Based accounts don't have a separate password — your PIN or Face ID is the only way in. Since this device's session has expired, you'll need a new activation link.</div>
+      <div class="t-body-md t-muted">Portal-Based accounts don't have a separate password — your PIN or Face ID is the only way in. Enter the email or phone number on your account to reactivate it.</div>
+      <div class="field">
+        <label class="field__label">Email or phone number</label>
+        <input class="field__input" type="text" placeholder="you@example.com or +31 6 12345678" value="${state.reactivationContact}" oninput="App.set('reactivationContact', this.value); updateFooterState();" />
+      </div>
       <div class="card card--tinted">
         <div class="t-label-md">What happens next</div>
-        <div class="t-body-sm t-muted">We'll automatically send a new activation link to ${MOCK_RETURNING_DRIVER.phone} — the number already on file. No approval wait, and nothing for your carrier's ops team to action.</div>
+        <div class="t-body-sm t-muted">We'll automatically send an 8-digit code to confirm it's you — no approval wait, and nothing for your carrier's ops team to action.</div>
       </div>
     `,
-    footer: () => h`<button class="btn btn-primary" onclick="App.nav('returning-activation-sent')">Send me a new activation link</button>`,
+    footer: () => h`<button class="btn btn-primary" ${state.reactivationContact.trim().length >= 4 ? '' : 'disabled'} onclick="App.nav('returning-activation-sent')">Reactivate my account</button>`,
   }),
 
   'returning-activation-sent': () => ({
     content: h`
-      <div class="center-state">
-        <div class="center-state__icon center-state__icon--success">&#128232;</div>
-        <div class="t-headline-md">Link sent</div>
-        <div class="t-body-md t-muted">A new activation link was just sent to ${MOCK_RETURNING_DRIVER.phone}. Tap it to get back in — no one else needs to action this.</div>
+      <div class="t-body-md t-muted">Enter the 8-digit code we sent to ${state.reactivationContact}.</div>
+      <div class="otp-row otp-row--compact">
+        ${[0,1,2,3,4,5,6,7].map(i => h`<input class="otp-box" inputmode="numeric" maxlength="1" oninput="App.otpInput(this, ${i}, '.otp-box', 'reactivationCode')" onkeydown="App.otpKeydown(event, ${i}, '.otp-box')" />`).join('')}
       </div>
+      <div class="t-body-sm t-caption">Demo: any 8 digits will verify.</div>
+      <button class="btn-link">Resend code</button>
     `,
-    footer: () => h`<button class="btn btn-primary" onclick="App.set('reactivating', true); App.nav('portal-confirm')">&#128241; Simulate: tap the activation link</button>`,
+    footer: () => h`<button class="btn btn-primary" ${state.reactivationCode.length === 8 ? '' : 'disabled'} onclick="App.set('reactivating', true); App.nav('portal-confirm')">Verify</button>`,
   }),
 
   /* ---------------- GUEST / ONE-OFF DRIVER ---------------- */
