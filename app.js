@@ -26,6 +26,9 @@ const MOCK_TRIPS = [
 
 const MOCK_GUEST_TRIP = { id: 'TRIP2026-000142', pickup: 'Heathrow Cargo Terminal', dropoff: 'Southampton Docks', status: 'In progress', badge: 'info', eta: 'Today, 16:00' };
 
+/* 8 digits, not 6 — backend preference, harder to brute-force than a 6-digit code. */
+const MOCK_ACTIVATION_CODE = '48213976';
+
 /* Mocked native OAuth account-chooser sheets — one per social provider, styled after
    each provider's real embedded sign-in UI rather than CCA's own visual system. */
 const OAUTH_PROVIDERS = {
@@ -513,7 +516,7 @@ const SCREENS = {
 
   'portal-sms': () => messagesAppScreen({
     sender: 'CtrlChain',
-    body: h`You've been added as a driver by <strong>${MOCK_PLANNER_RECORD.carrier}</strong> on CtrlChain.<br/>`,
+    body: h`You've been added as a driver by <strong>${MOCK_PLANNER_RECORD.carrier}</strong> on CtrlChain. Your activation code: <strong>${MOCK_ACTIVATION_CODE}</strong><br/>`,
     link: 'app.ctrlchain.com/invite/8f2a1c&hellip;',
     onLinkTap: "App.nav('portal-install')",
     note: "Prototype: tap the link above to continue. (Token is hashed, single-use, ~10-15 min validity.)",
@@ -536,13 +539,13 @@ const SCREENS = {
 
   'portal-code': () => ({
     content: h`
-      <div class="t-body-md t-muted">Enter the code from the SMS.</div>
-      <div class="otp-row">
-        ${[0,1,2,3,4,5].map(i => h`<input class="otp-box" inputmode="numeric" maxlength="1" oninput="App.otpInput(this, ${i}, '.otp-box', 'portalCode')" onkeydown="App.otpKeydown(event, ${i}, '.otp-box')" />`).join('')}
+      <div class="t-body-md t-muted">Enter the 8-digit activation code from the SMS.</div>
+      <div class="otp-row otp-row--compact">
+        ${[0,1,2,3,4,5,6,7].map(i => h`<input class="otp-box" inputmode="numeric" maxlength="1" oninput="App.otpInput(this, ${i}, '.otp-box', 'portalCode')" onkeydown="App.otpKeydown(event, ${i}, '.otp-box')" />`).join('')}
       </div>
-      <div class="t-body-sm t-caption">Demo: any 6 digits will work.</div>
+      <div class="t-body-sm t-caption">Demo: any 8 digits will work.</div>
     `,
-    footer: () => h`<button class="btn btn-primary" ${state.portalCode.length === 6 ? '' : 'disabled'} onclick="App.nav('portal-confirm')">Continue</button>`,
+    footer: () => h`<button class="btn btn-primary" ${state.portalCode.length === 8 ? '' : 'disabled'} onclick="App.nav('portal-confirm')">Continue</button>`,
   }),
 
   'portal-confirm': () => {
