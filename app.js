@@ -24,14 +24,44 @@ const MOCK_RETURNING_DRIVER = { firstName: 'Jordan', lastName: 'Reyes', carrier:
    its own timestamp, source (automated/manual), and confirm state. This mirrors
    CtrlChain's real trip model (05-projects/carrier-tms/trip-details.md): a trip
    is a sequence of stops, and a stop can carry one or more customer orders. */
-const MILESTONE_LABELS = {
-  pickup: ['Arrived at pickup', 'Loading started', 'Loading completed', 'Departed pickup'],
-  delivery: ['Arrived at delivery', 'Unloading started', 'Unloading completed', 'Departed delivery'],
-};
+/* The real, logical lifecycle of a stop — a live ETA leads into it, then
+   geofence-detectable arrival/departure bookend a manual load/unload action,
+   with POD its own gated step on delivery stops. `kind` drives both how a
+   stage is rendered and how it can complete:
+     'eta'    — informational only, never confirmable, always visible once set.
+     'auto'   — geofence-detectable; proposed automatically, driver confirms.
+     'manual' — only the driver knows this happened; driver marks it done.
+     'pod'    — gated on the prior stage; completes itself once every order at
+                this stop has a POD uploaded (see submitPod()).
+   Status values: 'eta' (informational) | 'pending' (blocked, future) |
+   'ready' (manual stage unlocked) | 'proposed' (auto stage awaiting confirm) |
+   'confirmed' (done). completeMilestone() advances a stop to its next stage
+   and, on a stop's last stage, hands the trip's activeStopId to the next stop —
+   so the whole trip progresses, not just one stop in isolation. */
+function pickupStages(etaTime) {
+  return [
+    { id: 'eta', label: 'Pickup ETA', kind: 'eta', status: 'eta', source: null, timestamp: etaTime },
+    { id: 'arrived', label: 'Arrived at pickup', kind: 'auto', status: 'pending', source: null, timestamp: null },
+    { id: 'loaded', label: 'Cargo loaded', kind: 'manual', status: 'pending', source: null, timestamp: null },
+    { id: 'departed', label: 'Departed pickup', kind: 'auto', status: 'pending', source: null, timestamp: null },
+  ];
+}
+function deliveryStages(etaTime) {
+  return [
+    { id: 'eta', label: 'Delivery ETA', kind: 'eta', status: 'eta', source: null, timestamp: etaTime },
+    { id: 'arrived', label: 'Arrived at delivery', kind: 'auto', status: 'pending', source: null, timestamp: null },
+    { id: 'unloaded', label: 'Cargo unloaded', kind: 'manual', status: 'pending', source: null, timestamp: null },
+    { id: 'pod', label: 'POD uploaded', kind: 'pod', status: 'pending', source: null, timestamp: null },
+    { id: 'departed', label: 'Departed delivery', kind: 'auto', status: 'pending', source: null, timestamp: null },
+  ];
+}
 
 /* The one trip a driver is actually transporting right now. Modelled as an array
    (see activeTripSection()) so the UI scales to more than one — Samuel's call,
-   even though V1 only ever has a single truck / single active trip in practice. */
+   even though V1 only ever has a single truck / single active trip in practice.
+   TRIP2026-000123 tells one coherent story: stop 1 fully done, stop 2 mid-flight
+   (arrived, awaiting confirm — everything after it is genuinely blocked), stop 3
+   not yet reached. */
 const MOCK_ACTIVE_TRIPS = [
   {
     id: 'TRIP2026-000123',
@@ -40,12 +70,13 @@ const MOCK_ACTIVE_TRIPS = [
       {
         id: 'STOP-1', type: 'pickup', location: 'Meridian Distribution Centre, Coventry', appointment: 'Today, 08:00',
         orders: [{ id: 'ORD-8841937', ref: 'PO-33210' }],
-        milestones: [
-          { id: 'm1', label: 'Arrived at pickup', status: 'confirmed', source: 'automated', timestamp: '08:02' },
-          { id: 'm2', label: 'Loading started', status: 'confirmed', source: 'manual', timestamp: '08:10' },
-          { id: 'm3', label: 'Loading completed', status: 'confirmed', source: 'manual', timestamp: '08:40' },
-          { id: 'm4', label: 'Departed pickup', status: 'confirmed', source: 'automated', timestamp: '08:45' },
-        ],
+        milestones: (() => {
+          const s = pickupStages('07:55');
+          s[1].status = 'confirmed'; s[1].source = 'automated'; s[1].timestamp = '08:02';
+          s[2].status = 'confirmed'; s[2].source = 'manual'; s[2].timestamp = '08:20';
+          s[3].status = 'confirmed'; s[3].source = 'automated'; s[3].timestamp = '08:30';
+          return s;
+        })(),
         exceptions: [],
       },
       {
@@ -54,23 +85,19 @@ const MOCK_ACTIVE_TRIPS = [
           { id: 'ORD-8841937', ref: 'PO-33210', podUploaded: false },
           { id: 'ORD-8841938', ref: 'PO-33211', podUploaded: false },
         ],
-        milestones: [
-          { id: 'm5', label: 'Arrived at delivery', status: 'proposed', source: 'automated', timestamp: '14:28' },
-          { id: 'm6', label: 'Unloading started', status: 'pending', source: null, timestamp: null },
-          { id: 'm7', label: 'Unloading completed', status: 'pending', source: null, timestamp: null },
-          { id: 'm8', label: 'Departed delivery', status: 'pending', source: null, timestamp: null },
-        ],
+        milestones: (() => {
+          const s = deliveryStages('14:30');
+          // Geofence fired 2 minutes early against the calculated ETA — a real
+          // case for the timestamp-edit feature, not just a round number.
+          s[1].status = 'proposed'; s[1].source = 'automated'; s[1].timestamp = '14:28';
+          return s;
+        })(),
         exceptions: [],
       },
       {
         id: 'STOP-3', type: 'delivery', location: 'Gloucester Services DC', appointment: 'Tomorrow, 08:00',
         orders: [{ id: 'ORD-8841939', ref: 'PO-33212', podUploaded: false }],
-        milestones: [
-          { id: 'm9', label: 'Arrived at delivery', status: 'pending', source: null, timestamp: null },
-          { id: 'm10', label: 'Unloading started', status: 'pending', source: null, timestamp: null },
-          { id: 'm11', label: 'Unloading completed', status: 'pending', source: null, timestamp: null },
-          { id: 'm12', label: 'Departed delivery', status: 'pending', source: null, timestamp: null },
-        ],
+        milestones: deliveryStages('Tomorrow, 08:00'),
         exceptions: [],
       },
     ],
@@ -97,23 +124,23 @@ const MOCK_GUEST_TRIP = {
     {
       id: 'STOP-G1', type: 'pickup', location: 'Heathrow Cargo Terminal', appointment: 'Today, 13:00',
       orders: [{ id: 'ORD-9001', ref: 'GT-142' }],
-      milestones: [
-        { id: 'g1', label: 'Arrived at pickup', status: 'confirmed', source: 'automated', timestamp: '13:04' },
-        { id: 'g2', label: 'Loading started', status: 'confirmed', source: 'manual', timestamp: '13:10' },
-        { id: 'g3', label: 'Loading completed', status: 'confirmed', source: 'manual', timestamp: '13:30' },
-        { id: 'g4', label: 'Departed pickup', status: 'confirmed', source: 'automated', timestamp: '13:35' },
-      ],
+      milestones: (() => {
+        const s = pickupStages('12:55');
+        s[1].status = 'confirmed'; s[1].source = 'automated'; s[1].timestamp = '13:04';
+        s[2].status = 'confirmed'; s[2].source = 'manual'; s[2].timestamp = '13:30';
+        s[3].status = 'confirmed'; s[3].source = 'automated'; s[3].timestamp = '13:35';
+        return s;
+      })(),
       exceptions: [],
     },
     {
       id: 'STOP-G2', type: 'delivery', location: 'Southampton Docks', appointment: 'Today, 16:00',
       orders: [{ id: 'ORD-9001', ref: 'GT-142', podUploaded: false }],
-      milestones: [
-        { id: 'g5', label: 'Arrived at delivery', status: 'proposed', source: 'automated', timestamp: '15:58' },
-        { id: 'g6', label: 'Unloading started', status: 'pending', source: null, timestamp: null },
-        { id: 'g7', label: 'Unloading completed', status: 'pending', source: null, timestamp: null },
-        { id: 'g8', label: 'Departed delivery', status: 'pending', source: null, timestamp: null },
-      ],
+      milestones: (() => {
+        const s = deliveryStages('16:00');
+        s[1].status = 'proposed'; s[1].source = 'automated'; s[1].timestamp = '15:58';
+        return s;
+      })(),
       exceptions: [],
     },
   ],
@@ -402,10 +429,16 @@ const App = {
   },
 
   confirmMilestone(tripId, stopId, milestoneId) {
-    const trip = findActiveTrip(tripId);
-    const stop = trip && findStop(trip, stopId);
-    const m = stop && stop.milestones.find(x => x.id === milestoneId);
-    if (m) m.status = 'confirmed';
+    completeMilestoneByIds(tripId, stopId, milestoneId);
+    render();
+  },
+
+  /* Same completion mechanics as confirmMilestone — a separate method name
+     because the two are semantically different actions for the driver: this
+     one attests to something the app has no way to detect on its own (cargo
+     physically loaded/unloaded), not confirming an automated proposal. */
+  markManualDone(tripId, stopId, milestoneId) {
+    completeMilestoneByIds(tripId, stopId, milestoneId);
     render();
   },
 
@@ -445,6 +478,14 @@ const App = {
     const stop = trip && findStop(trip, stopId);
     const order = stop && stop.orders.find(o => o.id === orderId);
     if (order) order.podUploaded = true;
+    // Once every order at this stop has a POD, the POD stage completes itself —
+    // it's gated on the orders, not on a single tap the way other stages are.
+    if (stop && stop.orders.every(o => o.podUploaded)) {
+      const podIdx = stop.milestones.findIndex(m => m.kind === 'pod');
+      if (podIdx >= 0 && stop.milestones[podIdx].status !== 'confirmed') {
+        completeMilestone(trip, stop, podIdx);
+      }
+    }
     state.podSheet = null;
     render();
   },
@@ -593,6 +634,46 @@ function findStop(trip, stopId) {
   return trip.stops.find(s => s.id === stopId);
 }
 
+function formatNowTime() {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+/* Completes one stage of a stop's lifecycle and cascades: unlocks the next
+   stage (proposed for an auto stage, ready for a manual one, ready for POD so
+   its per-order rows appear), and — on a stop's last stage — hands the trip's
+   activeStopId to the next stop in route order, so the whole trip advances,
+   not just one stop in isolation. */
+function completeMilestone(trip, stop, index) {
+  const m = stop.milestones[index];
+  m.status = 'confirmed';
+  if (!m.timestamp) m.timestamp = formatNowTime();
+
+  const next = stop.milestones[index + 1];
+  if (next && next.status === 'pending') {
+    if (next.kind === 'manual' || next.kind === 'pod') {
+      next.status = 'ready';
+    } else if (next.kind === 'auto') {
+      next.status = 'proposed';
+      next.source = 'automated';
+      next.timestamp = formatNowTime();
+    }
+  }
+
+  if (index === stop.milestones.length - 1) {
+    const stopIdx = trip.stops.findIndex(s => s.id === stop.id);
+    const nextStop = trip.stops[stopIdx + 1];
+    if (nextStop) trip.activeStopId = nextStop.id;
+  }
+}
+
+function completeMilestoneByIds(tripId, stopId, milestoneId) {
+  const trip = findActiveTrip(tripId);
+  const stop = trip && findStop(trip, stopId);
+  const idx = stop ? stop.milestones.findIndex(x => x.id === milestoneId) : -1;
+  if (idx >= 0) completeMilestone(trip, stop, idx);
+}
+
 /* One or more "Active Trip" accordions — the dashboard's main content. Each is
    its own <sl-details>, open by default (see isExpanded above), so a driver can
    collapse a trip to get it out of the way without losing anything else on the
@@ -624,11 +705,15 @@ function stopTimelineList(trip) {
 }
 
 function stopStatus(stop) {
-  if (stop.milestones.every(m => m.status === 'confirmed')) return 'completed';
-  if (stop.milestones.some(m => m.status !== 'pending')) return 'active';
+  const real = stop.milestones.filter(m => m.kind !== 'eta');
+  if (real.every(m => m.status === 'confirmed')) return 'completed';
+  if (real.some(m => m.status !== 'pending')) return 'active';
   return 'upcoming';
 }
 
+/* Flat, hairline-and-dot hierarchy instead of cards nested inside cards —
+   the stop and its stages read as one continuous, scannable list rather than
+   boxes within boxes within boxes. */
 function stopItem(trip, stop) {
   const status = stopStatus(stop);
   const isActive = stop.id === trip.activeStopId;
@@ -636,68 +721,77 @@ function stopItem(trip, stop) {
   const orderCount = stop.orders.length;
   return h`
     <div class="stop-item stop-item--${status}">
-      <div class="stop-card">
-        <sl-details ${expanded ? 'open' : ''} onclick="if(event.target.closest('[data-role=summary]')) App.toggleExpand('${stop.id}', ${expanded})">
-          <div slot="summary" data-role="summary" class="stop-summary">
-            <div>
-              <div class="stop-summary__title">
-                <span class="t-label-md">${stop.type === 'pickup' ? 'Pickup' : 'Delivery'} &middot; ${stop.location}</span>
-                ${stop.exceptions.length ? h`<span class="exception-flag" title="Exception reported">&#9888;</span>` : ''}
-              </div>
-              <div class="stop-summary__meta">
-                <span class="t-body-sm t-caption">${stop.appointment}</span>
-                ${orderCount > 1 ? h`<span class="badge badge--info">${orderCount} orders</span>` : ''}
-              </div>
+      <sl-details ${expanded ? 'open' : ''} onclick="if(event.target.closest('[data-role=summary]')) App.toggleExpand('${stop.id}', ${expanded})">
+        <div slot="summary" data-role="summary" class="stop-summary">
+          <div class="stop-summary__main">
+            <div class="stop-summary__title">
+              <span class="t-label-md">${stop.type === 'pickup' ? 'Pickup' : 'Delivery'} &middot; ${stop.location}</span>
+              ${stop.exceptions.length ? h`<span class="exception-flag" title="Exception reported">&#9888;</span>` : ''}
+            </div>
+            <div class="stop-summary__meta">
+              <span class="t-body-sm t-caption">${stop.appointment}</span>
+              ${orderCount > 1 ? h`<span class="badge badge--info">${orderCount} orders</span>` : ''}
             </div>
           </div>
-          <div class="stop-body">
-            ${stop.milestones.map(m => milestoneRow(trip, stop, m)).join('')}
-            ${stop.type === 'delivery' ? h`<div class="dash-section" style="gap:6px;">${stop.orders.map(o => orderRow(trip, stop, o)).join('')}</div>` : ''}
-            <div class="stop-actions">
-              <button type="button" class="btn btn-subtle" style="width:auto; flex:1;" onclick="App.openExceptionSheet('${trip.id}','${stop.id}')">&#9888; Report exception</button>
-            </div>
-          </div>
-        </sl-details>
-      </div>
+          <button type="button" class="icon-btn" title="Report exception" onclick="event.stopPropagation(); App.openExceptionSheet('${trip.id}','${stop.id}')">&#9888;</button>
+        </div>
+        <div class="stop-body">
+          <div class="stage-list">${stop.milestones.map(m => stageItem(trip, stop, m)).join('')}</div>
+        </div>
+      </sl-details>
     </div>
   `;
 }
 
-function milestoneRow(trip, stop, m) {
+/* One stage in a stop's lifecycle — see pickupStages()/deliveryStages() for
+   the 'eta' | 'auto' | 'manual' | 'pod' kinds this renders differently. */
+function stageItem(trip, stop, m) {
   const editing = state.editingMilestone && state.editingMilestone.milestoneId === m.id;
+  const dotClass = m.status === 'confirmed' ? 'done'
+    : (m.status === 'proposed' || m.status === 'ready') ? 'active'
+    : m.status === 'eta' ? 'eta' : 'todo';
+
+  let right;
   if (editing) {
-    return h`
-      <div class="milestone-row">
-        <div class="milestone-row__main">
-          <span class="t-body-md">${m.label}</span>
-          <div class="timestamp-edit">
-            <sl-input id="ts-input-${m.id}" type="time" size="small" value="${m.timestamp || ''}"></sl-input>
-            <sl-button size="small" variant="primary" onclick="App.saveTimestamp('${trip.id}','${stop.id}','${m.id}')">Save</sl-button>
-            <sl-button size="small" variant="default" onclick="App.cancelEditTimestamp()">Cancel</sl-button>
-          </div>
-        </div>
+    right = h`
+      <div class="timestamp-edit">
+        <sl-input id="ts-input-${m.id}" type="time" size="small" value="${m.timestamp || ''}"></sl-input>
+        <sl-button size="small" variant="primary" onclick="App.saveTimestamp('${trip.id}','${stop.id}','${m.id}')">Save</sl-button>
+        <sl-button size="small" onclick="App.cancelEditTimestamp()">Cancel</sl-button>
       </div>
     `;
+  } else if (m.kind === 'eta') {
+    right = h`<span class="t-body-sm t-caption">${m.timestamp}</span>`;
+  } else if (m.status === 'pending') {
+    right = h`<span class="t-body-sm t-caption">Not yet reached</span>`;
+  } else if (!m.timestamp) {
+    right = h`<span class="t-body-sm t-caption">Awaiting driver</span>`;
+  } else {
+    const sourceLabel = m.source === 'automated' ? 'Automated' : m.source === 'manual' ? 'Manual' : '';
+    right = h`<span class="t-body-sm t-caption">${sourceLabel ? sourceLabel + ' &middot; ' : ''}<button type="button" class="timestamp-btn" onclick="App.startEditTimestamp('${stop.id}','${m.id}')">${m.timestamp}</button></span>`;
   }
-  const sourceLabel = m.source === 'automated' ? 'Automated' : m.source === 'manual' ? 'Manual' : '';
+
+  let action = '';
+  if (!editing) {
+    if (m.status === 'proposed') {
+      action = h`<sl-button size="small" variant="primary" onclick="App.confirmMilestone('${trip.id}','${stop.id}','${m.id}')">Confirm</sl-button>`;
+    } else if (m.status === 'ready' && m.kind === 'manual') {
+      action = h`<sl-button size="small" variant="primary" onclick="App.markManualDone('${trip.id}','${stop.id}','${m.id}')">Mark done</sl-button>`;
+    } else if (m.status === 'confirmed') {
+      action = h`<span class="stage-item__check">&#10003;</span>`;
+    }
+  }
+
   return h`
-    <div class="milestone-row milestone-row--${m.status}">
-      <div class="milestone-row__main">
-        <div class="milestone-row__label-line">
-          <span class="t-body-md">${m.label}</span>
-          ${m.status === 'proposed' ? h`<span class="badge badge--warning">Awaiting confirm</span>` : ''}
+    <div class="stage-item stage-item--${dotClass}">
+      <div class="stage-item__row">
+        <div class="stage-item__main">
+          <div class="t-body-md ${m.status === 'pending' ? 't-muted' : ''}">${m.label}</div>
+          ${right}
         </div>
-        <span class="t-body-sm t-caption">
-          ${m.timestamp
-            ? h`${sourceLabel ? sourceLabel + ' &middot; ' : ''}<button type="button" class="timestamp-btn" onclick="App.startEditTimestamp('${stop.id}','${m.id}')">${m.timestamp}</button>`
-            : 'Not yet reached'}
-        </span>
+        <div class="stage-item__action">${action}</div>
       </div>
-      ${m.status === 'proposed' ? h`
-        <div class="milestone-row__actions">
-          <sl-button size="small" variant="primary" onclick="App.confirmMilestone('${trip.id}','${stop.id}','${m.id}')">Confirm</sl-button>
-        </div>
-      ` : m.status === 'confirmed' ? h`<div class="milestone-row__actions"><span class="t-label-sm" style="color:var(--success-text);">&#10003;</span></div>` : ''}
+      ${m.kind === 'pod' && m.status !== 'pending' ? h`<div class="stage-item__sub">${stop.orders.map(o => orderRow(trip, stop, o)).join('')}</div>` : ''}
     </div>
   `;
 }
@@ -1609,14 +1703,18 @@ function messagesAppScreen({ sender, body, link, onLinkTap, note }) {
   };
 }
 
+/* Compact inline status — a dot and one line of text, not a big colored
+   banner. Persistent state deserves low visual weight; it's ambient context,
+   not something competing with the trip data for attention. */
 function trackingStatusBanner() {
   if (state.locationPermission === 'always') {
-    return h`<div class="tracking-pill tracking-pill--active">&#128205; Automatic tracking active</div>`;
+    return h`<div class="tracking-status"><span class="tracking-status__dot tracking-status__dot--active"></span>Automatic tracking active</div>`;
   }
   return h`
-    <div class="tracking-pill tracking-pill--limited">
-      <span>&#9888; Background tracking limited — arrival won't auto-detect.</span>
-      <button type="button" class="tracking-pill__fix" onclick="App.nav('location-priming')">Fix</button>
+    <div class="tracking-status tracking-status--limited">
+      <span class="tracking-status__dot tracking-status__dot--limited"></span>
+      <span class="tracking-status__text">Background tracking limited — arrival won't auto-detect.</span>
+      <button type="button" class="tracking-status__fix" onclick="App.nav('location-priming')">Fix</button>
     </div>
   `;
 }

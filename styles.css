@@ -593,42 +593,35 @@ button { font-family: inherit; }
 .hero__logo { width: 168px; height: auto; }
 
 /* ---------- Dashboard hero (full-access driver home) ----------
-   Same cinematic photo treatment as the welcome hero, scaled down to a header
-   band rather than full-bleed — Air NZ's "Kia ora" home screen was the direct
-   reference (dark photo, white greeting, a light pill anchored to the bottom
-   edge of the image), reused here since the truck photo/gradient pairing
-   already exists rather than sourcing a second image treatment. */
+   Deliberately no photo/image treatment — flat, dense, high-contrast type,
+   restrained color (Uber Driver's home screen was the reference, not a
+   destination-app hero): the greeting is just large type on the same plain
+   surface as the rest of the dashboard, so the eye goes straight to the
+   trip data instead of decoration. */
 .dash-hero {
-  position: relative;
-  background-image: linear-gradient(180deg, rgba(10,14,10,0.25) 0%, rgba(8,12,10,0.55) 60%, rgba(8,12,10,0.9) 100%), url('assets/hero-truck.jpeg');
-  background-size: cover;
-  background-position: center 55%;
-  color: #fff;
-  margin: -4px calc(-1 * var(--space-screen-margin)) 0;
-  padding: 20px var(--space-screen-margin) 32px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
 }
 .dash-hero__top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.dash-hero__sub { color: rgba(255,255,255,0.78); margin-top: 2px; }
+.dash-hero__sub { margin-top: 2px; }
 .dash-hero__bell {
   position: relative;
-  width: 36px; height: 36px; flex-shrink: 0;
+  width: 34px; height: 34px; flex-shrink: 0;
   border-radius: 50%;
-  background: rgba(255,255,255,0.16);
+  background: var(--surface-neutral-dark);
   border: none;
-  color: #fff;
-  font-size: 16px;
+  color: var(--text-neutral-title);
+  font-size: 15px;
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
 }
-.dash-hero__bell:hover { background: rgba(255,255,255,0.26); }
+.dash-hero__bell:hover { background: var(--surface-neutral-darker); }
 .dash-hero__bell-dot {
-  position: absolute; top: 5px; right: 6px;
+  position: absolute; top: 4px; right: 5px;
   width: 8px; height: 8px; border-radius: 50%;
-  background: var(--color-orange-400, #f0a640);
-  border: 1.5px solid rgba(0,0,0,0.4);
+  background: var(--warning-surface);
+  border: 1.5px solid var(--surface-neutral-light);
 }
 
 /* ---------- Bottom tab bar ---------- */
@@ -901,22 +894,24 @@ button { font-family: inherit; }
 }
 .os-alert__btn--muted { font-weight: 600; }
 
-/* ---------- Dashboard tracking-status pill ---------- */
-.tracking-pill {
+/* ---------- Dashboard tracking status (compact inline, not a banner) ---------- */
+.tracking-status {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 12px;
-  border-radius: var(--radius-sm);
   font-size: var(--type-body-sm-size);
+  color: var(--text-neutral-subtitle);
 }
-.tracking-pill--active { background: var(--badge-bg-green-light); color: var(--badge-text-green); }
-.tracking-pill--limited { background: var(--badge-bg-orange-light); color: var(--badge-text-orange); justify-content: space-between; }
-.tracking-pill__fix {
+.tracking-status--limited { color: var(--warning-text); }
+.tracking-status__text { flex: 1; min-width: 0; }
+.tracking-status__dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.tracking-status__dot--active { background: var(--success-surface); }
+.tracking-status__dot--limited { background: var(--warning-surface); }
+.tracking-status__fix {
   background: none;
   border: 1.5px solid currentColor;
   border-radius: var(--radius-full);
-  padding: 4px 10px;
+  padding: 3px 10px;
   font-size: 11px;
   font-weight: 600;
   font-family: inherit;
@@ -944,38 +939,69 @@ button { font-family: inherit; }
 .active-trip { border: 1px solid var(--border-neutral-default); border-radius: var(--radius-md); padding: 16px; background: var(--surface-neutral-light); }
 .active-trip__summary { display: flex; flex-direction: column; gap: 2px; width: 100%; cursor: pointer; }
 .active-trip__summary-top { display: flex; align-items: center; justify-content: space-between; }
-.active-trip__timeline { display: flex; flex-direction: column; gap: 10px; }
+.active-trip__timeline { display: flex; flex-direction: column; gap: 4px; }
 
-/* One stop within the timeline. The connecting vertical line is drawn with a
-   left border on the list wrapper and a notch removed for the first/last item. */
+/* Small neutral circular icon button — Uber-style compact secondary action
+   instead of a full-width outlined button competing for attention. */
+.icon-btn {
+  width: 30px; height: 30px; flex-shrink: 0;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--text-neutral-caption);
+  font-size: 14px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.icon-btn:hover { background: var(--surface-neutral-dark); color: var(--critical-text); }
+
+/* One stop within the trip timeline — a hairline-and-dot list, not a card.
+   The connecting line/dot pattern repeats one level deeper for the stages
+   inside an expanded stop (.stage-item below), so the whole thing reads as
+   one continuous, scannable hierarchy instead of boxes nested in boxes. */
 .stop-list { position: relative; display: flex; flex-direction: column; gap: 0; }
-.stop-item { position: relative; padding-left: 22px; padding-bottom: 14px; }
-.stop-item::before { /* connecting line */
-  content: ''; position: absolute; left: 5px; top: 14px; bottom: -4px; width: 2px;
+.stop-item { position: relative; padding-left: 20px; padding-bottom: 4px; }
+.stop-item::before {
+  content: ''; position: absolute; left: 4px; top: 16px; bottom: -2px; width: 2px;
   background: var(--border-neutral-default);
 }
 .stop-item:last-child::before { display: none; }
-.stop-item::after { /* stop dot */
-  content: ''; position: absolute; left: 0; top: 4px; width: 12px; height: 12px;
+.stop-item::after {
+  content: ''; position: absolute; left: 0; top: 6px; width: 10px; height: 10px;
   border-radius: 50%; background: var(--color-neutrals-300); border: 2px solid var(--surface-neutral-light);
 }
 .stop-item--active::after { background: var(--surface-brand-default); }
 .stop-item--completed::after { background: var(--success-surface); }
 
-.stop-card { border: 1px solid var(--border-neutral-default); border-radius: var(--radius-sm); background: var(--surface-neutral-default); }
-.stop-item--active .stop-card { border-color: var(--border-brand-default); }
-.stop-summary { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; padding: 10px 12px; cursor: pointer; width: 100%; }
+.stop-summary { display: flex; align-items: flex-start; justify-content: space-between; gap: 4px; cursor: pointer; width: 100%; padding: 6px 0; }
+.stop-summary__main { min-width: 0; }
 .stop-summary__title { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.stop-summary__meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.stop-body { padding: 4px 12px 12px; display: flex; flex-direction: column; gap: 10px; }
+.stop-summary__meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
+.stop-body { padding: 2px 0 12px; display: flex; flex-direction: column; gap: 4px; }
 
-/* Milestone row */
-.milestone-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-top: 1px solid var(--border-neutral-lighter, var(--color-neutrals-200)); }
-.stop-body > .milestone-row:first-child { border-top: none; }
-.milestone-row--pending { opacity: 0.5; }
-.milestone-row__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.milestone-row__label-line { display: flex; align-items: center; gap: 6px; }
-.milestone-row__actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+/* Stage list — same dot/line timeline language as .stop-item, one indent
+   level in, so a stop's stages read as a natural continuation of the trip
+   timeline rather than a visually distinct component. */
+.stage-list { position: relative; display: flex; flex-direction: column; padding-left: 4px; }
+.stage-item { position: relative; padding-left: 18px; padding-bottom: 12px; }
+.stage-item::before {
+  content: ''; position: absolute; left: 3px; top: 14px; bottom: -2px; width: 2px;
+  background: var(--border-neutral-lighter, var(--color-neutrals-200));
+}
+.stage-item:last-child::before { display: none; }
+.stage-item::after {
+  content: ''; position: absolute; left: 0; top: 5px; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--color-neutrals-300);
+}
+.stage-item--done::after { background: var(--surface-brand-default); }
+.stage-item--active::after { background: var(--surface-brand-default); box-shadow: 0 0 0 3px var(--surface-brand-lighter); }
+.stage-item--eta::after { background: var(--surface-neutral-light); border: 1.5px solid var(--border-neutral-dark); width: 7px; height: 7px; }
+.stage-item__row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.stage-item__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.stage-item__action { flex-shrink: 0; }
+.stage-item__check { color: var(--success-text); font-weight: 600; }
+.stage-item__sub { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+
 .timestamp-btn {
   background: none; border: none; padding: 2px 4px; margin: -2px -4px; border-radius: var(--radius-xs);
   font: inherit; color: var(--text-neutral-subtitle); cursor: pointer; text-decoration: underline dotted;
@@ -984,10 +1010,9 @@ button { font-family: inherit; }
 .timestamp-edit { display: flex; align-items: center; gap: 6px; }
 
 /* Order / POD rows */
-.order-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border-radius: var(--radius-xs); background: var(--surface-neutral-light); }
+.order-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border-radius: var(--radius-xs); background: var(--surface-neutral-default); }
 .order-row__label { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 
-.stop-actions { display: flex; gap: 8px; }
 .exception-flag { color: var(--critical-text); }
 
 /* ---------- POD / exception drawers (bottom sheets) ---------- */
