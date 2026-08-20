@@ -77,14 +77,18 @@ const ROUTE_META = {
   'self-reg-gdpr': { flow: 'self-reg', step: 5, total: 7 },
   'self-reg-pin': { flow: 'self-reg', step: 6, total: 7 },
   'self-reg-pending': { flow: 'self-reg', step: 7, total: 7 },
-  'portal-sms': { flow: 'portal', step: 1, total: 8 },
-  'portal-install': { flow: 'portal', step: 2, total: 8 },
-  'portal-code': { flow: 'portal', step: 3, total: 8 },
-  'portal-confirm': { flow: 'portal', step: 4, total: 8 },
-  'portal-otp': { flow: 'portal', step: 5, total: 8 },
-  'portal-pin': { flow: 'portal', step: 6, total: 8 },
-  'portal-gdpr': { flow: 'portal', step: 7, total: 8 },
-  'portal-complete': { flow: 'portal', step: 8, total: 8 },
+  // portal-sms and portal-install both happen before the driver has the app
+  // open at all (a text message, then either the App Store or manually
+  // switching to an already-installed app) — neither is a real numbered step
+  // in CtrlChain's own onboarding, so neither gets progress-bar chrome.
+  'portal-sms': null,
+  'portal-install': null,
+  'portal-code': { flow: 'portal', step: 1, total: 6 },
+  'portal-confirm': { flow: 'portal', step: 2, total: 6 },
+  'portal-otp': { flow: 'portal', step: 3, total: 6 },
+  'portal-pin': { flow: 'portal', step: 4, total: 6 },
+  'portal-gdpr': { flow: 'portal', step: 5, total: 6 },
+  'portal-complete': { flow: 'portal', step: 6, total: 6 },
   'returning-entry': { flow: 'returning', step: 1, total: 2 },
   'returning-pin': { flow: 'returning', step: 2, total: 2 },
   'returning-password': { flow: 'returning', step: 2, total: 2 },
@@ -522,19 +526,27 @@ const SCREENS = {
     note: "Prototype: tap the link above to continue. (Token is hashed, single-use, ~10-15 min validity.)",
   }),
 
+  // A plain app-store link, sent separately from the code — no deferred
+  // deep-linking dependency. This happens before the driver has CtrlChain
+  // open at all, so it can't be one of our own numbered in-app screens; it's
+  // styled to read as the App Store, not as step 2 of onboarding. Either path
+  // (install, or already have it) ends at the same place: portal-code, the
+  // app's real first screen once actually opened.
   'portal-install': () => ({
+    hideHeader: true,
     content: h`
-      <div class="t-body-md t-muted">A plain app-store link is sent separately from the code — no deferred deep-linking dependency.</div>
-      <div class="card" style="align-items:center; text-align:center;">
-        <div style="font-size:36px;">&#128241;</div>
-        <div class="t-label-lg">CtrlChain Driver</div>
-        <div class="t-body-sm t-muted">Install the app, then open it to continue.</div>
+      <div class="appstore-mock">
+        <div class="appstore-mock__nav">&#8249; App Store</div>
+        <div class="appstore-mock__card">
+          <div class="appstore-mock__icon"><img src="assets/logo-icon.svg" alt="" /></div>
+          <div class="appstore-mock__title">CtrlChain Driver</div>
+          <div class="appstore-mock__subtitle">Business</div>
+          <button type="button" class="appstore-mock__get" onclick="App.nav('portal-code')">GET</button>
+        </div>
+        <div class="appstore-mock__caption">A plain app-store link is sent separately from the code — no deferred deep-linking dependency.</div>
       </div>
     `,
-    footer: () => h`
-      <button class="btn btn-primary" onclick="App.nav('portal-code')">Install &amp; open app</button>
-      <button class="btn btn-text" onclick="App.nav('portal-code')">Already installed? Continue</button>
-    `,
+    footer: () => h`<div class="messages-mock__note">Prototype: tap GET to simulate installing and opening the app. Already installed? <a class="btn-link" onclick="App.nav('portal-code')">Skip straight to the app</a>.</div>`,
   }),
 
   'portal-code': () => ({
