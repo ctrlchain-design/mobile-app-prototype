@@ -83,12 +83,11 @@ const ROUTE_META = {
   // in CtrlChain's own onboarding, so neither gets progress-bar chrome.
   'portal-sms': null,
   'portal-install': null,
-  'portal-code': { flow: 'portal', step: 1, total: 6 },
-  'portal-confirm': { flow: 'portal', step: 2, total: 6 },
-  'portal-otp': { flow: 'portal', step: 3, total: 6 },
-  'portal-pin': { flow: 'portal', step: 4, total: 6 },
-  'portal-gdpr': { flow: 'portal', step: 5, total: 6 },
-  'portal-complete': { flow: 'portal', step: 6, total: 6 },
+  'portal-code': { flow: 'portal', step: 1, total: 5 },
+  'portal-confirm': { flow: 'portal', step: 2, total: 5 },
+  'portal-pin': { flow: 'portal', step: 3, total: 5 },
+  'portal-gdpr': { flow: 'portal', step: 4, total: 5 },
+  'portal-complete': { flow: 'portal', step: 5, total: 5 },
   'returning-entry': { flow: 'returning', step: 1, total: 2 },
   'returning-pin': { flow: 'returning', step: 2, total: 2 },
   'returning-password': { flow: 'returning', step: 2, total: 2 },
@@ -122,7 +121,6 @@ const TITLES = {
   'portal-install': 'Get the app',
   'portal-code': 'Enter your code',
   'portal-confirm': 'Confirm your details',
-  'portal-otp': 'Verify your number',
   'portal-pin': 'Secure your account',
   'portal-gdpr': 'Terms & privacy',
   'portal-complete': "You're all set",
@@ -150,7 +148,6 @@ function freshState() {
     lastName: '',
     gdprAccepted: false,
     portalCode: '',
-    portalOtp: '',
     pin: '',
     pinTarget: 'dashboard',
     portalGdprAccepted: false,
@@ -578,26 +575,11 @@ const SCREENS = {
           <div class="readonly-field">${record.phone}</div>
         </div>
       `,
-      // Reactivating drivers already proved they hold this phone/email by
-      // verifying the 8-digit code sent to it — re-verifying via OTP here
-      // would just repeat the same check. Skip straight to PIN setup.
-      footer: () => state.reactivating
-        ? h`<button class="btn btn-primary" onclick="App.set('pinTarget','portal-gdpr'); App.nav('portal-pin')">This is me — continue</button>`
-        : h`<button class="btn btn-primary" onclick="App.nav('portal-otp')">This is me — continue</button>`,
-    };
-  },
-
-  'portal-otp': () => {
-    const record = currentPortalRecord();
-    return {
-      content: h`
-        <div class="t-body-md t-muted">We've sent a code to ${record.phone} to confirm it's really you.</div>
-        <div class="otp-row">
-          ${[0,1,2,3,4,5].map(i => h`<input class="otp-box" inputmode="numeric" maxlength="1" oninput="App.otpInput(this, ${i}, '.otp-box', 'portalOtp')" onkeydown="App.otpKeydown(event, ${i}, '.otp-box')" />`).join('')}
-        </div>
-        <div class="t-body-sm t-caption">Demo: any 6 digits will verify.</div>
-      `,
-      footer: () => h`<button class="btn btn-primary" ${state.portalOtp.length === 6 ? '' : 'disabled'} onclick="App.set('pinTarget','portal-gdpr'); App.nav('portal-pin')">Verify</button>`,
+      // The 8-digit activation code (portal-code) already proved the driver
+      // holds this phone number — a second OTP here would just re-check the
+      // same channel. Straight to PIN setup for both first-time and
+      // reactivating drivers.
+      footer: () => h`<button class="btn btn-primary" onclick="App.set('pinTarget','portal-gdpr'); App.nav('portal-pin')">This is me — continue</button>`,
     };
   },
 
