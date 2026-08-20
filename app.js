@@ -569,7 +569,12 @@ const SCREENS = {
           <div class="readonly-field">${record.phone}</div>
         </div>
       `,
-      footer: () => h`<button class="btn btn-primary" onclick="App.nav('portal-otp')">This is me — continue</button>`,
+      // Reactivating drivers already proved they hold this phone/email by
+      // verifying the 8-digit code sent to it — re-verifying via OTP here
+      // would just repeat the same check. Skip straight to PIN setup.
+      footer: () => state.reactivating
+        ? h`<button class="btn btn-primary" onclick="App.set('pinTarget','portal-gdpr'); App.nav('portal-pin')">This is me — continue</button>`
+        : h`<button class="btn btn-primary" onclick="App.nav('portal-otp')">This is me — continue</button>`,
     };
   },
 
