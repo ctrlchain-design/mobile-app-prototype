@@ -19,12 +19,17 @@ const MOCK_PLANNER_RECORD = {
 
 const MOCK_RETURNING_DRIVER = { firstName: 'Jordan', lastName: 'Reyes', carrier: 'Meridian Freight Ltd', phone: '+44 7700 900456' };
 
+/* Index into MILESTONE_STAGES below — drives the stepper shown on the dashboard's
+   "Today" card and on trip detail. Purely a status visualization in this prototype;
+   actually advancing a trip through these stages is Phase 2 (milestone confirmation). */
+const MILESTONE_STAGES = ['Assigned', 'Heading to pickup', 'At pickup', 'In transit', 'Delivered'];
+
 const MOCK_TRIPS = [
-  { id: 'TRIP2026-000123', pickup: 'Meridian Distribution Centre, Coventry', dropoff: 'Aldi RDC, Bristol', status: 'Upcoming', badge: 'info', eta: 'Today, 14:30' },
-  { id: 'TRIP2026-000124', pickup: 'Heathrow Cargo Terminal', dropoff: 'Southampton Docks', status: 'Scheduled', badge: 'warning', eta: 'Tomorrow, 08:00' },
+  { id: 'TRIP2026-000123', pickup: 'Meridian Distribution Centre, Coventry', dropoff: 'Aldi RDC, Bristol', status: 'Upcoming', badge: 'info', eta: 'Today, 14:30', milestoneStage: 1 },
+  { id: 'TRIP2026-000124', pickup: 'Heathrow Cargo Terminal', dropoff: 'Southampton Docks', status: 'Scheduled', badge: 'warning', eta: 'Tomorrow, 08:00', milestoneStage: 0 },
 ];
 
-const MOCK_GUEST_TRIP = { id: 'TRIP2026-000142', pickup: 'Heathrow Cargo Terminal', dropoff: 'Southampton Docks', status: 'In progress', badge: 'info', eta: 'Today, 16:00' };
+const MOCK_GUEST_TRIP = { id: 'TRIP2026-000142', pickup: 'Heathrow Cargo Terminal', dropoff: 'Southampton Docks', status: 'In progress', badge: 'info', eta: 'Today, 16:00', milestoneStage: 3 };
 
 /* 8 digits, not 6 — backend preference, harder to brute-force than a 6-digit code. */
 const MOCK_ACTIVATION_CODE = '48213976';
@@ -324,6 +329,78 @@ function tripCard(trip, clickable) {
       </div>
       <div class="t-body-sm t-muted">${trip.pickup} &#8594; ${trip.dropoff}</div>
       <div class="t-body-sm t-caption">ETA ${trip.eta}</div>
+    </div>
+  `;
+}
+
+/* Time-of-day greeting for the dashboard header — small touch, but it's the
+   difference between "Welcome" (a system talking) and a driver feeling checked-in on. */
+function greeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 18) return 'Good afternoon';
+  return 'Good evening';
+}
+
+/* Horizontal dot-line stepper (Uber Eats / Blinkit / Glovo pattern) — a status
+   visualization only in this prototype. Advancing a trip through stages for real
+   is milestone confirmation, which is Phase 2. */
+function milestoneStepper(stageIndex) {
+  const dots = MILESTONE_STAGES.map((_, i) => {
+    const state = i < stageIndex ? 'done' : i === stageIndex ? 'active' : 'todo';
+    const dot = h`<div class="ms-dot ms-dot--${state}"></div>`;
+    if (i === MILESTONE_STAGES.length - 1) return dot;
+    const lineState = i < stageIndex ? 'done' : 'todo';
+    return dot + h`<div class="ms-line ms-line--${lineState}"></div>`;
+  }).join('');
+  return h`
+    <div class="milestone-stepper">
+      <div class="milestone-stepper__track">${dots}</div>
+      <div class="t-label-sm milestone-stepper__label">${MILESTONE_STAGES[stageIndex]}</div>
+    </div>
+  `;
+}
+
+/* Vertical dot / dashed-line / pin route visual for pickup -> drop-off, replacing
+   the plain "A -> B" text row used elsewhere in the app. */
+function routeVisual(pickup, dropoff) {
+  return h`
+    <div class="route-visual">
+      <div class="route-visual__markers">
+        <div class="route-visual__dot"></div>
+        <div class="route-visual__line"></div>
+        <div class="route-visual__pin"></div>
+      </div>
+      <div class="route-visual__stops">
+        <div class="route-visual__stop">
+          <div class="t-caption">Pickup</div>
+          <div class="t-body-md">${pickup}</div>
+        </div>
+        <div class="route-visual__stop">
+          <div class="t-caption">Drop-off</div>
+          <div class="t-body-md">${dropoff}</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+/* The dashboard's single "Today" card — the next actionable trip, always above the
+   fold, DoorDash "Current dash"-style. clickable trips lead to the same trip-detail
+   screen as the compact rows in the Upcoming list; it isn't a separate flow. */
+function todayTripCard(trip, label) {
+  return h`
+    <div class="card today-card" onclick="App.viewTrip('${trip.id}')">
+      <div class="today-card__top">
+        <span class="t-label-sm t-caption">${label || 'TODAY'}</span>
+        <span class="badge badge--${trip.badge}">${trip.status}</span>
+      </div>
+      <div class="t-headline-sm">${trip.pickup} &#8594; ${trip.dropoff}</div>
+      ${milestoneStepper(trip.milestoneStage)}
+      <div class="today-card__footer">
+        <span class="t-body-sm t-muted">ETA ${trip.eta}</span>
+        <span class="today-card__chevron">View details &#8250;</span>
+      </div>
     </div>
   `;
 }
@@ -800,11 +877,16 @@ const SCREENS = {
     if (state.dashboardMode === 'guest') {
       return {
         content: h`
+          <div class="dash-header">
+            <div class="t-headline-md">${greeting()}</div>
+            <span class="badge badge--info">Guest access — this trip only</span>
+          </div>
           ${trackingStatusBanner()}
-          <span class="badge badge--info">Guest access — this trip only</span>
-          <div class="t-headline-sm" style="margin-top:4px;">Your trip</div>
-          ${tripCard(MOCK_GUEST_TRIP, true)}
-          <div class="card" style="margin-top:4px;">
+          <div class="dash-section">
+            <div class="t-label-sm t-caption dash-section__label">TODAY</div>
+            ${todayTripCard(MOCK_GUEST_TRIP)}
+          </div>
+          <div class="card">
             <div class="t-body-sm t-muted">This access ends automatically once the trip is marked complete — nothing to clean up.</div>
           </div>
         `,
@@ -818,15 +900,29 @@ const SCREENS = {
     const carrier = state.activeFlow === 'self-reg' ? MOCK_PLANNER_RECORD.carrier
       : state.activeFlow === 'returning' ? MOCK_RETURNING_DRIVER.carrier
       : MOCK_PLANNER_RECORD.carrier;
+    const [today, ...upcoming] = MOCK_TRIPS;
     return {
       content: h`
+        <div class="dash-header">
+          <div class="t-headline-md">${greeting()}, ${name.split(' ')[0] || 'driver'}</div>
+          <div class="t-body-sm t-muted">${carrier} &middot; Full trip visibility</div>
+        </div>
         ${trackingStatusBanner()}
-        <div class="t-headline-md">Welcome, ${name.split(' ')[0] || 'driver'}</div>
-        <div class="t-body-sm t-muted">${carrier}</div>
-        <span class="badge badge--success">Full trip visibility</span>
-        <div class="t-headline-sm" style="margin-top:8px;">Your trips</div>
-        <div class="t-body-sm t-caption">Non-sequential list — tap any trip for details.</div>
-        ${MOCK_TRIPS.map(t => tripCard(t, true)).join('')}
+        ${today ? h`
+          <div class="dash-section">
+            <div class="t-label-sm t-caption dash-section__label">TODAY</div>
+            ${todayTripCard(today)}
+          </div>
+        ` : ''}
+        <div class="dash-section">
+          <div class="dash-section__row">
+            <span class="t-label-sm t-caption dash-section__label">UPCOMING</span>
+            <span class="t-caption">${upcoming.length ? `${upcoming.length} trip${upcoming.length > 1 ? 's' : ''} &middot; non-sequential` : ''}</span>
+          </div>
+          ${upcoming.length
+            ? upcoming.map(t => tripCard(t, true)).join('')
+            : h`<div class="t-body-sm t-caption dash-empty-note">No other trips scheduled right now.</div>`}
+        </div>
       `,
       footer: () => h`<button class="btn btn-subtle" onclick="App.restartFlow()">Restart this flow</button>`,
     };
@@ -836,13 +932,15 @@ const SCREENS = {
     const trip = MOCK_TRIPS.concat([MOCK_GUEST_TRIP]).find(t => t.id === state.selectedTripId) || MOCK_TRIPS[0];
     return {
       content: h`
-        <span class="badge badge--${trip.badge}">${trip.status}</span>
-        <div class="card" style="width:100%;">
-          <div class="t-label-lg">${trip.id}</div>
-          <div class="t-body-md">${trip.pickup}</div>
-          <div class="t-body-sm t-caption">&#8595; pickup</div>
-          <div class="t-body-md">${trip.dropoff}</div>
-          <div class="t-body-sm t-caption">&#8593; drop-off</div>
+        <div class="trip-detail__top">
+          <span class="t-label-md">${trip.id}</span>
+          <span class="badge badge--${trip.badge}">${trip.status}</span>
+        </div>
+        <div class="card">
+          ${milestoneStepper(trip.milestoneStage)}
+        </div>
+        <div class="card">
+          ${routeVisual(trip.pickup, trip.dropoff)}
         </div>
         <div class="card">
           <div class="t-label-md">ETA</div>
