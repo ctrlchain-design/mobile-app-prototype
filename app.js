@@ -671,10 +671,10 @@ function completeMilestoneByIds(tripId, stopId, milestoneId) {
    never actually has more than one active at a time. */
 function activeTripSection(trips) {
   return trips.map(trip => h`
-    <sl-details class="active-trip" ${isExpanded(trip.id, true) ? 'open' : ''} onclick="if(event.target.closest('[data-role=summary]')) App.toggleExpand('${trip.id}', ${isExpanded(trip.id, true)})">
+    <sl-details class="active-trip" ${isExpanded(trip.id, true) ? 'open' : ''} onclick="if (event.target.closest('sl-details') === this && event.target.closest('[data-role=summary]')) App.toggleExpand('${trip.id}', ${isExpanded(trip.id, true)})">
       <div slot="summary" data-role="summary" class="active-trip__summary">
         <div class="active-trip__summary-top">
-          <span class="t-label-md">${trip.id}</span>
+          <span class="t-label-lg">${trip.id}</span>
           <span class="badge badge--info">In progress</span>
         </div>
         <span class="t-body-sm t-caption">${trip.stops.length} stops &middot; ${trip.stops.reduce((n, s) => n + s.orders.length, 0)} orders</span>
@@ -711,7 +711,7 @@ function stopItem(trip, stop) {
   const orderCount = stop.orders.length;
   return h`
     <div class="stop-item stop-item--${status}">
-      <sl-details ${expanded ? 'open' : ''} onclick="if(event.target.closest('[data-role=summary]')) App.toggleExpand('${stop.id}', ${expanded})">
+      <sl-details ${expanded ? 'open' : ''} onclick="if (event.target.closest('sl-details') === this && event.target.closest('[data-role=summary]')) App.toggleExpand('${stop.id}', ${expanded})">
         <div slot="summary" data-role="summary" class="stop-summary">
           <div class="stop-summary__main">
             <div class="stop-summary__title">
@@ -723,10 +723,12 @@ function stopItem(trip, stop) {
               ${orderCount > 1 ? h`<span class="badge badge--info">${orderCount} orders</span>` : ''}
             </div>
           </div>
-          <button type="button" class="icon-btn" title="Report exception" onclick="event.stopPropagation(); App.openExceptionSheet('${trip.id}','${stop.id}')">&#9888;</button>
         </div>
         <div class="stop-body">
           <div class="stage-list">${stop.milestones.map(m => stageItem(trip, stop, m)).join('')}</div>
+          <button type="button" class="report-issue-link" onclick="App.openExceptionSheet('${trip.id}','${stop.id}')">
+            <span aria-hidden="true">&#9888;</span> Report an issue with this stop
+          </button>
         </div>
       </sl-details>
     </div>
@@ -859,13 +861,13 @@ function exceptionSheetMarkup() {
     stop = trip && findStop(trip, state.exceptionSheet.stopId);
   }
   return h`
-    <sl-drawer id="exception-drawer" label="Report exception" placement="bottom" ${open ? 'open' : ''} onsl-request-close="App.closeExceptionSheet()">
+    <sl-drawer id="exception-drawer" label="Report an issue" placement="bottom" ${open ? 'open' : ''} onsl-request-close="App.closeExceptionSheet()">
       ${open ? h`
         <div class="sheet-body">
           <div class="t-body-sm t-muted">${stop.location}</div>
           <div class="sheet-field">
-            <label class="t-label-sm">Type</label>
-            <sl-select id="exception-type">
+            <label class="t-label-sm">What kind of issue?</label>
+            <sl-select id="exception-type" placeholder="Select one">
               ${EXCEPTION_TYPES.map(t => h`<sl-option value="${t.value}">${t.label}</sl-option>`).join('')}
             </sl-select>
           </div>

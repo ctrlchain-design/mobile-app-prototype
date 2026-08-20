@@ -941,19 +941,28 @@ button { font-family: inherit; }
 .active-trip__summary-top { display: flex; align-items: center; justify-content: space-between; }
 .active-trip__timeline { display: flex; flex-direction: column; gap: 4px; }
 
-/* Small neutral circular icon button — Uber-style compact secondary action
-   instead of a full-width outlined button competing for attention. */
-.icon-btn {
-  width: 30px; height: 30px; flex-shrink: 0;
-  border-radius: 50%;
+/* Report-an-issue action — always a legible label, never an icon alone: a
+   lone warning-triangle button reads as ambiguous status chrome rather than
+   a tappable action, especially for a driver who isn't reading it as a
+   designer would. Lives in the stop's body (not its clickable summary), both
+   so it never fights the accordion's own expand/collapse click and so there's
+   room for real words. Kept visually quiet — a tertiary utility action, not
+   competing with the Confirm/Mark done buttons above it. */
+.report-issue-link {
+  align-self: flex-start;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
   border: none;
-  background: transparent;
-  color: var(--text-neutral-caption);
-  font-size: 14px;
+  padding: 6px 2px;
+  font: inherit;
+  font-size: var(--type-body-sm-size);
+  color: var(--text-neutral-subtitle);
   cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
 }
-.icon-btn:hover { background: var(--surface-neutral-dark); color: var(--critical-text); }
+.report-issue-link:hover { color: var(--critical-text); }
 
 /* One stop within the trip timeline — a hairline-and-dot list, not a card.
    The connecting line/dot pattern repeats one level deeper for the stages
