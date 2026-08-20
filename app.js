@@ -196,7 +196,6 @@ function currentPortalRecord() {
 
 /* Route metadata: { flow, step, total } for progress display. null = terminal/no-flow screen. */
 const ROUTE_META = {
-  'welcome': null,
   'self-reg-welcome': null,
   'self-reg-social-google': null,
   'self-reg-social-apple': null,
@@ -222,9 +221,8 @@ const ROUTE_META = {
   'returning-password': { flow: 'returning', step: 2, total: 2 },
   'returning-request-activation': { flow: 'returning', step: 2, total: 3 },
   'returning-activation-sent': { flow: 'returning', step: 3, total: 3 },
-  'guest-sms': { flow: 'guest', step: 1, total: 3 },
-  'guest-trust': { flow: 'guest', step: 2, total: 3 },
-  'guest-scoped': { flow: 'guest', step: 3, total: 3 },
+  'guest-sms': { flow: 'guest', step: 1, total: 2 },
+  'guest-trust': { flow: 'guest', step: 2, total: 2 },
   'location-priming': null,
   'location-os-prompt-1': null,
   'location-os-prompt-2': null,
@@ -240,7 +238,6 @@ const FLOW_FIRST_ROUTE = { 'self-reg': 'self-reg-welcome', 'portal': 'portal-sms
 const FLOW_LABELS = { 'self-reg': 'Self-Registration', 'portal': 'Portal-Based (Magic Link)', 'returning': 'Returning Driver', 'guest': 'Guest / One-Off' };
 
 const TITLES = {
-  'welcome': '',
   'self-reg-welcome': '',
   'self-reg-signup': 'Create your account',
   'self-reg-otp': 'Verify your number',
@@ -262,7 +259,6 @@ const TITLES = {
   'returning-activation-sent': 'Enter code',
   'guest-sms': 'Guest access',
   'guest-trust': "You've been added",
-  'guest-scoped': 'Single-trip access',
   'dashboard': 'Dashboard',
   'nav-trips': 'My Trips',
   'nav-notifications': 'Notifications',
@@ -292,7 +288,7 @@ function freshState() {
     reactivationContact: '',
     reactivationCode: '',
     reactivating: false,
-    locationPermission: null, // null | 'always' | 'while-using' | 'denied'
+    locationPermission: null, // null | 'always' | 'while-using' | 'once' | 'denied'
 
     // Mutable copies — the driver confirms milestones, edits timestamps, and
     // uploads PODs against these, never against the MOCK_* constants directly.
@@ -358,12 +354,12 @@ const App = {
       state.activeFlow = flow;
       setHash(FLOW_FIRST_ROUTE[flow]);
     } else {
-      setHash('welcome');
+      setHash('self-reg-welcome');
     }
   },
 
   back() {
-    setHash(navHistory.pop() || 'welcome');
+    setHash(navHistory.pop() || 'self-reg-welcome');
   },
 
   set(key, value) {
@@ -593,7 +589,13 @@ const App = {
 };
 
 function currentRoute() {
-  return window.location.hash.replace('#', '') || 'welcome';
+  // No standalone "choose a flow" screen — a real driver never picks between
+  // Self-Registration/Portal/Returning/Guest as an in-app menu (that choice
+  // is made for them by how they arrived: fresh install, an SMS link, or
+  // already having an account). Self-Registration's own welcome screen is
+  // the actual front door; the other flows are reached via a real deep link
+  // (or, for review, the flow-switcher bar above the device).
+  return window.location.hash.replace('#', '') || 'self-reg-welcome';
 }
 
 function h(strings, ...values) {
@@ -1067,51 +1069,6 @@ function tabBarMarkup(activeRoute) {
 
 const SCREENS = {
 
-  'welcome': () => ({
-    hideHeader: true,
-    content: h`
-      <div class="hero">
-        <img class="hero__logo" src="assets/logo-white.svg" alt="CtrlChain" />
-        <div class="t-body-md hero__tagline">Moving transport forward</div>
-      </div>
-      <div class="t-body-md t-muted" style="padding: 0 2px;">
-        This prototype covers driver onboarding and the dashboard. Choose an entry path:
-      </div>
-      <button class="choice-card" onclick="App.switchFlow('self-reg')">
-        <div class="choice-card__icon">&#128241;</div>
-        <div class="choice-card__body">
-          <div class="t-label-lg">Self-Registration</div>
-          <div class="t-body-sm t-muted">Driver signs up on their own — no site or portal action needed first.</div>
-        </div>
-        <div class="choice-card__chevron">&#8250;</div>
-      </button>
-      <button class="choice-card" onclick="App.switchFlow('portal')">
-        <div class="choice-card__icon">&#128279;</div>
-        <div class="choice-card__body">
-          <div class="t-label-lg">Portal-Based (Magic Link)</div>
-          <div class="t-body-sm t-muted">Ops adds the driver in the CCA web portal; driver claims the account via a link.</div>
-        </div>
-        <div class="choice-card__chevron">&#8250;</div>
-      </button>
-      <button class="choice-card" onclick="App.switchFlow('returning')">
-        <div class="choice-card__icon">&#128260;</div>
-        <div class="choice-card__body">
-          <div class="t-label-lg">Returning Driver</div>
-          <div class="t-body-sm t-muted">Already has an account — quick PIN/Face ID sign-in, or reactivation if the session expired.</div>
-        </div>
-        <div class="choice-card__chevron">&#8250;</div>
-      </button>
-      <button class="choice-card" onclick="App.switchFlow('guest')">
-        <div class="choice-card__icon">&#127915;</div>
-        <div class="choice-card__body">
-          <div class="t-label-lg">Guest / One-Off Driver</div>
-          <div class="t-body-sm t-muted">Subcontracted for a single trip — scoped access, no account created.</div>
-        </div>
-        <div class="choice-card__chevron">&#8250;</div>
-      </button>
-    `,
-  }),
-
   /* ---------------- SELF-REGISTRATION ---------------- */
 
   'self-reg-welcome': () => ({
@@ -1240,7 +1197,7 @@ const SCREENS = {
     onLinkTap: "App.nav('portal-install')",
     reviewerNote: h`
       <div class="reviewer-sticky__title">Why this looks like Messages</div>
-      A real invite SMS opens the phone's own Messages app, not CtrlChain's UI — styled that way on purpose so it's never mistaken for an in-app screen. Tap the link bubble to continue. Token is single-use, ~10-15 min validity.
+      A real invite SMS opens the phone's own Messages app, not CtrlChain's UI — styled that way on purpose so it's never mistaken for an in-app screen. Tap the link bubble to continue.
     `,
   }),
 
@@ -1403,31 +1360,27 @@ const SCREENS = {
     onLinkTap: "App.nav('guest-trust')",
     reviewerNote: h`
       <div class="reviewer-sticky__title">Why this looks like Messages</div>
-      Styled like the phone's own Messages app, not CtrlChain's UI, so it's never mistaken for an in-app screen. Tap the link bubble to continue. Token is single-use, ~10-15 min validity.
+      Styled like the phone's own Messages app, not CtrlChain's UI, so it's never mistaken for an in-app screen. Tap the link bubble to continue.
     `,
   }),
 
+  /* Trust (who added you, and how to verify that) and scope (no account, no
+     password, ends automatically) used to be two separate steps — merged
+     into one: a real driver reads both in the same glance, and neither
+     message needed a screen of its own to land. Reached only by tapping the
+     link in the SMS mock, so there's nothing real to go "back" to. */
   'guest-trust': () => ({
+    hideBack: true,
     content: h`
       <div class="card card--tinted" style="text-align:center; align-items:center; padding:28px 20px;">
         <div style="font-size:32px;">&#9989;</div>
         <div class="t-headline-md">You've been added to Trip ${MOCK_GUEST_TRIP.id} by ${MOCK_PLANNER_RECORD.carrier}</div>
         <div class="t-body-sm t-muted">You can confirm this with ${MOCK_PLANNER_RECORD.carrier} directly if anything looks off.</div>
       </div>
-    `,
-    footer: () => h`<button class="btn btn-primary" onclick="App.nav('guest-scoped')">Continue</button>`,
-  }),
-
-  'guest-scoped': () => ({
-    content: h`
-      <div class="center-state">
-        <div class="center-state__icon center-state__icon--success">&#128274;</div>
-        <div class="t-headline-md">Scoped single-trip access</div>
-        <div class="t-body-md t-muted">No email, no password, no account created. Access ends automatically when the trip is complete.</div>
-        <div class="card trip-card" style="text-align:left; width:100%;">
-          <div class="trip-card__top"><span class="t-label-md">${MOCK_GUEST_TRIP.id}</span></div>
-          <div class="t-body-sm t-muted">${MOCK_GUEST_TRIP.stops[0].location} &#8594; ${MOCK_GUEST_TRIP.stops[MOCK_GUEST_TRIP.stops.length - 1].location}</div>
-        </div>
+      <div class="t-body-md t-muted">No email, no password, no account created. Access ends automatically when the trip is complete.</div>
+      <div class="card trip-card" style="text-align:left; width:100%;">
+        <div class="trip-card__top"><span class="t-label-md">${MOCK_GUEST_TRIP.id}</span></div>
+        <div class="t-body-sm t-muted">${MOCK_GUEST_TRIP.stops[0].location} &#8594; ${MOCK_GUEST_TRIP.stops[MOCK_GUEST_TRIP.stops.length - 1].location}</div>
       </div>
     `,
     footer: () => h`<button class="btn btn-primary" onclick="App.enterDashboard('guest')">Continue to trip</button>`,
@@ -1466,7 +1419,10 @@ const SCREENS = {
           <div class="os-alert__title">Allow &ldquo;CtrlChain&rdquo; to use your location?</div>
           <div class="os-alert__message">Your location is used to detect pickup arrival and share live trip updates with your carrier.</div>
           <div class="os-alert__actions">
-            <button class="os-alert__btn" onclick="App.set('locationPermission','while-using'); App.nav('location-os-prompt-2')">Allow Once</button>
+            <!-- "Once" is ephemeral and doesn't persist across app opens — real
+                 iOS never follows it with the Always-upgrade prompt, only a
+                 persistent "While Using" grant earns that follow-up. -->
+            <button class="os-alert__btn" onclick="App.set('locationPermission','once'); App.nav('dashboard')">Allow Once</button>
             <button class="os-alert__btn" onclick="App.set('locationPermission','while-using'); App.nav('location-os-prompt-2')">Allow While Using App</button>
             <button class="os-alert__btn os-alert__btn--muted" onclick="App.set('locationPermission','denied'); App.nav('location-denied')">Don't Allow</button>
           </div>
@@ -1806,15 +1762,16 @@ function updateFooterState() {
 
 function render() {
   const route = currentRoute();
-  const screen = SCREENS[route] ? SCREENS[route]() : SCREENS['welcome']();
+  const screen = SCREENS[route] ? SCREENS[route]() : SCREENS['self-reg-welcome']();
   const meta = ROUTE_META[route];
   // Guest access stays deliberately minimal (single trip, no account, no nav —
   // an established principle, not an oversight) and the locked/pending-approval
   // state has nothing yet to navigate to, so the tab bar is 'full' mode only.
   const isTabRoute = TAB_ROUTES.includes(route) && state.dashboardMode === 'full';
-  // 'welcome' and every bottom-tab screen are top-level destinations — nothing
-  // above them to go back to, regardless of how this session happened to arrive.
-  const canGoBack = route !== 'welcome' && !isTabRoute;
+  // The welcome screen, every bottom-tab screen, and any screen reached by
+  // tapping a link in an external mock (screen.hideBack) are top-level
+  // destinations — nothing a real driver could go "back" to from there.
+  const canGoBack = route !== 'self-reg-welcome' && !isTabRoute && !screen.hideBack;
 
   let headerHtml = '';
   if (!screen.hideHeader) {
