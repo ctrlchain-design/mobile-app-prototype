@@ -1007,9 +1007,16 @@ button { font-family: inherit; }
 .stage-item--eta::after { background: var(--surface-neutral-light); border: 1.5px solid var(--border-neutral-dark); width: 7px; height: 7px; }
 .stage-item__row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .stage-item__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.stage-item__label-line { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .stage-item__action { flex-shrink: 0; }
 .stage-item__check { color: var(--success-text); font-weight: 600; }
 .stage-item__sub { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+
+/* Pallet-exchange mismatch — Corax's extracted count vs what was expected,
+   with the actual count left editable right there (pre-filled with whatever
+   Corax detected, or blank if extraction failed outright). */
+.pallet-mismatch { display: flex; flex-direction: column; gap: 6px; margin-top: 2px; }
+.pallet-mismatch__input { max-width: 140px; }
 
 .timestamp-btn {
   background: none; border: none; padding: 2px 4px; margin: -2px -4px; border-radius: var(--radius-xs);
