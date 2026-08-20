@@ -68,10 +68,17 @@ const MOCK_ACTIVE_TRIPS = [
   {
     id: 'TRIP2026-000123',
     activeStopId: 'STOP-1',
+    // Consolidated, 2 orders — both are loaded at the one pickup and both are
+    // delivered at the one delivery, so the same two orders appear at both
+    // stops (previously PO-33211 only appeared at delivery, as if it had never
+    // been picked up — fixed here).
     stops: [
       {
         id: 'STOP-1', type: 'pickup', location: 'Meridian Distribution Centre, Coventry', appointment: 'Today, 08:00',
-        orders: [{ id: 'ORD-8841937', ref: 'PO-33210' }],
+        orders: [
+          { id: 'ORD-8841937', ref: 'PO-33210' },
+          { id: 'ORD-8841938', ref: 'PO-33211' },
+        ],
         milestones: (() => {
           const s = pickupStages('07:55');
           // Geofence fired 2 minutes early against the calculated ETA — a real
@@ -88,12 +95,6 @@ const MOCK_ACTIVE_TRIPS = [
           { id: 'ORD-8841938', ref: 'PO-33211', podUploaded: false },
         ],
         milestones: deliveryStages('14:30'),
-        exceptions: [],
-      },
-      {
-        id: 'STOP-3', type: 'delivery', location: 'Gloucester Services DC', appointment: 'Tomorrow, 08:00',
-        orders: [{ id: 'ORD-8841939', ref: 'PO-33212', podUploaded: false }],
-        milestones: deliveryStages('Tomorrow, 08:00'),
         exceptions: [],
       },
     ],
@@ -624,6 +625,13 @@ function findStop(trip, stopId) {
   return trip.stops.find(s => s.id === stopId);
 }
 
+/* An order picked up at one stop is the same order delivered at another, so
+   it appears in both stops' `orders` lists — summing stop.orders.length
+   double-counts it. Count distinct order ids across the whole trip instead. */
+function distinctOrderCount(trip) {
+  return new Set(trip.stops.flatMap(s => s.orders.map(o => o.id))).size;
+}
+
 function formatNowTime() {
   const d = new Date();
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
@@ -677,7 +685,7 @@ function activeTripSection(trips) {
           <span class="t-label-lg">${trip.id}</span>
           <span class="badge badge--info">In progress</span>
         </div>
-        <span class="t-body-sm t-caption">${trip.stops.length} stops &middot; ${trip.stops.reduce((n, s) => n + s.orders.length, 0)} orders</span>
+        <span class="t-body-sm t-caption">${trip.stops.length} stops &middot; ${distinctOrderCount(trip)} orders</span>
       </div>
       <div class="active-trip__timeline">${stopTimelineList(trip)}</div>
     </sl-details>
@@ -1526,7 +1534,7 @@ const SCREENS = {
           ${active.map(trip => h`
             <div class="card" onclick="App.goTab('dashboard')" style="cursor:pointer;">
               <div class="trip-card__top"><span class="t-label-md">${trip.id}</span><span class="badge badge--info">In progress</span></div>
-              <div class="t-body-sm t-muted">${trip.stops.length} stops &middot; ${trip.stops.reduce((n, s) => n + s.orders.length, 0)} orders</div>
+              <div class="t-body-sm t-muted">${trip.stops.length} stops &middot; ${distinctOrderCount(trip)} orders</div>
               <div class="t-body-sm t-caption">Tap to open on the dashboard</div>
             </div>
           `).join('')}
