@@ -511,18 +511,12 @@ const SCREENS = {
 
   /* ---------------- PORTAL-BASED (MAGIC LINK) ---------------- */
 
-  'portal-sms': () => ({
-    content: h`
-      <div class="t-body-md t-muted">Simulating the text message a driver receives after ops adds them in the CCA web portal.</div>
-      <div class="sms-mock">
-        <div class="sms-bubble">
-          <div class="t-body-md">You've been added as a driver by <strong>${MOCK_PLANNER_RECORD.carrier}</strong> on CtrlChain.</div>
-          <div class="t-body-sm sms-link" style="margin-top:8px;">app.ctrlchain.com/invite/8f2a1c&hellip;</div>
-        </div>
-      </div>
-      <div class="t-body-sm t-caption">Token is hashed, single-use, ~10-15 min validity.</div>
-    `,
-    footer: () => h`<button class="btn btn-primary" onclick="App.nav('portal-install')">&#128241; Tap the link</button>`,
+  'portal-sms': () => messagesAppScreen({
+    sender: 'CtrlChain',
+    body: h`You've been added as a driver by <strong>${MOCK_PLANNER_RECORD.carrier}</strong> on CtrlChain.<br/>`,
+    link: 'app.ctrlchain.com/invite/8f2a1c&hellip;',
+    onLinkTap: "App.nav('portal-install')",
+    note: "Prototype: tap the link above to continue. (Token is hashed, single-use, ~10-15 min validity.)",
   }),
 
   'portal-install': () => ({
@@ -680,18 +674,12 @@ const SCREENS = {
 
   /* ---------------- GUEST / ONE-OFF DRIVER ---------------- */
 
-  'guest-sms': () => ({
-    content: h`
-      <div class="t-body-md t-muted">Simulating the message a subcontracted driver receives for a single trip — no account required.</div>
-      <div class="sms-mock">
-        <div class="sms-bubble">
-          <div class="t-body-md">You've been given temporary access to <strong>Trip ${MOCK_GUEST_TRIP.id}</strong> by <strong>${MOCK_PLANNER_RECORD.carrier}</strong>.</div>
-          <div class="t-body-sm sms-link" style="margin-top:8px;">app.ctrlchain.com/trip/${MOCK_GUEST_TRIP.id}?t=e91a&hellip;</div>
-        </div>
-      </div>
-      <div class="t-body-sm t-caption">Hashed, single-use token (~10-15 min validity) — app-store link sent separately if not yet installed.</div>
-    `,
-    footer: () => h`<button class="btn btn-primary" onclick="App.nav('guest-trust')">&#128241; Tap the link</button>`,
+  'guest-sms': () => messagesAppScreen({
+    sender: 'CtrlChain',
+    body: h`You've been given temporary access to <strong>Trip ${MOCK_GUEST_TRIP.id}</strong> by <strong>${MOCK_PLANNER_RECORD.carrier}</strong>.<br/>`,
+    link: `app.ctrlchain.com/trip/${MOCK_GUEST_TRIP.id}?t=e91a&hellip;`,
+    onLinkTap: "App.nav('guest-trust')",
+    note: "Prototype: tap the link above to continue. (Hashed, single-use token, ~10-15 min validity — app-store link sent separately if not yet installed.)",
   }),
 
   'guest-trust': () => ({
@@ -952,6 +940,33 @@ function oauthConsentScreen(provider) {
         </div>
       </div>
     `,
+  };
+}
+
+/* Mocks the phone's native Messages app — deliberately breaks from CCA's own
+   UI (no header, no brand colors) so reviewers don't mistake "a text message
+   arrives" for an in-app screen. Tapping the link (or the whole bubble, for
+   forgiveness) is the only interactive element; the rest is inert chrome. */
+function messagesAppScreen({ sender, body, link, onLinkTap, note }) {
+  return {
+    hideHeader: true,
+    content: h`
+      <div class="messages-mock">
+        <div class="messages-mock__bar">
+          <span class="messages-mock__back">&#8249; Messages</span>
+          <span class="messages-mock__contact">${sender}</span>
+          <span class="messages-mock__icon">&#9432;</span>
+        </div>
+        <div class="messages-mock__body">
+          <div class="messages-mock__timestamp">Today 9:41</div>
+          <div class="messages-mock__bubble" onclick="${onLinkTap}">
+            ${body}
+            <a class="messages-mock__link">${link}</a>
+          </div>
+        </div>
+      </div>
+    `,
+    footer: () => h`<div class="messages-mock__note">${note}</div>`,
   };
 }
 

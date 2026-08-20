@@ -821,25 +821,52 @@ button { font-family: inherit; }
 .center-state__icon--success { background: var(--success-surface-lighter); color: var(--success-text); }
 .center-state__icon--warning { background: var(--warning-surface-lighter); color: var(--warning-text); }
 
-/* ---------- Message bubble (portal SMS simulation) ---------- */
-.sms-mock {
-  background: var(--color-neutrals-100);
-  border-radius: var(--radius-md);
-  padding: 16px;
+/* ---------- Mocked native Messages app ----------
+   Deliberately breaks from CCA's own visual system — this needs to read as
+   the phone's own Messages app, not another CtrlChain screen, which is
+   exactly the confusion reviewers ran into when this was a plain in-app card. */
+.messages-mock {
+  margin: -4px calc(-1 * var(--space-screen-margin)) calc(-1 * var(--space-section-gap));
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: #e9e9eb;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
-.sms-bubble {
+.messages-mock__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 16px;
+  background: rgba(249,249,249,0.96);
+  border-bottom: 1px solid rgba(0,0,0,0.12);
+  flex-shrink: 0;
+}
+.messages-mock__back { color: #007aff; font-size: 15px; }
+.messages-mock__contact { font-weight: 600; font-size: 14px; color: #000; }
+.messages-mock__icon { color: #007aff; font-size: 18px; }
+.messages-mock__body { flex: 1; padding: 20px 14px; }
+.messages-mock__timestamp { text-align: center; font-size: 11px; color: #8e8e93; margin-bottom: 10px; }
+.messages-mock__bubble {
   background: #fff;
-  color: var(--color-neutrals-900);
-  border: 1px solid var(--border-neutral-default);
-  border-radius: var(--radius-md);
-  padding: 12px 14px;
-  max-width: 85%;
+  color: #000;
+  border-radius: 18px;
+  padding: 10px 14px;
+  max-width: 82%;
+  font-size: 15px;
+  line-height: 1.35;
+  box-shadow: 0 1px 1px rgba(0,0,0,0.06);
+  cursor: pointer;
 }
-.sms-bubble strong { color: var(--color-neutrals-900); }
-.sms-link {
-  color: var(--accent-blue-default);
-  text-decoration: underline;
-  word-break: break-all;
+.messages-mock__bubble strong { font-weight: 600; }
+.messages-mock__link { color: #007aff; text-decoration: underline; word-break: break-all; }
+.messages-mock__note {
+  font-size: var(--type-body-sm-size);
+  color: var(--text-neutral-caption);
+  text-align: center;
+  padding: 4px 8px;
 }
 
 .readonly-field {
