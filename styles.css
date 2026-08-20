@@ -668,7 +668,7 @@ button { font-family: inherit; }
   justify-content: flex-end;
   color: #fff;
   text-align: center;
-  background: #0c130f;
+  background: var(--color-newCold-500);
 }
 .launch-hero::before {
   content: '';
@@ -685,7 +685,7 @@ button { font-family: inherit; }
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(6,12,9,0.05) 0%, rgba(6,12,9,0.2) 38%, rgba(6,12,9,0.68) 56%, rgba(6,12,9,0.97) 74%, #0c130f 100%);
+  background: linear-gradient(180deg, rgba(16,21,46,0.05) 0%, rgba(16,21,46,0.2) 38%, rgba(16,21,46,0.68) 56%, rgba(16,21,46,0.97) 74%, var(--color-newCold-500) 100%);
   z-index: 1;
 }
 @keyframes launch-hero-zoom {
