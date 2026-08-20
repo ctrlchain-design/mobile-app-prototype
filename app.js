@@ -84,6 +84,12 @@ const MOCK_UPCOMING_TRIPS = [
   { id: 'TRIP2026-000124', pickup: 'Heathrow Cargo Terminal', dropoff: 'Southampton Docks', status: 'Scheduled', badge: 'warning', eta: 'Tomorrow, 08:00' },
 ];
 
+/* Read-only — completed trips aren't mutated in this prototype, so these don't
+   need a state clone the way scheduledTrips (driver can add to it) does. */
+const MOCK_TRIP_HISTORY = [
+  { id: 'TRIP2026-000098', pickup: 'Dover Freight Village', dropoff: 'Meridian Distribution Centre, Coventry', status: 'Completed', badge: 'success', eta: 'Yesterday, 18:45' },
+];
+
 const MOCK_GUEST_TRIP = {
   id: 'TRIP2026-000142',
   activeStopId: 'STOP-G2',
@@ -192,6 +198,10 @@ const ROUTE_META = {
   'location-os-prompt-2': null,
   'location-denied': null,
   'dashboard': null,
+  'nav-trips': null,
+  'nav-notifications': null,
+  'nav-chats': null,
+  'nav-profile': null,
 };
 
 const FLOW_FIRST_ROUTE = { 'self-reg': 'self-reg-welcome', 'portal': 'portal-sms', 'returning': 'returning-entry', 'guest': 'guest-sms' };
@@ -223,6 +233,10 @@ const TITLES = {
   'guest-trust': "You've been added",
   'guest-scoped': 'Single-trip access',
   'dashboard': 'Dashboard',
+  'nav-trips': 'My Trips',
+  'nav-notifications': 'Notifications',
+  'nav-chats': 'Chats',
+  'nav-profile': 'Profile',
 };
 
 function freshState() {
@@ -253,6 +267,7 @@ function freshState() {
     // uploads PODs against these, never against the MOCK_* constants directly.
     activeTrips: deepClone(MOCK_ACTIVE_TRIPS),
     guestTrip: deepClone(MOCK_GUEST_TRIP),
+    scheduledTrips: deepClone(MOCK_UPCOMING_TRIPS), // driver can add to this via "Add a trip"
 
     // Dashboard UI-only state (expand/collapse, open modals) — not part of the
     // trip data itself, reset on every restart along with everything else.
@@ -260,6 +275,7 @@ function freshState() {
     editingMilestone: null, // { stopId, milestoneId } | null — which timestamp is mid-edit
     podSheet: null,         // { tripId, stopId, orderId } | null
     exceptionSheet: null,   // { tripId, stopId } | null
+    addTripSheet: false,
   };
 }
 
@@ -463,6 +479,35 @@ const App = {
     render();
   },
 
+  openAddTripSheet() {
+    state.addTripSheet = true;
+    render();
+  },
+
+  closeAddTripSheet() {
+    state.addTripSheet = false;
+    render();
+  },
+
+  submitAddTrip() {
+    const input = document.getElementById('add-trip-ref');
+    const ref = input && input.value.trim();
+    if (ref) {
+      state.scheduledTrips.push({
+        id: ref.toUpperCase(), pickup: 'Details pending', dropoff: '—',
+        status: 'Pending', badge: 'warning', eta: 'Awaiting confirmation from ops',
+      });
+    }
+    state.addTripSheet = false;
+    render();
+  },
+
+  /* Bottom tab bar — a direct hash switch, not this.nav(), since tabs are
+     sibling top-level destinations rather than a back-stack of screens. */
+  goTab(route) {
+    setHash(route);
+  },
+
   approveDashboard() {
     state.dashboardMode = 'full';
     if (!state.locationPermission) {
@@ -503,7 +548,7 @@ function tripCard(trip) {
         <span class="badge badge--${trip.badge}">${trip.status}</span>
       </div>
       <div class="t-body-sm t-muted">${trip.pickup} &#8594; ${trip.dropoff}</div>
-      <div class="t-body-sm t-caption">ETA ${trip.eta}</div>
+      <div class="t-body-sm t-caption">${trip.status === 'Completed' ? '' : 'ETA '}${trip.eta}</div>
     </div>
   `;
 }
@@ -515,6 +560,19 @@ function greeting() {
   if (hour < 12) return 'Good morning';
   if (hour < 18) return 'Good afternoon';
   return 'Good evening';
+}
+
+/* Which mock driver record is "you" right now — depends on which onboarding
+   path this session took. Shared by the dashboard hero and the Profile tab. */
+function currentDriverIdentity() {
+  const name = state.activeFlow === 'self-reg' ? `${state.firstName} ${state.lastName}`
+    : state.activeFlow === 'returning' ? `${MOCK_RETURNING_DRIVER.firstName} ${MOCK_RETURNING_DRIVER.lastName}`
+    : `${MOCK_PLANNER_RECORD.firstName} ${MOCK_PLANNER_RECORD.lastName}`;
+  const carrier = state.activeFlow === 'self-reg' ? MOCK_PLANNER_RECORD.carrier
+    : state.activeFlow === 'returning' ? MOCK_RETURNING_DRIVER.carrier
+    : MOCK_PLANNER_RECORD.carrier;
+  const phone = state.activeFlow === 'returning' ? MOCK_RETURNING_DRIVER.phone : (state.phone || MOCK_PLANNER_RECORD.phone);
+  return { name, carrier, phone };
 }
 
 /* Whether a given <sl-details> (a stop card, or the trip accordion itself) should
@@ -751,6 +809,94 @@ function exceptionSheetMarkup() {
         </div>
       ` : ''}
     </sl-drawer>
+  `;
+}
+
+/* Self-service "I have a reference number" trip claim — distinct from the
+   Guest/One-Off flow (that's ops inviting an unregistered driver to one trip).
+   This is an already-registered driver adding an extra trip themselves, e.g.
+   one handed to them outside the normal assignment path. No real lookup exists
+   in this prototype, so an added trip lands as "Pending" rather than faking
+   invented pickup/drop-off details for an arbitrary reference. */
+function addTripSheetMarkup() {
+  const open = !!state.addTripSheet;
+  return h`
+    <sl-drawer id="add-trip-drawer" label="Add a trip" placement="bottom" ${open ? 'open' : ''} onsl-request-close="App.closeAddTripSheet()">
+      ${open ? h`
+        <div class="sheet-body">
+          <div class="t-body-sm t-muted">Enter the trip reference number your carrier or dispatch gave you.</div>
+          <div class="sheet-field">
+            <label class="t-label-sm">Trip reference number</label>
+            <sl-input id="add-trip-ref" placeholder="e.g. TRIP2026-000125"></sl-input>
+          </div>
+        </div>
+        <div slot="footer" style="display:flex; gap:8px;">
+          <sl-button style="flex:1;" onclick="App.closeAddTripSheet()">Cancel</sl-button>
+          <sl-button style="flex:1;" variant="primary" onclick="App.submitAddTrip()">Add trip</sl-button>
+        </div>
+      ` : ''}
+    </sl-drawer>
+  `;
+}
+
+/* Notifications feed — mostly derived live from actual trip state (a proposed
+   milestone awaiting confirm, a reported exception) rather than static mock
+   copy, so it stays honest about what's actually happened in the session. */
+function notificationItems() {
+  const items = [];
+  state.activeTrips.forEach(trip => {
+    trip.stops.forEach(stop => {
+      stop.milestones.forEach(m => {
+        if (m.status === 'proposed') {
+          items.push({ icon: '📍', tone: 'warning', text: `${m.label} detected at ${stop.location} — confirm to continue`, time: m.timestamp });
+        }
+      });
+      stop.exceptions.forEach(e => {
+        items.push({ icon: '⚠️', tone: 'critical', text: `${e.type} reported at ${stop.location}`, time: '' });
+      });
+    });
+  });
+  state.scheduledTrips.forEach(t => {
+    items.push({ icon: '📅', tone: 'info', text: `Trip ${t.id} scheduled — ${t.pickup} → ${t.dropoff}`, time: t.eta });
+  });
+  return items;
+}
+
+function notificationRow(item) {
+  return h`
+    <div class="card notification-row">
+      <span class="notification-row__icon">${item.icon}</span>
+      <div class="notification-row__body">
+        <div class="t-body-md">${item.text}</div>
+        ${item.time ? h`<div class="t-body-sm t-caption">${item.time}</div>` : ''}
+      </div>
+    </div>
+  `;
+}
+
+/* ---------- Bottom tab bar (Dashboard / My Trips / Notifications / Chats / Profile) ----------
+   Only shown once a driver has real dashboard access (dashboardMode 'full') —
+   guest access stays deliberately minimal (single trip, no account, no nav),
+   and the locked/pending-approval state has nothing yet to navigate to. */
+const TAB_ITEMS = [
+  { route: 'dashboard', icon: '🏠', label: 'Dashboard' },
+  { route: 'nav-trips', icon: '📋', label: 'My Trips' },
+  { route: 'nav-notifications', icon: '🔔', label: 'Alerts' },
+  { route: 'nav-chats', icon: '💬', label: 'Chats' },
+  { route: 'nav-profile', icon: '👤', label: 'Profile' },
+];
+const TAB_ROUTES = TAB_ITEMS.map(t => t.route);
+
+function tabBarMarkup(activeRoute) {
+  return h`
+    <div class="app-tabbar">
+      ${TAB_ITEMS.map(item => h`
+        <button type="button" class="app-tabbar__item ${item.route === activeRoute ? 'is-active' : ''}" onclick="App.goTab('${item.route}')">
+          <span class="app-tabbar__icon">${item.icon}</span>
+          <span class="app-tabbar__label">${item.label}</span>
+        </button>
+      `).join('')}
+    </div>
   `;
 }
 
@@ -1245,19 +1391,24 @@ const SCREENS = {
       };
     }
     // full
-    const name = state.activeFlow === 'self-reg' ? `${state.firstName} ${state.lastName}`
-      : state.activeFlow === 'returning' ? `${MOCK_RETURNING_DRIVER.firstName} ${MOCK_RETURNING_DRIVER.lastName}`
-      : `${MOCK_PLANNER_RECORD.firstName} ${MOCK_PLANNER_RECORD.lastName}`;
-    const carrier = state.activeFlow === 'self-reg' ? MOCK_PLANNER_RECORD.carrier
-      : state.activeFlow === 'returning' ? MOCK_RETURNING_DRIVER.carrier
-      : MOCK_PLANNER_RECORD.carrier;
+    const { name, carrier } = currentDriverIdentity();
+    const unreadCount = notificationItems().length;
     return {
+      hideHeader: true,
       content: h`
-        <div class="dash-header">
-          <div class="t-headline-md">${greeting()}, ${name.split(' ')[0] || 'driver'}</div>
-          <div class="t-body-sm t-muted">${carrier} &middot; Full trip visibility</div>
+        <div class="dash-hero">
+          <div class="dash-hero__top">
+            <div>
+              <div class="t-headline-md">${greeting()}, ${name.split(' ')[0] || 'driver'}</div>
+              <div class="dash-hero__sub t-body-sm">${carrier} &middot; Full trip visibility</div>
+            </div>
+            <button type="button" class="dash-hero__bell" onclick="App.goTab('nav-notifications')" aria-label="Notifications">
+              &#128276;
+              ${unreadCount ? h`<span class="dash-hero__bell-dot"></span>` : ''}
+            </button>
+          </div>
+          ${trackingStatusBanner()}
         </div>
-        ${trackingStatusBanner()}
         <div class="dash-section">
           <div class="t-label-sm t-caption dash-section__label">ACTIVE TRIP</div>
           ${activeTripSection(state.activeTrips)}
@@ -1265,16 +1416,85 @@ const SCREENS = {
         <div class="dash-section">
           <div class="dash-section__row">
             <span class="t-label-sm t-caption dash-section__label">SCHEDULED</span>
-            <span class="t-caption">${MOCK_UPCOMING_TRIPS.length ? `${MOCK_UPCOMING_TRIPS.length} trip${MOCK_UPCOMING_TRIPS.length > 1 ? 's' : ''}` : ''}</span>
+            <button type="button" class="btn-link" style="font-size:12px;" onclick="App.openAddTripSheet()">+ Add trip</button>
           </div>
-          ${MOCK_UPCOMING_TRIPS.length
-            ? MOCK_UPCOMING_TRIPS.map(t => tripCard(t)).join('')
+          ${state.scheduledTrips.length
+            ? state.scheduledTrips.map(t => tripCard(t)).join('')
             : h`<div class="t-body-sm t-caption dash-empty-note">Nothing scheduled beyond the active trip.</div>`}
         </div>
         ${podSheetMarkup()}
         ${exceptionSheetMarkup()}
+        ${addTripSheetMarkup()}
       `,
-      footer: () => h`<button class="btn btn-subtle" onclick="App.restartFlow()">Restart this flow</button>`,
+    };
+  },
+
+  /* ---------------- BOTTOM TAB SCREENS ---------------- */
+
+  'nav-trips': () => {
+    const active = state.dashboardMode === 'guest' ? [state.guestTrip] : state.activeTrips;
+    return {
+      content: h`
+        <div class="dash-section">
+          <div class="t-label-sm t-caption dash-section__label">ACTIVE</div>
+          ${active.map(trip => h`
+            <div class="card" onclick="App.goTab('dashboard')" style="cursor:pointer;">
+              <div class="trip-card__top"><span class="t-label-md">${trip.id}</span><span class="badge badge--info">In progress</span></div>
+              <div class="t-body-sm t-muted">${trip.stops.length} stops &middot; ${trip.stops.reduce((n, s) => n + s.orders.length, 0)} orders</div>
+              <div class="t-body-sm t-caption">Tap to open on the dashboard</div>
+            </div>
+          `).join('')}
+        </div>
+        <div class="dash-section">
+          <div class="dash-section__row">
+            <span class="t-label-sm t-caption dash-section__label">SCHEDULED</span>
+            <button type="button" class="btn-link" style="font-size:12px;" onclick="App.openAddTripSheet()">+ Add trip</button>
+          </div>
+          ${state.scheduledTrips.length
+            ? state.scheduledTrips.map(t => tripCard(t)).join('')
+            : h`<div class="t-body-sm t-caption dash-empty-note">Nothing scheduled.</div>`}
+        </div>
+        <div class="dash-section">
+          <div class="t-label-sm t-caption dash-section__label">HISTORY</div>
+          ${MOCK_TRIP_HISTORY.map(t => tripCard(t)).join('')}
+        </div>
+        ${addTripSheetMarkup()}
+      `,
+    };
+  },
+
+  'nav-notifications': () => {
+    const items = notificationItems();
+    return {
+      content: h`
+        ${items.length
+          ? items.map(n => notificationRow(n)).join('')
+          : h`<div class="center-state"><div class="t-body-md t-muted">Nothing new right now.</div></div>`}
+      `,
+    };
+  },
+
+  'nav-chats': () => ({
+    content: h`
+      <div class="center-state">
+        <div class="center-state__icon center-state__icon--warning">&#128172;</div>
+        <div class="t-headline-md">Chat with back-office</div>
+        <div class="t-body-md t-muted">Structured messaging with your carrier's back office is planned but not yet defined for this prototype.</div>
+      </div>
+    `,
+  }),
+
+  'nav-profile': () => {
+    const { name, carrier, phone } = currentDriverIdentity();
+    return {
+      content: h`
+        <div class="card">
+          <div class="t-label-lg">${name}</div>
+          <div class="t-body-sm t-muted">${carrier}</div>
+          <div class="t-body-sm t-muted">${phone}</div>
+        </div>
+        <button type="button" class="btn btn-subtle" onclick="App.restartFlow()">Restart this flow</button>
+      `,
     };
   },
 };
@@ -1418,9 +1638,13 @@ function render() {
   const route = currentRoute();
   const screen = SCREENS[route] ? SCREENS[route]() : SCREENS['welcome']();
   const meta = ROUTE_META[route];
-  // 'welcome' and 'dashboard' are both parent/home screens — nothing above
-  // them to go back to, regardless of how this session happened to arrive.
-  const canGoBack = route !== 'welcome' && route !== 'dashboard';
+  // Guest access stays deliberately minimal (single trip, no account, no nav —
+  // an established principle, not an oversight) and the locked/pending-approval
+  // state has nothing yet to navigate to, so the tab bar is 'full' mode only.
+  const isTabRoute = TAB_ROUTES.includes(route) && state.dashboardMode === 'full';
+  // 'welcome' and every bottom-tab screen are top-level destinations — nothing
+  // above them to go back to, regardless of how this session happened to arrive.
+  const canGoBack = route !== 'welcome' && !isTabRoute;
 
   let headerHtml = '';
   if (!screen.hideHeader) {
@@ -1437,7 +1661,9 @@ function render() {
     `;
   }
 
-  const footerHtml = screen.footer ? h`<div class="app-footer">${screen.footer()}</div>` : '';
+  const footerHtml = isTabRoute
+    ? tabBarMarkup(route)
+    : (screen.footer ? h`<div class="app-footer">${screen.footer()}</div>` : '');
 
   const statusBar = document.querySelector('.status-bar');
   if (statusBar) statusBar.classList.toggle('status-bar--overlay', !!screen.transparentStatusBar);

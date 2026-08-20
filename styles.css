@@ -74,18 +74,12 @@
   --sl-color-danger-500: var(--critical-surface);
   --sl-color-danger-600: var(--critical-surface-dark);
 
-  --sl-color-neutral-0: var(--color-neutrals-50);
-  --sl-color-neutral-50: var(--surface-neutral-light);
-  --sl-color-neutral-100: var(--color-neutrals-100);
-  --sl-color-neutral-200: var(--border-neutral-default);
-  --sl-color-neutral-300: var(--color-neutrals-300);
-  --sl-color-neutral-400: var(--text-neutral-disabled);
-  --sl-color-neutral-500: var(--text-neutral-caption);
-  --sl-color-neutral-600: var(--text-neutral-subtitle);
-  --sl-color-neutral-700: var(--text-neutral-body);
-  --sl-color-neutral-800: var(--text-neutral-title);
-  --sl-color-neutral-900: var(--color-neutrals-900);
-  --sl-color-neutral-1000: var(--color-neutrals-900);
+  /* Deliberately NOT overriding --sl-color-neutral-* here: Shoelace's own
+     light.css/dark.css already invert that ramp correctly per theme (0 = near-
+     white in light, near-black in dark). Forcing it to fixed CCA greys broke
+     default-variant buttons in dark mode — a light-forced background under
+     dark-mode text read as washed-out/low-contrast. Brand + status colors are
+     the only ones that actually need CCA's palette instead of Shoelace's own. */
 }
 /* Shoelace's own chrome (border/shadow) fights with our .card look — strip it
    back on sl-details so a stop card reads as one of our cards, not two nested ones. */
@@ -96,6 +90,12 @@ sl-details::part(content) { padding: 8px 0 0; }
    rounded top corners rather than Shoelace's default square panel. */
 sl-drawer::part(panel) { border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
 sl-drawer::part(title) { font-family: var(--font-family); font-weight: 500; }
+/* Shoelace's drawer defaults to position:fixed against the browser viewport —
+   this is a simulated phone screen, not the real one, so the sheet must stay
+   inside .phone-frame (position:relative + overflow:hidden) instead of covering
+   the whole reviewer page. */
+sl-drawer::part(base) { position: absolute; }
+sl-drawer::part(overlay) { position: absolute; }
 
 * { box-sizing: border-box; }
 html, body {
@@ -203,7 +203,8 @@ button { font-family: inherit; }
 .phone-frame {
   width: 390px;
   max-width: calc(100vw - 24px);
-  min-height: 844px;
+  height: 844px;
+  max-height: calc(100vh - 24px);
   margin: 0 auto;
   background: var(--surface-neutral-light);
   border-radius: 40px;
@@ -284,6 +285,9 @@ button { font-family: inherit; }
 /* ---------- Content / footer ---------- */
 .app-content {
   flex: 1;
+  min-height: 0; /* flex items default to min-height:auto, which blocks shrinking
+                    below content size and defeats overflow-y — this is what let
+                    .phone-frame grow instead of scrolling internally. */
   overflow-y: auto;
   padding: 4px var(--space-screen-margin) var(--space-section-gap);
   display: flex;
@@ -587,6 +591,76 @@ button { font-family: inherit; }
   justify-content: flex-end;
 }
 .hero__logo { width: 168px; height: auto; }
+
+/* ---------- Dashboard hero (full-access driver home) ----------
+   Same cinematic photo treatment as the welcome hero, scaled down to a header
+   band rather than full-bleed — Air NZ's "Kia ora" home screen was the direct
+   reference (dark photo, white greeting, a light pill anchored to the bottom
+   edge of the image), reused here since the truck photo/gradient pairing
+   already exists rather than sourcing a second image treatment. */
+.dash-hero {
+  position: relative;
+  background-image: linear-gradient(180deg, rgba(10,14,10,0.25) 0%, rgba(8,12,10,0.55) 60%, rgba(8,12,10,0.9) 100%), url('assets/hero-truck.jpeg');
+  background-size: cover;
+  background-position: center 55%;
+  color: #fff;
+  margin: -4px calc(-1 * var(--space-screen-margin)) 0;
+  padding: 20px var(--space-screen-margin) 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.dash-hero__top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.dash-hero__sub { color: rgba(255,255,255,0.78); margin-top: 2px; }
+.dash-hero__bell {
+  position: relative;
+  width: 36px; height: 36px; flex-shrink: 0;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.16);
+  border: none;
+  color: #fff;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.dash-hero__bell:hover { background: rgba(255,255,255,0.26); }
+.dash-hero__bell-dot {
+  position: absolute; top: 5px; right: 6px;
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--color-orange-400, #f0a640);
+  border: 1.5px solid rgba(0,0,0,0.4);
+}
+
+/* ---------- Bottom tab bar ---------- */
+.app-tabbar {
+  flex-shrink: 0;
+  display: flex;
+  background: var(--surface-neutral-light);
+  border-top: 1px solid var(--border-neutral-lighter, var(--color-neutrals-200));
+  padding: 6px 4px 10px;
+}
+.app-tabbar__item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 2px;
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-neutral-caption);
+  cursor: pointer;
+}
+.app-tabbar__icon { font-size: 18px; line-height: 1.2; }
+.app-tabbar__item.is-active { color: var(--text-brand-default); }
+
+/* ---------- Notifications ---------- */
+.notification-row { flex-direction: row; align-items: flex-start; gap: 10px; }
+.notification-row__icon { font-size: 18px; flex-shrink: 0; }
+.notification-row__body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .hero__tagline { color: var(--color-green-300); }
 
 /* ---------- Launch hero (Self-Registration entry — full-bleed, edge-to-edge) ---------- */
