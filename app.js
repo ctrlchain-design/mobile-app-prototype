@@ -162,13 +162,6 @@ const OAUTH_PROVIDERS = {
       { name: 'Jordan Reyes', email: 'jordan.reyes@icloud.com', initial: 'J', color: '#5a5a5f' },
     ],
   },
-  facebook: {
-    label: 'Facebook', domain: 'facebook.com', logo: 'assets/social-facebook.svg',
-    share: 'name, email address, and profile picture',
-    accounts: [
-      { name: 'Jordan Reyes', email: 'jordan.reyes@outlook.com', initial: 'J', color: '#3b5998' },
-    ],
-  },
 };
 
 /* Returns whichever mock driver record the currently-displayed portal-flow screen should show —
@@ -184,7 +177,6 @@ const ROUTE_META = {
   'self-reg-welcome': null,
   'self-reg-social-google': null,
   'self-reg-social-apple': null,
-  'self-reg-social-facebook': null,
   'self-reg-signup': { flow: 'self-reg', step: 1, total: 7 },
   'self-reg-otp': { flow: 'self-reg', step: 2, total: 7 },
   'self-reg-password': { flow: 'self-reg', step: 3, total: 7 },
@@ -1069,11 +1061,9 @@ const SCREENS = {
           <button class="btn btn-social" onclick="App.nav('self-reg-social-apple')">
             <img class="btn-social__icon" src="assets/social-apple.svg" alt="" /> Continue with Apple
           </button>
-          <button class="btn btn-social" onclick="App.nav('self-reg-social-facebook')">
-            <img class="btn-social__icon" src="assets/social-facebook.svg" alt="" /> Continue with Facebook
-          </button>
           <div class="launch-hero__divider launch-hero__divider--secondary"><span>Continue with</span></div>
           <button class="btn launch-hero__secondary" onclick="App.nav('self-reg-signup')">Email or phone number</button>
+          <button class="btn launch-hero__secondary" onclick="App.set('activeFlow','portal'); App.nav('portal-code')">Activation code</button>
           <button class="btn-link launch-hero__signin" onclick="App.switchFlow('returning')">Already have an account? Sign in</button>
         </div>
       </div>
@@ -1082,7 +1072,6 @@ const SCREENS = {
 
   'self-reg-social-google': () => oauthConsentScreen('google'),
   'self-reg-social-apple': () => oauthConsentScreen('apple'),
-  'self-reg-social-facebook': () => oauthConsentScreen('facebook'),
 
   'self-reg-signup': () => ({
     content: h`
