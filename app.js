@@ -746,7 +746,7 @@ function activeTripSection(trips) {
           <span class="t-label-lg">${trip.id}</span>
           <span class="badge badge--info">In Transit</span>
         </div>
-        <span class="t-body-sm t-caption">${trip.stops.length} stops &middot; ${distinctOrderCount(trip)} orders</span>
+        <span class="t-body-sm t-caption">${trip.stops.length} stop${trip.stops.length === 1 ? '' : 's'} &middot; ${distinctOrderCount(trip)} order${distinctOrderCount(trip) === 1 ? '' : 's'}</span>
       </div>
       <div class="active-trip__timeline">${stopTimelineList(trip)}</div>
     </sl-details>
@@ -1114,14 +1114,14 @@ const SCREENS = {
         </div>
         <div class="launch-hero__actions" role="group" aria-label="Sign up or log in options">
           <div class="launch-hero__divider"><span>Sign up or log in with</span></div>
-          <button class="btn btn-social" onclick="App.nav('self-reg-social-google')">
+          <button class="btn btn-social" onclick="App.set('activeFlow','self-reg'); App.nav('self-reg-social-google')">
             <img class="btn-social__icon" src="assets/social-google.svg" alt="" /> Continue with Google
           </button>
-          <button class="btn btn-social" onclick="App.nav('self-reg-social-apple')">
+          <button class="btn btn-social" onclick="App.set('activeFlow','self-reg'); App.nav('self-reg-social-apple')">
             <img class="btn-social__icon" src="assets/social-apple.svg" alt="" /> Continue with Apple
           </button>
           <div class="launch-hero__divider launch-hero__divider--secondary"><span>Continue with</span></div>
-          <button class="btn launch-hero__secondary" onclick="App.nav('self-reg-signup')">Email or phone number</button>
+          <button class="btn launch-hero__secondary" onclick="App.set('activeFlow','self-reg'); App.nav('self-reg-signup')">Email or phone number</button>
           <button class="btn launch-hero__secondary" onclick="App.set('activeFlow','portal'); App.nav('portal-code')">Activation code</button>
           <button class="btn-link launch-hero__signin" onclick="App.switchFlow('returning')">Already have an account? Sign in</button>
         </div>
@@ -1586,7 +1586,7 @@ const SCREENS = {
           ${active.map(trip => h`
             <div class="card" onclick="App.goTab('dashboard')" style="cursor:pointer;">
               <div class="trip-card__top"><span class="t-label-md">${trip.id}</span><span class="badge badge--info">In Transit</span></div>
-              <div class="t-body-sm t-muted">${trip.stops.length} stops &middot; ${distinctOrderCount(trip)} orders</div>
+              <div class="t-body-sm t-muted">${trip.stops.length} stop${trip.stops.length === 1 ? '' : 's'} &middot; ${distinctOrderCount(trip)} order${distinctOrderCount(trip) === 1 ? '' : 's'}</div>
               <div class="t-body-sm t-caption">Tap to open on the dashboard</div>
             </div>
           `).join('')}
