@@ -19,17 +19,103 @@ const MOCK_PLANNER_RECORD = {
 
 const MOCK_RETURNING_DRIVER = { firstName: 'Jordan', lastName: 'Reyes', carrier: 'Meridian Freight Ltd', phone: '+44 7700 900456' };
 
-/* Index into MILESTONE_STAGES below — drives the stepper shown on the dashboard's
-   "Today" card and on trip detail. Purely a status visualization in this prototype;
-   actually advancing a trip through these stages is Phase 2 (milestone confirmation). */
-const MILESTONE_STAGES = ['Assigned', 'Heading to pickup', 'At pickup', 'In transit', 'Delivered'];
+/* Milestone label sets per stop type, matching the target list in the vault's
+   product-foundation.md (arrived -> loading/unloading -> departed), each with
+   its own timestamp, source (automated/manual), and confirm state. This mirrors
+   CtrlChain's real trip model (05-projects/carrier-tms/trip-details.md): a trip
+   is a sequence of stops, and a stop can carry one or more customer orders. */
+const MILESTONE_LABELS = {
+  pickup: ['Arrived at pickup', 'Loading started', 'Loading completed', 'Departed pickup'],
+  delivery: ['Arrived at delivery', 'Unloading started', 'Unloading completed', 'Departed delivery'],
+};
 
-const MOCK_TRIPS = [
-  { id: 'TRIP2026-000123', pickup: 'Meridian Distribution Centre, Coventry', dropoff: 'Aldi RDC, Bristol', status: 'Upcoming', badge: 'info', eta: 'Today, 14:30', milestoneStage: 1 },
-  { id: 'TRIP2026-000124', pickup: 'Heathrow Cargo Terminal', dropoff: 'Southampton Docks', status: 'Scheduled', badge: 'warning', eta: 'Tomorrow, 08:00', milestoneStage: 0 },
+/* The one trip a driver is actually transporting right now. Modelled as an array
+   (see activeTripSection()) so the UI scales to more than one — Samuel's call,
+   even though V1 only ever has a single truck / single active trip in practice. */
+const MOCK_ACTIVE_TRIPS = [
+  {
+    id: 'TRIP2026-000123',
+    activeStopId: 'STOP-2',
+    stops: [
+      {
+        id: 'STOP-1', type: 'pickup', location: 'Meridian Distribution Centre, Coventry', appointment: 'Today, 08:00',
+        orders: [{ id: 'ORD-8841937', ref: 'PO-33210' }],
+        milestones: [
+          { id: 'm1', label: 'Arrived at pickup', status: 'confirmed', source: 'automated', timestamp: '08:02' },
+          { id: 'm2', label: 'Loading started', status: 'confirmed', source: 'manual', timestamp: '08:10' },
+          { id: 'm3', label: 'Loading completed', status: 'confirmed', source: 'manual', timestamp: '08:40' },
+          { id: 'm4', label: 'Departed pickup', status: 'confirmed', source: 'automated', timestamp: '08:45' },
+        ],
+        exceptions: [],
+      },
+      {
+        id: 'STOP-2', type: 'delivery', location: 'Aldi RDC, Bristol', appointment: 'Today, 14:30',
+        orders: [
+          { id: 'ORD-8841937', ref: 'PO-33210', podUploaded: false },
+          { id: 'ORD-8841938', ref: 'PO-33211', podUploaded: false },
+        ],
+        milestones: [
+          { id: 'm5', label: 'Arrived at delivery', status: 'proposed', source: 'automated', timestamp: '14:28' },
+          { id: 'm6', label: 'Unloading started', status: 'pending', source: null, timestamp: null },
+          { id: 'm7', label: 'Unloading completed', status: 'pending', source: null, timestamp: null },
+          { id: 'm8', label: 'Departed delivery', status: 'pending', source: null, timestamp: null },
+        ],
+        exceptions: [],
+      },
+      {
+        id: 'STOP-3', type: 'delivery', location: 'Gloucester Services DC', appointment: 'Tomorrow, 08:00',
+        orders: [{ id: 'ORD-8841939', ref: 'PO-33212', podUploaded: false }],
+        milestones: [
+          { id: 'm9', label: 'Arrived at delivery', status: 'pending', source: null, timestamp: null },
+          { id: 'm10', label: 'Unloading started', status: 'pending', source: null, timestamp: null },
+          { id: 'm11', label: 'Unloading completed', status: 'pending', source: null, timestamp: null },
+          { id: 'm12', label: 'Departed delivery', status: 'pending', source: null, timestamp: null },
+        ],
+        exceptions: [],
+      },
+    ],
+  },
 ];
 
-const MOCK_GUEST_TRIP = { id: 'TRIP2026-000142', pickup: 'Heathrow Cargo Terminal', dropoff: 'Southampton Docks', status: 'In progress', badge: 'info', eta: 'Today, 16:00', milestoneStage: 3 };
+/* Scheduled trips not yet underway — shown collapsed in their own section,
+   per Samuel's call that upcoming/scheduled trips get a separate list, not
+   a timeline (nothing to act on until they become the active trip). */
+const MOCK_UPCOMING_TRIPS = [
+  { id: 'TRIP2026-000124', pickup: 'Heathrow Cargo Terminal', dropoff: 'Southampton Docks', status: 'Scheduled', badge: 'warning', eta: 'Tomorrow, 08:00' },
+];
+
+const MOCK_GUEST_TRIP = {
+  id: 'TRIP2026-000142',
+  activeStopId: 'STOP-G2',
+  stops: [
+    {
+      id: 'STOP-G1', type: 'pickup', location: 'Heathrow Cargo Terminal', appointment: 'Today, 13:00',
+      orders: [{ id: 'ORD-9001', ref: 'GT-142' }],
+      milestones: [
+        { id: 'g1', label: 'Arrived at pickup', status: 'confirmed', source: 'automated', timestamp: '13:04' },
+        { id: 'g2', label: 'Loading started', status: 'confirmed', source: 'manual', timestamp: '13:10' },
+        { id: 'g3', label: 'Loading completed', status: 'confirmed', source: 'manual', timestamp: '13:30' },
+        { id: 'g4', label: 'Departed pickup', status: 'confirmed', source: 'automated', timestamp: '13:35' },
+      ],
+      exceptions: [],
+    },
+    {
+      id: 'STOP-G2', type: 'delivery', location: 'Southampton Docks', appointment: 'Today, 16:00',
+      orders: [{ id: 'ORD-9001', ref: 'GT-142', podUploaded: false }],
+      milestones: [
+        { id: 'g5', label: 'Arrived at delivery', status: 'proposed', source: 'automated', timestamp: '15:58' },
+        { id: 'g6', label: 'Unloading started', status: 'pending', source: null, timestamp: null },
+        { id: 'g7', label: 'Unloading completed', status: 'pending', source: null, timestamp: null },
+        { id: 'g8', label: 'Departed delivery', status: 'pending', source: null, timestamp: null },
+      ],
+      exceptions: [],
+    },
+  ],
+};
+
+function deepClone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
 
 /* 8 digits, not 6 — backend preference, harder to brute-force than a 6-digit code. */
 const MOCK_ACTIVATION_CODE = '48213976';
@@ -106,7 +192,6 @@ const ROUTE_META = {
   'location-os-prompt-2': null,
   'location-denied': null,
   'dashboard': null,
-  'trip-detail': null,
 };
 
 const FLOW_FIRST_ROUTE = { 'self-reg': 'self-reg-welcome', 'portal': 'portal-sms', 'returning': 'returning-entry', 'guest': 'guest-sms' };
@@ -138,7 +223,6 @@ const TITLES = {
   'guest-trust': "You've been added",
   'guest-scoped': 'Single-trip access',
   'dashboard': 'Dashboard',
-  'trip-detail': 'Trip details',
 };
 
 function freshState() {
@@ -163,8 +247,19 @@ function freshState() {
     reactivationContact: '',
     reactivationCode: '',
     reactivating: false,
-    selectedTripId: null,
     locationPermission: null, // null | 'always' | 'while-using' | 'denied'
+
+    // Mutable copies — the driver confirms milestones, edits timestamps, and
+    // uploads PODs against these, never against the MOCK_* constants directly.
+    activeTrips: deepClone(MOCK_ACTIVE_TRIPS),
+    guestTrip: deepClone(MOCK_GUEST_TRIP),
+
+    // Dashboard UI-only state (expand/collapse, open modals) — not part of the
+    // trip data itself, reset on every restart along with everything else.
+    stopExpandOverride: {}, // stopId/tripId -> boolean, overrides the default (active stop open)
+    editingMilestone: null, // { stopId, milestoneId } | null — which timestamp is mid-edit
+    podSheet: null,         // { tripId, stopId, orderId } | null
+    exceptionSheet: null,   // { tripId, stopId } | null
   };
 }
 
@@ -241,8 +336,8 @@ const App = {
   toggleTheme() {
     const html = document.documentElement;
     const goingDark = !html.classList.contains('dark');
-    html.classList.remove('light', 'dark');
-    html.classList.add(goingDark ? 'dark' : 'light');
+    html.classList.remove('light', 'dark', 'sl-theme-light', 'sl-theme-dark');
+    html.classList.add(goingDark ? 'dark' : 'light', goingDark ? 'sl-theme-dark' : 'sl-theme-light');
     try { localStorage.setItem('cca-theme', goingDark ? 'dark' : 'light'); } catch (e) { /* ignore */ }
     render();
   },
@@ -285,9 +380,87 @@ const App = {
     render();
   },
 
-  viewTrip(id) {
-    state.selectedTripId = id;
-    this.nav('trip-detail');
+  toggleExpand(id, current) {
+    state.stopExpandOverride[id] = !current;
+    render();
+  },
+
+  confirmMilestone(tripId, stopId, milestoneId) {
+    const trip = findActiveTrip(tripId);
+    const stop = trip && findStop(trip, stopId);
+    const m = stop && stop.milestones.find(x => x.id === milestoneId);
+    if (m) m.status = 'confirmed';
+    render();
+  },
+
+  startEditTimestamp(stopId, milestoneId) {
+    state.editingMilestone = { stopId, milestoneId };
+    render();
+  },
+
+  cancelEditTimestamp() {
+    state.editingMilestone = null;
+    render();
+  },
+
+  saveTimestamp(tripId, stopId, milestoneId) {
+    const input = document.getElementById(`ts-input-${milestoneId}`);
+    const trip = findActiveTrip(tripId);
+    const stop = trip && findStop(trip, stopId);
+    const m = stop && stop.milestones.find(x => x.id === milestoneId);
+    if (m && input) m.timestamp = input.value || m.timestamp;
+    state.editingMilestone = null;
+    render();
+  },
+
+  openPodSheet(tripId, stopId, orderId) {
+    state.podSheet = { tripId, stopId, orderId };
+    render();
+  },
+
+  closePodSheet() {
+    state.podSheet = null;
+    render();
+  },
+
+  submitPod() {
+    const { tripId, stopId, orderId } = state.podSheet;
+    const trip = findActiveTrip(tripId);
+    const stop = trip && findStop(trip, stopId);
+    const order = stop && stop.orders.find(o => o.id === orderId);
+    if (order) order.podUploaded = true;
+    state.podSheet = null;
+    render();
+  },
+
+  openExceptionSheet(tripId, stopId) {
+    state.exceptionSheet = { tripId, stopId };
+    render();
+  },
+
+  closeExceptionSheet() {
+    state.exceptionSheet = null;
+    render();
+  },
+
+  submitException() {
+    const { tripId, stopId } = state.exceptionSheet;
+    const trip = findActiveTrip(tripId);
+    const stop = trip && findStop(trip, stopId);
+    const typeEl = document.getElementById('exception-type');
+    const orderEl = document.getElementById('exception-order');
+    const descEl = document.getElementById('exception-description');
+    if (stop) {
+      const typeValue = typeEl ? typeEl.value : EXCEPTION_TYPES[0].value;
+      const typeLabel = (EXCEPTION_TYPES.find(t => t.value === typeValue) || EXCEPTION_TYPES[0]).label;
+      stop.exceptions.push({
+        type: typeLabel,
+        orderId: orderEl && orderEl.value !== '__all' ? orderEl.value : null,
+        description: descEl ? descEl.value : '',
+      });
+    }
+    state.exceptionSheet = null;
+    render();
   },
 
   approveDashboard() {
@@ -320,9 +493,11 @@ function h(strings, ...values) {
   return strings.reduce((acc, str, i) => acc + str + (values[i] !== undefined ? values[i] : ''), '');
 }
 
-function tripCard(trip, clickable) {
+/* Compact row for a trip that isn't underway yet — Scheduled/Upcoming section
+   only. Nothing to act on until it becomes the active trip, so it isn't tappable. */
+function tripCard(trip) {
   return h`
-    <div class="card trip-card" ${clickable ? `onclick="App.viewTrip('${trip.id}')"` : ''}>
+    <div class="card trip-card">
       <div class="trip-card__top">
         <span class="t-label-md">${trip.id}</span>
         <span class="badge badge--${trip.badge}">${trip.status}</span>
@@ -342,66 +517,240 @@ function greeting() {
   return 'Good evening';
 }
 
-/* Horizontal dot-line stepper (Uber Eats / Blinkit / Glovo pattern) — a status
-   visualization only in this prototype. Advancing a trip through stages for real
-   is milestone confirmation, which is Phase 2. */
-function milestoneStepper(stageIndex) {
-  const dots = MILESTONE_STAGES.map((_, i) => {
-    const state = i < stageIndex ? 'done' : i === stageIndex ? 'active' : 'todo';
-    const dot = h`<div class="ms-dot ms-dot--${state}"></div>`;
-    if (i === MILESTONE_STAGES.length - 1) return dot;
-    const lineState = i < stageIndex ? 'done' : 'todo';
-    return dot + h`<div class="ms-line ms-line--${lineState}"></div>`;
-  }).join('');
+/* Whether a given <sl-details> (a stop card, or the trip accordion itself) should
+   render open. Defaults to "the active stop / the trip itself" is open; anything
+   the driver has manually toggled is remembered in state.stopExpandOverride so a
+   later re-render (e.g. confirming a milestone elsewhere) doesn't silently re-collapse
+   something they opened themselves — full re-renders replace the DOM every time,
+   so this can't rely on <sl-details> tracking its own open state across renders. */
+function isExpanded(id, defaultOpen) {
+  return id in state.stopExpandOverride ? state.stopExpandOverride[id] : defaultOpen;
+}
+
+function findActiveTrip(tripId) {
+  return state.activeTrips.find(t => t.id === tripId) || (state.guestTrip.id === tripId ? state.guestTrip : null);
+}
+
+function findStop(trip, stopId) {
+  return trip.stops.find(s => s.id === stopId);
+}
+
+/* One or more "Active Trip" accordions — the dashboard's main content. Each is
+   its own <sl-details>, open by default (see isExpanded above), so a driver can
+   collapse a trip to get it out of the way without losing anything else on the
+   dashboard. Takes an array so this scales past one truck/trip, even though V1
+   never actually has more than one active at a time. */
+function activeTripSection(trips) {
+  return trips.map(trip => h`
+    <sl-details class="active-trip" ${isExpanded(trip.id, true) ? 'open' : ''} onclick="if(event.target.closest('[data-role=summary]')) App.toggleExpand('${trip.id}', ${isExpanded(trip.id, true)})">
+      <div slot="summary" data-role="summary" class="active-trip__summary">
+        <div class="active-trip__summary-top">
+          <span class="t-label-md">${trip.id}</span>
+          <span class="badge badge--info">In progress</span>
+        </div>
+        <span class="t-body-sm t-caption">${trip.stops.length} stops &middot; ${trip.stops.reduce((n, s) => n + s.orders.length, 0)} orders</span>
+      </div>
+      <div class="active-trip__timeline">${stopTimelineList(trip)}</div>
+    </sl-details>
+  `).join('');
+}
+
+/* Current stop pinned to the top (not chronological-from-start), everything
+   else following in actual route order below — scroll to reach any other
+   stop, past or future, non-sequentially. */
+function stopTimelineList(trip) {
+  const active = findStop(trip, trip.activeStopId);
+  const rest = trip.stops.filter(s => s.id !== trip.activeStopId);
+  const ordered = active ? [active, ...rest] : trip.stops;
+  return h`<div class="stop-list">${ordered.map(stop => stopItem(trip, stop)).join('')}</div>`;
+}
+
+function stopStatus(stop) {
+  if (stop.milestones.every(m => m.status === 'confirmed')) return 'completed';
+  if (stop.milestones.some(m => m.status !== 'pending')) return 'active';
+  return 'upcoming';
+}
+
+function stopItem(trip, stop) {
+  const status = stopStatus(stop);
+  const isActive = stop.id === trip.activeStopId;
+  const expanded = isExpanded(stop.id, isActive);
+  const orderCount = stop.orders.length;
   return h`
-    <div class="milestone-stepper">
-      <div class="milestone-stepper__track">${dots}</div>
-      <div class="t-label-sm milestone-stepper__label">${MILESTONE_STAGES[stageIndex]}</div>
+    <div class="stop-item stop-item--${status}">
+      <div class="stop-card">
+        <sl-details ${expanded ? 'open' : ''} onclick="if(event.target.closest('[data-role=summary]')) App.toggleExpand('${stop.id}', ${expanded})">
+          <div slot="summary" data-role="summary" class="stop-summary">
+            <div>
+              <div class="stop-summary__title">
+                <span class="t-label-md">${stop.type === 'pickup' ? 'Pickup' : 'Delivery'} &middot; ${stop.location}</span>
+                ${stop.exceptions.length ? h`<span class="exception-flag" title="Exception reported">&#9888;</span>` : ''}
+              </div>
+              <div class="stop-summary__meta">
+                <span class="t-body-sm t-caption">${stop.appointment}</span>
+                ${orderCount > 1 ? h`<span class="badge badge--info">${orderCount} orders</span>` : ''}
+              </div>
+            </div>
+          </div>
+          <div class="stop-body">
+            ${stop.milestones.map(m => milestoneRow(trip, stop, m)).join('')}
+            ${stop.type === 'delivery' ? h`<div class="dash-section" style="gap:6px;">${stop.orders.map(o => orderRow(trip, stop, o)).join('')}</div>` : ''}
+            <div class="stop-actions">
+              <button type="button" class="btn btn-subtle" style="width:auto; flex:1;" onclick="App.openExceptionSheet('${trip.id}','${stop.id}')">&#9888; Report exception</button>
+            </div>
+          </div>
+        </sl-details>
+      </div>
     </div>
   `;
 }
 
-/* Vertical dot / dashed-line / pin route visual for pickup -> drop-off, replacing
-   the plain "A -> B" text row used elsewhere in the app. */
-function routeVisual(pickup, dropoff) {
+function milestoneRow(trip, stop, m) {
+  const editing = state.editingMilestone && state.editingMilestone.milestoneId === m.id;
+  if (editing) {
+    return h`
+      <div class="milestone-row">
+        <div class="milestone-row__main">
+          <span class="t-body-md">${m.label}</span>
+          <div class="timestamp-edit">
+            <sl-input id="ts-input-${m.id}" type="time" size="small" value="${m.timestamp || ''}"></sl-input>
+            <sl-button size="small" variant="primary" onclick="App.saveTimestamp('${trip.id}','${stop.id}','${m.id}')">Save</sl-button>
+            <sl-button size="small" variant="default" onclick="App.cancelEditTimestamp()">Cancel</sl-button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  const sourceLabel = m.source === 'automated' ? 'Automated' : m.source === 'manual' ? 'Manual' : '';
   return h`
-    <div class="route-visual">
-      <div class="route-visual__markers">
-        <div class="route-visual__dot"></div>
-        <div class="route-visual__line"></div>
-        <div class="route-visual__pin"></div>
-      </div>
-      <div class="route-visual__stops">
-        <div class="route-visual__stop">
-          <div class="t-caption">Pickup</div>
-          <div class="t-body-md">${pickup}</div>
+    <div class="milestone-row milestone-row--${m.status}">
+      <div class="milestone-row__main">
+        <div class="milestone-row__label-line">
+          <span class="t-body-md">${m.label}</span>
+          ${m.status === 'proposed' ? h`<span class="badge badge--warning">Awaiting confirm</span>` : ''}
         </div>
-        <div class="route-visual__stop">
-          <div class="t-caption">Drop-off</div>
-          <div class="t-body-md">${dropoff}</div>
-        </div>
+        <span class="t-body-sm t-caption">
+          ${m.timestamp
+            ? h`${sourceLabel ? sourceLabel + ' &middot; ' : ''}<button type="button" class="timestamp-btn" onclick="App.startEditTimestamp('${stop.id}','${m.id}')">${m.timestamp}</button>`
+            : 'Not yet reached'}
+        </span>
       </div>
+      ${m.status === 'proposed' ? h`
+        <div class="milestone-row__actions">
+          <sl-button size="small" variant="primary" onclick="App.confirmMilestone('${trip.id}','${stop.id}','${m.id}')">Confirm</sl-button>
+        </div>
+      ` : m.status === 'confirmed' ? h`<div class="milestone-row__actions"><span class="t-label-sm" style="color:var(--success-text);">&#10003;</span></div>` : ''}
     </div>
   `;
 }
 
-/* The dashboard's single "Today" card — the next actionable trip, always above the
-   fold, DoorDash "Current dash"-style. clickable trips lead to the same trip-detail
-   screen as the compact rows in the Upcoming list; it isn't a separate flow. */
-function todayTripCard(trip, label) {
+function orderRow(trip, stop, order) {
   return h`
-    <div class="card today-card" onclick="App.viewTrip('${trip.id}')">
-      <div class="today-card__top">
-        <span class="t-label-sm t-caption">${label || 'TODAY'}</span>
-        <span class="badge badge--${trip.badge}">${trip.status}</span>
+    <div class="order-row">
+      <div class="order-row__label">
+        <span class="t-body-sm t-label-md">${order.ref}</span>
+        <span class="t-body-sm t-caption">${order.podUploaded ? 'POD uploaded' : 'POD not yet uploaded'}</span>
       </div>
-      <div class="t-headline-sm">${trip.pickup} &#8594; ${trip.dropoff}</div>
-      ${milestoneStepper(trip.milestoneStage)}
-      <div class="today-card__footer">
-        <span class="t-body-sm t-muted">ETA ${trip.eta}</span>
-        <span class="today-card__chevron">View details &#8250;</span>
-      </div>
+      ${order.podUploaded
+        ? h`<span class="badge badge--success">&#10003; Done</span>`
+        : h`<sl-button size="small" onclick="App.openPodSheet('${trip.id}','${stop.id}','${order.id}')">Upload POD</sl-button>`}
     </div>
+  `;
+}
+
+/* POD upload — real modal sheet (bottom drawer), per order at a delivery stop.
+   Matches what's actually built today (mobile-app-status.md): a mandatory POD
+   document plus an optional cargo photo — no signature/notes fields exist yet,
+   so none are invented here. */
+function podSheetMarkup() {
+  const open = !!state.podSheet;
+  let order = null, stop = null;
+  if (open) {
+    const trip = findActiveTrip(state.podSheet.tripId);
+    stop = trip && findStop(trip, state.podSheet.stopId);
+    order = stop && stop.orders.find(o => o.id === state.podSheet.orderId);
+  }
+  return h`
+    <sl-drawer id="pod-drawer" label="Upload POD" placement="bottom" ${open ? 'open' : ''} onsl-request-close="App.closePodSheet()">
+      ${open ? h`
+        <div class="sheet-body">
+          <div class="t-body-sm t-muted">${order.ref} &middot; ${stop.location}</div>
+          <div class="sheet-field">
+            <label class="t-label-sm">POD document <span class="t-caption">(required)</span></label>
+            <input type="file" accept="image/*,.pdf" capture="environment" />
+          </div>
+          <div class="sheet-field">
+            <label class="t-label-sm">Cargo photo <span class="t-caption">(optional)</span></label>
+            <input type="file" accept="image/*" capture="environment" />
+          </div>
+        </div>
+        <div slot="footer" style="display:flex; gap:8px;">
+          <sl-button style="flex:1;" onclick="App.closePodSheet()">Cancel</sl-button>
+          <sl-button style="flex:1;" variant="primary" onclick="App.submitPod()">Submit POD</sl-button>
+        </div>
+      ` : ''}
+    </sl-drawer>
+  `;
+}
+
+/* Exception reporting — real modal sheet, originated for this design since no
+   structured flow exists anywhere yet (today it's phone-call-only). Fields
+   chosen to match the V1 "structured exception capture" goal from the kickoff:
+   a type, which order it affects (only asked when the stop has more than one),
+   a description, and optional photo evidence. */
+/* sl-option values can't contain spaces (Shoelace silently mangles them) — slug
+   for the value, human label for the visible text and the stored record. */
+const EXCEPTION_TYPES = [
+  { value: 'delay', label: 'Delay' },
+  { value: 'damaged-goods', label: 'Damaged goods' },
+  { value: 'missing-items', label: 'Missing items' },
+  { value: 'site-access', label: 'Site access issue' },
+  { value: 'vehicle-issue', label: 'Vehicle issue' },
+  { value: 'other', label: 'Other' },
+];
+
+function exceptionSheetMarkup() {
+  const open = !!state.exceptionSheet;
+  let stop = null;
+  if (open) {
+    const trip = findActiveTrip(state.exceptionSheet.tripId);
+    stop = trip && findStop(trip, state.exceptionSheet.stopId);
+  }
+  return h`
+    <sl-drawer id="exception-drawer" label="Report exception" placement="bottom" ${open ? 'open' : ''} onsl-request-close="App.closeExceptionSheet()">
+      ${open ? h`
+        <div class="sheet-body">
+          <div class="t-body-sm t-muted">${stop.location}</div>
+          <div class="sheet-field">
+            <label class="t-label-sm">Type</label>
+            <sl-select id="exception-type">
+              ${EXCEPTION_TYPES.map(t => h`<sl-option value="${t.value}">${t.label}</sl-option>`).join('')}
+            </sl-select>
+          </div>
+          ${stop.orders.length > 1 ? h`
+            <div class="sheet-field">
+              <label class="t-label-sm">Affected order</label>
+              <sl-select id="exception-order" value="__all">
+                <sl-option value="__all">Whole stop</sl-option>
+                ${stop.orders.map(o => h`<sl-option value="${o.id}">${o.ref}</sl-option>`).join('')}
+              </sl-select>
+            </div>
+          ` : ''}
+          <div class="sheet-field">
+            <label class="t-label-sm">Description</label>
+            <sl-textarea id="exception-description" rows="3" placeholder="What happened?"></sl-textarea>
+          </div>
+          <div class="sheet-field">
+            <label class="t-label-sm">Photo evidence <span class="t-caption">(optional)</span></label>
+            <input type="file" accept="image/*" capture="environment" />
+          </div>
+        </div>
+        <div slot="footer" style="display:flex; gap:8px;">
+          <sl-button style="flex:1;" onclick="App.closeExceptionSheet()">Cancel</sl-button>
+          <sl-button style="flex:1;" variant="primary" onclick="App.submitException()">Submit</sl-button>
+        </div>
+      ` : ''}
+    </sl-drawer>
   `;
 }
 
@@ -773,7 +1122,10 @@ const SCREENS = {
         <div class="center-state__icon center-state__icon--success">&#128274;</div>
         <div class="t-headline-md">Scoped single-trip access</div>
         <div class="t-body-md t-muted">No email, no password, no account created. Access ends automatically when the trip is complete.</div>
-        ${tripCard(MOCK_GUEST_TRIP, false)}
+        <div class="card trip-card" style="text-align:left; width:100%;">
+          <div class="trip-card__top"><span class="t-label-md">${MOCK_GUEST_TRIP.id}</span></div>
+          <div class="t-body-sm t-muted">${MOCK_GUEST_TRIP.stops[0].location} &#8594; ${MOCK_GUEST_TRIP.stops[MOCK_GUEST_TRIP.stops.length - 1].location}</div>
+        </div>
       </div>
     `,
     footer: () => h`<button class="btn btn-primary" onclick="App.enterDashboard('guest')">Continue to trip</button>`,
@@ -882,13 +1234,12 @@ const SCREENS = {
             <span class="badge badge--info">Guest access — this trip only</span>
           </div>
           ${trackingStatusBanner()}
-          <div class="dash-section">
-            <div class="t-label-sm t-caption dash-section__label">TODAY</div>
-            ${todayTripCard(MOCK_GUEST_TRIP)}
-          </div>
+          ${activeTripSection([state.guestTrip])}
           <div class="card">
             <div class="t-body-sm t-muted">This access ends automatically once the trip is marked complete — nothing to clean up.</div>
           </div>
+          ${podSheetMarkup()}
+          ${exceptionSheetMarkup()}
         `,
         footer: () => h`<button class="btn btn-subtle" onclick="App.restartFlow()">Restart this flow</button>`,
       };
@@ -900,7 +1251,6 @@ const SCREENS = {
     const carrier = state.activeFlow === 'self-reg' ? MOCK_PLANNER_RECORD.carrier
       : state.activeFlow === 'returning' ? MOCK_RETURNING_DRIVER.carrier
       : MOCK_PLANNER_RECORD.carrier;
-    const [today, ...upcoming] = MOCK_TRIPS;
     return {
       content: h`
         <div class="dash-header">
@@ -908,49 +1258,23 @@ const SCREENS = {
           <div class="t-body-sm t-muted">${carrier} &middot; Full trip visibility</div>
         </div>
         ${trackingStatusBanner()}
-        ${today ? h`
-          <div class="dash-section">
-            <div class="t-label-sm t-caption dash-section__label">TODAY</div>
-            ${todayTripCard(today)}
-          </div>
-        ` : ''}
+        <div class="dash-section">
+          <div class="t-label-sm t-caption dash-section__label">ACTIVE TRIP</div>
+          ${activeTripSection(state.activeTrips)}
+        </div>
         <div class="dash-section">
           <div class="dash-section__row">
-            <span class="t-label-sm t-caption dash-section__label">UPCOMING</span>
-            <span class="t-caption">${upcoming.length ? `${upcoming.length} trip${upcoming.length > 1 ? 's' : ''} &middot; non-sequential` : ''}</span>
+            <span class="t-label-sm t-caption dash-section__label">SCHEDULED</span>
+            <span class="t-caption">${MOCK_UPCOMING_TRIPS.length ? `${MOCK_UPCOMING_TRIPS.length} trip${MOCK_UPCOMING_TRIPS.length > 1 ? 's' : ''}` : ''}</span>
           </div>
-          ${upcoming.length
-            ? upcoming.map(t => tripCard(t, true)).join('')
-            : h`<div class="t-body-sm t-caption dash-empty-note">No other trips scheduled right now.</div>`}
+          ${MOCK_UPCOMING_TRIPS.length
+            ? MOCK_UPCOMING_TRIPS.map(t => tripCard(t)).join('')
+            : h`<div class="t-body-sm t-caption dash-empty-note">Nothing scheduled beyond the active trip.</div>`}
         </div>
+        ${podSheetMarkup()}
+        ${exceptionSheetMarkup()}
       `,
       footer: () => h`<button class="btn btn-subtle" onclick="App.restartFlow()">Restart this flow</button>`,
-    };
-  },
-
-  'trip-detail': () => {
-    const trip = MOCK_TRIPS.concat([MOCK_GUEST_TRIP]).find(t => t.id === state.selectedTripId) || MOCK_TRIPS[0];
-    return {
-      content: h`
-        <div class="trip-detail__top">
-          <span class="t-label-md">${trip.id}</span>
-          <span class="badge badge--${trip.badge}">${trip.status}</span>
-        </div>
-        <div class="card">
-          ${milestoneStepper(trip.milestoneStage)}
-        </div>
-        <div class="card">
-          ${routeVisual(trip.pickup, trip.dropoff)}
-        </div>
-        <div class="card">
-          <div class="t-label-md">ETA</div>
-          <div class="t-body-sm t-muted">${trip.eta}</div>
-        </div>
-        <div class="card card--tinted">
-          <div class="t-body-sm t-muted">Milestone confirmation, structured exception reporting, and back-office communication for this trip are Phase 2 — not in this prototype yet.</div>
-        </div>
-      `,
-      footer: () => h`<button class="btn btn-subtle" onclick="App.back()">Back to dashboard</button>`,
     };
   },
 };

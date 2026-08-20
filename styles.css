@@ -44,6 +44,59 @@
   --space-inline-padding: 12px;
 }
 
+/* ---------- Shoelace theme bridge ----------
+   Shoelace ships its own token set scoped under .sl-theme-light/.sl-theme-dark
+   (kept on <html> in sync with our own .light/.dark class — see toggleTheme()).
+   Re-point its tokens at CCA's own so every Shoelace component we use inherits
+   the CCA look automatically, instead of re-theming each one individually. */
+.sl-theme-light, .sl-theme-dark {
+  --sl-font-sans: var(--font-family);
+  --sl-input-font-family: var(--font-family);
+  --sl-border-radius-small: var(--radius-xs);
+  --sl-border-radius-medium: var(--radius-sm);
+  --sl-border-radius-large: var(--radius-md);
+  --sl-input-border-radius-medium: var(--radius-sm);
+
+  --sl-color-primary-50: var(--surface-brand-lightest);
+  --sl-color-primary-100: var(--surface-brand-lightest);
+  --sl-color-primary-200: var(--surface-brand-light);
+  --sl-color-primary-300: var(--surface-brand-light);
+  --sl-color-primary-400: var(--surface-brand-default);
+  --sl-color-primary-500: var(--surface-brand-default);
+  --sl-color-primary-600: var(--surface-brand-default);
+  --sl-color-primary-700: var(--surface-brand-dark);
+  --sl-color-primary-800: var(--surface-brand-darker);
+  --sl-color-primary-900: var(--surface-brand-darker);
+  --sl-color-primary-950: var(--surface-brand-darker);
+
+  --sl-color-warning-500: var(--warning-surface);
+  --sl-color-warning-600: var(--warning-surface-dark);
+  --sl-color-danger-500: var(--critical-surface);
+  --sl-color-danger-600: var(--critical-surface-dark);
+
+  --sl-color-neutral-0: var(--color-neutrals-50);
+  --sl-color-neutral-50: var(--surface-neutral-light);
+  --sl-color-neutral-100: var(--color-neutrals-100);
+  --sl-color-neutral-200: var(--border-neutral-default);
+  --sl-color-neutral-300: var(--color-neutrals-300);
+  --sl-color-neutral-400: var(--text-neutral-disabled);
+  --sl-color-neutral-500: var(--text-neutral-caption);
+  --sl-color-neutral-600: var(--text-neutral-subtitle);
+  --sl-color-neutral-700: var(--text-neutral-body);
+  --sl-color-neutral-800: var(--text-neutral-title);
+  --sl-color-neutral-900: var(--color-neutrals-900);
+  --sl-color-neutral-1000: var(--color-neutrals-900);
+}
+/* Shoelace's own chrome (border/shadow) fights with our .card look — strip it
+   back on sl-details so a stop card reads as one of our cards, not two nested ones. */
+sl-details::part(base) { border: none; background: transparent; }
+sl-details::part(header) { padding: 0; }
+sl-details::part(content) { padding: 8px 0 0; }
+/* Drawers styled as bottom sheets (placement="bottom" set per-instance) with
+   rounded top corners rather than Shoelace's default square panel. */
+sl-drawer::part(panel) { border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
+sl-drawer::part(title) { font-family: var(--font-family); font-weight: 500; }
+
 * { box-sizing: border-box; }
 html, body {
   margin: 0;
@@ -810,41 +863,62 @@ button { font-family: inherit; }
 .dash-section__label { letter-spacing: 0.04em; }
 .dash-empty-note { padding: 4px 2px; }
 
-/* ---------- Today card (dashboard's single next-action trip) ---------- */
-.today-card {
-  cursor: pointer;
-  gap: 12px;
-  border-left: 3px solid var(--border-brand-default);
+/* ---------- Active Trip (collapsible, vertical stop timeline) ----------
+   Built on <sl-details> (accordion behavior, a11y, focus handling) rather
+   than a bespoke expand/collapse — see the Shoelace theme bridge above for
+   how it's re-skinned to look native to CCA instead of a foreign UI kit. */
+.active-trip { border: 1px solid var(--border-neutral-default); border-radius: var(--radius-md); padding: 16px; background: var(--surface-neutral-light); }
+.active-trip__summary { display: flex; flex-direction: column; gap: 2px; width: 100%; cursor: pointer; }
+.active-trip__summary-top { display: flex; align-items: center; justify-content: space-between; }
+.active-trip__timeline { display: flex; flex-direction: column; gap: 10px; }
+
+/* One stop within the timeline. The connecting vertical line is drawn with a
+   left border on the list wrapper and a notch removed for the first/last item. */
+.stop-list { position: relative; display: flex; flex-direction: column; gap: 0; }
+.stop-item { position: relative; padding-left: 22px; padding-bottom: 14px; }
+.stop-item::before { /* connecting line */
+  content: ''; position: absolute; left: 5px; top: 14px; bottom: -4px; width: 2px;
+  background: var(--border-neutral-default);
 }
-.today-card:hover { border-color: var(--border-brand-default); }
-.today-card__top { display: flex; align-items: center; justify-content: space-between; }
-.today-card__footer { display: flex; align-items: center; justify-content: space-between; }
-.today-card__chevron { font-size: var(--type-label-sm-size); font-weight: 600; color: var(--text-brand-default); }
-
-/* ---------- Milestone stepper (status visualization, not yet interactive) ---------- */
-.milestone-stepper { display: flex; flex-direction: column; gap: 6px; }
-.milestone-stepper__track { display: flex; align-items: center; }
-.milestone-stepper__label { color: var(--text-brand-default); }
-.ms-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--color-neutrals-300); }
-.ms-dot--done { background: var(--surface-brand-default); }
-.ms-dot--active {
-  background: var(--surface-brand-default);
-  box-shadow: 0 0 0 3px var(--surface-brand-lighter);
+.stop-item:last-child::before { display: none; }
+.stop-item::after { /* stop dot */
+  content: ''; position: absolute; left: 0; top: 4px; width: 12px; height: 12px;
+  border-radius: 50%; background: var(--color-neutrals-300); border: 2px solid var(--surface-neutral-light);
 }
-.ms-dot--todo { background: var(--color-neutrals-300); }
-.ms-line { flex: 1; height: 2px; margin: 0 2px; background: var(--color-neutrals-300); }
-.ms-line--done { background: var(--surface-brand-default); }
+.stop-item--active::after { background: var(--surface-brand-default); }
+.stop-item--completed::after { background: var(--success-surface); }
 
-/* ---------- Route visual (pickup -> drop-off, dot / dashed line / pin) ---------- */
-.route-visual { display: flex; gap: 12px; }
-.route-visual__markers { display: flex; flex-direction: column; align-items: center; width: 10px; padding: 3px 0; }
-.route-visual__dot { width: 10px; height: 10px; border-radius: 50%; background: var(--surface-brand-default); flex-shrink: 0; }
-.route-visual__line { width: 2px; flex: 1; min-height: 24px; margin: 4px 0; border-left: 2px dashed var(--border-neutral-default); }
-.route-visual__pin { width: 10px; height: 10px; border-radius: 50% 50% 50% 0; background: var(--color-neutrals-800); transform: rotate(-45deg); flex-shrink: 0; }
-.route-visual__stops { flex: 1; display: flex; flex-direction: column; justify-content: space-between; gap: 20px; }
-.route-visual__stop { display: flex; flex-direction: column; gap: 2px; }
+.stop-card { border: 1px solid var(--border-neutral-default); border-radius: var(--radius-sm); background: var(--surface-neutral-default); }
+.stop-item--active .stop-card { border-color: var(--border-brand-default); }
+.stop-summary { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; padding: 10px 12px; cursor: pointer; width: 100%; }
+.stop-summary__title { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.stop-summary__meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.stop-body { padding: 4px 12px 12px; display: flex; flex-direction: column; gap: 10px; }
 
-.trip-detail__top { display: flex; align-items: center; justify-content: space-between; }
+/* Milestone row */
+.milestone-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-top: 1px solid var(--border-neutral-lighter, var(--color-neutrals-200)); }
+.stop-body > .milestone-row:first-child { border-top: none; }
+.milestone-row--pending { opacity: 0.5; }
+.milestone-row__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.milestone-row__label-line { display: flex; align-items: center; gap: 6px; }
+.milestone-row__actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.timestamp-btn {
+  background: none; border: none; padding: 2px 4px; margin: -2px -4px; border-radius: var(--radius-xs);
+  font: inherit; color: var(--text-neutral-subtitle); cursor: pointer; text-decoration: underline dotted;
+}
+.timestamp-btn:hover { background: var(--surface-neutral-dark); }
+.timestamp-edit { display: flex; align-items: center; gap: 6px; }
+
+/* Order / POD rows */
+.order-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border-radius: var(--radius-xs); background: var(--surface-neutral-light); }
+.order-row__label { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+
+.stop-actions { display: flex; gap: 8px; }
+.exception-flag { color: var(--critical-text); }
+
+/* ---------- POD / exception drawers (bottom sheets) ---------- */
+.sheet-body { display: flex; flex-direction: column; gap: 14px; }
+.sheet-field { display: flex; flex-direction: column; gap: 6px; }
 
 /* ---------- Success / centered state screens ---------- */
 .center-state {
