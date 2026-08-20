@@ -732,7 +732,7 @@ function activeTripSection(trips) {
       <div slot="summary" data-role="summary" class="active-trip__summary">
         <div class="active-trip__summary-top">
           <span class="t-label-lg">${trip.id}</span>
-          <span class="badge badge--info">In progress</span>
+          <span class="badge badge--info">In Transit</span>
         </div>
         <span class="t-body-sm t-caption">${trip.stops.length} stops &middot; ${distinctOrderCount(trip)} orders</span>
       </div>
@@ -770,6 +770,7 @@ function stopItem(trip, stop) {
     <div class="stop-item stop-item--${status}">
       <sl-details ${expanded ? 'open' : ''} onclick="if (event.target.closest('sl-details') === this && event.target.closest('[data-role=summary]')) App.toggleExpand('${stop.id}', ${expanded})">
         <div slot="summary" data-role="summary" class="stop-summary">
+          <span class="stop-item__dot"></span>
           <div class="stop-summary__main">
             <div class="stop-summary__title">
               <span class="t-label-md">${stop.type === 'pickup' ? 'Pickup' : 'Delivery'} &middot; ${stop.location}</span>
@@ -891,7 +892,7 @@ function podSheetMarkup() {
     order = stop && stop.orders.find(o => o.id === state.podSheet.orderId);
   }
   return h`
-    <sl-drawer id="pod-drawer" label="Upload POD" placement="bottom" ${open ? 'open' : ''} onsl-request-close="App.closePodSheet()">
+    <sl-drawer id="pod-drawer" label="Upload POD" placement="bottom" ${open ? 'open' : ''}>
       ${open ? h`
         <div class="sheet-body">
           <div class="t-body-sm t-muted">${order.ref} &middot; ${stop.location}</div>
@@ -938,7 +939,7 @@ function exceptionSheetMarkup() {
     stop = trip && findStop(trip, state.exceptionSheet.stopId);
   }
   return h`
-    <sl-drawer id="exception-drawer" label="Report an issue" placement="bottom" ${open ? 'open' : ''} onsl-request-close="App.closeExceptionSheet()">
+    <sl-drawer id="exception-drawer" label="Report an issue" placement="bottom" ${open ? 'open' : ''}>
       ${open ? h`
         <div class="sheet-body">
           <div class="t-body-sm t-muted">${stop.location}</div>
@@ -984,7 +985,7 @@ function exceptionSheetMarkup() {
 function addTripSheetMarkup() {
   const open = !!state.addTripSheet;
   return h`
-    <sl-drawer id="add-trip-drawer" label="Add a trip" placement="bottom" ${open ? 'open' : ''} onsl-request-close="App.closeAddTripSheet()">
+    <sl-drawer id="add-trip-drawer" label="Add a trip" placement="bottom" ${open ? 'open' : ''}>
       ${open ? h`
         <div class="sheet-body">
           <div class="t-body-sm t-muted">Enter the trip reference number your carrier or dispatch gave you.</div>
@@ -1044,7 +1045,6 @@ function notificationRow(item) {
 const TAB_ITEMS = [
   { route: 'dashboard', icon: '🏠', label: 'Dashboard' },
   { route: 'nav-trips', icon: '📋', label: 'My Trips' },
-  { route: 'nav-notifications', icon: '🔔', label: 'Alerts' },
   { route: 'nav-chats', icon: '💬', label: 'Chats' },
   { route: 'nav-profile', icon: '👤', label: 'Profile' },
 ];
@@ -1599,7 +1599,7 @@ const SCREENS = {
           <div class="t-label-sm t-caption dash-section__label">ACTIVE</div>
           ${active.map(trip => h`
             <div class="card" onclick="App.goTab('dashboard')" style="cursor:pointer;">
-              <div class="trip-card__top"><span class="t-label-md">${trip.id}</span><span class="badge badge--info">In progress</span></div>
+              <div class="trip-card__top"><span class="t-label-md">${trip.id}</span><span class="badge badge--info">In Transit</span></div>
               <div class="t-body-sm t-muted">${trip.stops.length} stops &middot; ${distinctOrderCount(trip)} orders</div>
               <div class="t-body-sm t-caption">Tap to open on the dashboard</div>
             </div>
@@ -1653,7 +1653,6 @@ const SCREENS = {
           <div class="t-body-sm t-muted">${carrier}</div>
           <div class="t-body-sm t-muted">${phone}</div>
         </div>
-        <button type="button" class="btn btn-subtle" onclick="App.restartFlow()">Restart this flow</button>
       `,
     };
   },
@@ -1818,7 +1817,7 @@ function render() {
         <div class="app-header__row">
           <button class="app-header__back" onclick="App.back()" ${canGoBack ? '' : 'style="visibility:hidden"'}>&#8592;</button>
           <div class="app-header__title t-headline-md">${TITLES[route] || ''}</div>
-          ${meta ? h`<div class="app-header__step t-body-sm">${meta.step} / ${meta.total}</div>` : ''}
+          ${meta ? h`<div class="app-header__step t-body-sm">${meta.step} / ${meta.total}</div>` : h`<div class="app-header__spacer"></div>`}
         </div>
         ${meta ? h`<div class="app-progress"><div class="app-progress__fill" style="width:${progressPct}%"></div></div>` : ''}
       </div>
@@ -1840,6 +1839,22 @@ function render() {
 
   document.querySelectorAll('.proto-flow-btn').forEach(btn => {
     btn.classList.toggle('is-active', state.activeFlow === btn.dataset.flow);
+  });
+
+  // sl-drawer emits a custom `sl-request-close` event (its own close button,
+  // clicking the overlay, or Escape) — inline HTML attributes like
+  // onsl-request-close="..." do NOT wire up custom events the way onclick
+  // does (that only works for events with a matching native on* IDL
+  // property), so this needs a real addEventListener. Every render() rebuilds
+  // the DOM from scratch, so these are re-attached fresh each time.
+  const drawerClosers = {
+    'pod-drawer': () => App.closePodSheet(),
+    'exception-drawer': () => App.closeExceptionSheet(),
+    'add-trip-drawer': () => App.closeAddTripSheet(),
+  };
+  Object.keys(drawerClosers).forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('sl-request-close', drawerClosers[id]);
   });
 
   const themeBtn = document.querySelector('.proto-theme-btn');

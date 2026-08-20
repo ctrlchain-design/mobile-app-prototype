@@ -266,7 +266,8 @@ button { font-family: inherit; }
   justify-content: center;
 }
 .app-header__back:hover { background: var(--surface-neutral-dark); }
-.app-header__title { flex: 1; color: var(--text-neutral-title); }
+.app-header__title { flex: 1; color: var(--text-neutral-title); text-align: center; }
+.app-header__spacer { width: 36px; flex-shrink: 0; }
 .app-header__step { color: var(--text-neutral-caption); }
 .app-progress {
   height: 4px;
@@ -970,19 +971,27 @@ button { font-family: inherit; }
    one continuous, scannable hierarchy instead of boxes nested in boxes. */
 .stop-list { position: relative; display: flex; flex-direction: column; gap: 0; }
 .stop-item { position: relative; padding-left: 20px; padding-bottom: 4px; }
+/* The connecting line spans the item's full height (it's painted first, so
+   real content — including the dot below — naturally paints over it), rather
+   than trying to end it exactly where a dot sits. That dot now lives inside
+   .stop-summary as a real flex child instead of a pseudo-element pinned to a
+   fixed top offset — a fixed offset only lined up with a single-line title;
+   once "Pickup · <long shipper name>, <city>" wraps to two lines, a dot fixed
+   at top:6px no longer sits anywhere near the title's actual vertical center. */
 .stop-item::before {
-  content: ''; position: absolute; left: 4px; top: 16px; bottom: -2px; width: 2px;
+  content: ''; position: absolute; left: 4px; top: 0; bottom: -2px; width: 2px;
   background: var(--border-neutral-default);
 }
 .stop-item:last-child::before { display: none; }
-.stop-item::after {
-  content: ''; position: absolute; left: 0; top: 6px; width: 10px; height: 10px;
+.stop-item__dot {
+  width: 10px; height: 10px; flex-shrink: 0;
+  margin-left: -20px; /* pull back into the line's gutter, out of the summary's own padding */
   border-radius: 50%; background: var(--color-neutrals-300); border: 2px solid var(--surface-neutral-light);
 }
-.stop-item--active::after { background: var(--surface-brand-default); }
-.stop-item--completed::after { background: var(--success-surface); }
+.stop-item--active .stop-item__dot { background: var(--surface-brand-default); }
+.stop-item--completed .stop-item__dot { background: var(--success-surface); }
 
-.stop-summary { display: flex; align-items: flex-start; justify-content: space-between; gap: 4px; cursor: pointer; width: 100%; padding: 6px 0; }
+.stop-summary { display: flex; align-items: center; gap: 10px; cursor: pointer; width: 100%; padding: 6px 0; }
 .stop-summary__main { min-width: 0; }
 .stop-summary__title { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .stop-summary__meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
