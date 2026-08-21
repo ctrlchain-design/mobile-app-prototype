@@ -1089,12 +1089,6 @@ button { font-family: inherit; }
 .stage-item__action { flex-shrink: 0; }
 .stage-item__sub { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
 
-/* Pallet-exchange count entry — the driver's own typed-in count, checked
-   against what was expected once submitted; no pre-filled value since
-   there's no automated extraction to seed it with. */
-.pallet-mismatch { display: flex; flex-direction: column; gap: 6px; margin-top: 2px; }
-.pallet-mismatch__input { max-width: 140px; }
-
 .timestamp-btn {
   background: none; border: none; padding: 2px 4px; margin: -2px -4px; border-radius: var(--radius-xs);
   font: inherit; color: var(--text-neutral-subtitle); cursor: pointer; text-decoration: underline dotted;
@@ -1102,9 +1096,18 @@ button { font-family: inherit; }
 .timestamp-btn:hover { background: var(--surface-neutral-dark); }
 .timestamp-edit { display: flex; align-items: center; gap: 6px; }
 
-/* Order / POD rows */
-.order-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border-radius: var(--radius-xs); background: var(--surface-neutral-default); }
-.order-row__label { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+/* Order / POD / pallet-exchange rows — label grows to fill the space, so
+   whatever comes after (a badge, an upload button, or a pallet-count input
+   + Confirm button) sits flush at the end regardless of how many trailing
+   elements there are. */
+.order-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: var(--radius-xs); background: var(--surface-neutral-default); }
+.order-row__label { flex: 1; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+/* Pallet-exchange entry needs a label plus an input plus a button — too
+   much for one line at phone width, so it stacks: label on top, the
+   input/Confirm pair below it, full width. */
+.order-row--stacked { flex-direction: column; align-items: stretch; gap: 8px; }
+.order-row__pallet-entry { display: flex; gap: 8px; }
+.pallet-count-input { flex: 1; }
 
 .exception-flag { color: var(--critical-text); }
 

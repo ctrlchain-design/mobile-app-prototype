@@ -35,31 +35,35 @@ const MOCK_RETURNING_DRIVER = { firstName: 'Jordan', lastName: 'Reyes', carrier:
                 this stop has a POD uploaded (see submitPod()).
      'pallet-exchange' — pickup-only, conditional (only present on stops that
                 actually need one — per uat-findings.md, "if pallet exchange
-                isn't required, don't ask at all"). No automated extraction is
-                assumed here: Corax's OCR-based count extraction is confirmed
-                working today, but only for NewCold — not something CtrlChain
-                can assume for an arbitrary broker-model shipper (see
+                isn't required, don't ask at all") and logged **per customer
+                order**, not once for the whole stop (kickoff-pack.md line
+                40: "Log pallet exchange per customer order") — same gating
+                shape as 'pod': completes itself once every order at this
+                stop has a driver-entered count (see submitPalletCount()).
+                No automated extraction is assumed here: Corax's OCR-based
+                count extraction is confirmed working today, but only for
+                NewCold — not something CtrlChain can assume for an
+                arbitrary broker-model shipper (see
                 keep-brand-artifacts-separate). The driver always enters the
-                actual count by hand; a count that doesn't match what was
-                expected is flagged as a structured exception for ops to
-                review, not resolved silently (see completeMilestone()).
+                actual count by hand, per order; a count that doesn't match
+                what was expected for that order is flagged as a structured
+                exception for ops to review, not resolved silently.
    Status values: 'eta' (informational) | 'pending' (blocked, future) |
-   'ready' (manual stage unlocked, or pallet-exchange awaiting a driver-
-   entered count) | 'proposed' (auto stage awaiting confirm) | 'confirmed'
-   (done). completeMilestone() advances a stop
+   'ready' (manual/pod/pallet-exchange stage unlocked, awaiting the driver)
+   | 'proposed' (auto stage awaiting confirm) | 'confirmed' (done).
+   completeMilestone() advances a stop
    to its next stage and, on a stop's last stage, hands the trip's
    activeStopId to the next stop — so the whole trip progresses, not just one
    stop in isolation. */
-function pickupStages(etaTime, palletExchange) {
+function pickupStages(etaTime, palletDock) {
   const stages = [
     { id: 'eta', label: 'Pickup ETA', kind: 'eta', status: 'eta', source: null, timestamp: etaTime },
     { id: 'arrived', label: 'Arrived at pickup', kind: 'auto', status: 'pending', source: null, timestamp: null },
   ];
-  if (palletExchange) {
+  if (palletDock) {
     stages.push({
-      id: 'pallet-exchange', label: 'Pallet exchange — ' + palletExchange.dock, kind: 'pallet-exchange',
+      id: 'pallet-exchange', label: 'Pallet exchange — ' + palletDock, kind: 'pallet-exchange',
       status: 'pending', source: null, timestamp: null,
-      expectedCount: palletExchange.expectedCount, actualCount: null, mismatch: false,
     });
   }
   stages.push(
@@ -97,17 +101,19 @@ const MOCK_ACTIVE_TRIPS = [
     stops: [
       {
         id: 'STOP-1', type: 'pickup', location: 'Meridian Distribution Centre, Coventry', appointment: 'Today, 08:00',
+        // expectedPallets/actualPallets/palletConfirmed/palletMismatch are
+        // pallet-exchange fields, logged per customer order (kickoff-pack.md
+        // line 40) — same shape as podUploaded on the delivery-side orders
+        // below. No pre-filled actualPallets: no automated extraction exists
+        // to seed it with, the driver always types it in themselves.
         orders: [
-          { id: 'ORD-8841937', ref: 'PO-33210' },
-          { id: 'ORD-8841938', ref: 'PO-33211' },
+          { id: 'ORD-8841937', ref: 'PO-33210', expectedPallets: 7, actualPallets: null, palletConfirmed: false, palletMismatch: false },
+          { id: 'ORD-8841938', ref: 'PO-33211', expectedPallets: 5, actualPallets: null, palletConfirmed: false, palletMismatch: false },
         ],
         milestones: (() => {
           // Pallet exchange required at this shipper — exchange dock is a
-          // per-warehouse constant per uat-findings.md, not per-trip. No
-          // extraction happens here (that's NewCold-specific Corax tech,
-          // not something CtrlChain can assume for an arbitrary shipper) —
-          // the driver types in the actual count themselves.
-          const s = pickupStages('07:55', { dock: 'Dock 018', expectedCount: 12 });
+          // per-warehouse constant per uat-findings.md, not per-trip.
+          const s = pickupStages('07:55', 'Dock 018');
           // Geofence fired 2 minutes early against the calculated ETA — a real
           // case for the timestamp-edit feature, not just a round number.
           s[1].status = 'proposed'; s[1].source = 'automated'; s[1].timestamp = '08:02';
@@ -457,22 +463,30 @@ const App = {
     render();
   },
 
-  /* Records the pallet count the driver typed in by hand — there's no
-     automated extraction to confirm or correct, just a number they counted
-     themselves — then completes the stage like any other. A count that
-     doesn't match what was expected is flagged (`mismatch`) as a structured
-     exception for ops to review, not reconciled silently. */
-  confirmPalletCount(tripId, stopId, milestoneId) {
-    const input = document.getElementById(`pallet-input-${milestoneId}`);
+  /* Records the pallet count the driver typed in by hand for one order —
+     there's no automated extraction to confirm or correct, just a number
+     they counted themselves. Pallet exchange is logged per customer order
+     (kickoff-pack.md line 40), so this mirrors submitPod(): once every
+     order at the stop has a driver-entered count, the stage completes
+     itself. A count that doesn't match what was expected for that order is
+     flagged (`palletMismatch`) as a structured exception for ops to
+     review, not reconciled silently. */
+  confirmPalletCount(tripId, stopId, orderId) {
+    const input = document.getElementById(`pallet-input-${orderId}`);
     const trip = findActiveTrip(tripId);
     const stop = trip && findStop(trip, stopId);
-    const m = stop && stop.milestones.find(x => x.id === milestoneId);
-    if (m && input && input.value !== '') {
-      m.actualCount = parseInt(input.value, 10);
-      m.mismatch = m.actualCount !== m.expectedCount;
+    const order = stop && stop.orders.find(o => o.id === orderId);
+    if (order && input && input.value !== '') {
+      order.actualPallets = parseInt(input.value, 10);
+      order.palletMismatch = order.actualPallets !== order.expectedPallets;
+      order.palletConfirmed = true;
     }
-    if (m) m.source = 'manual';
-    completeMilestoneByIds(tripId, stopId, milestoneId);
+    if (stop && stop.orders.every(o => o.palletConfirmed)) {
+      const idx = stop.milestones.findIndex(m => m.kind === 'pallet-exchange');
+      if (idx >= 0 && stop.milestones[idx].status !== 'confirmed') {
+        completeMilestone(trip, stop, idx);
+      }
+    }
     render();
   },
 
@@ -699,16 +713,12 @@ function completeMilestone(trip, stop, index) {
 
   const next = stop.milestones[index + 1];
   if (next && next.status === 'pending') {
-    if (next.kind === 'manual' || next.kind === 'pod') {
+    if (next.kind === 'manual' || next.kind === 'pod' || next.kind === 'pallet-exchange') {
       next.status = 'ready';
     } else if (next.kind === 'auto') {
       next.status = 'proposed';
       next.source = 'automated';
       next.timestamp = formatNowTime();
-    } else if (next.kind === 'pallet-exchange') {
-      // No automated count to check against — the driver always enters it
-      // themselves, same as any other manual stage.
-      next.status = 'ready';
     }
   }
 
@@ -817,19 +827,13 @@ function stageItem(trip, stop, m) {
   const dotClass = m.status === 'confirmed' ? 'done'
     : (m.status === 'proposed' || m.status === 'ready') ? 'active'
     : m.status === 'eta' ? 'eta' : 'todo';
-  // Pallet exchange is always driver-entered — there's no automated count
-  // to check against, so the input shows as soon as the stage unlocks.
-  const needsPalletCount = m.kind === 'pallet-exchange' && m.status === 'ready';
+  // Pallet exchange has no stage-level count any more — it's logged per
+  // customer order (see palletExchangeOrderRow()), same shape as 'pod'.
+  const hasOrderRows = m.kind === 'pod' || m.kind === 'pallet-exchange';
+  const anyPalletMismatch = m.kind === 'pallet-exchange' && m.status === 'confirmed' && stop.orders.some(o => o.palletMismatch);
 
   let right;
-  if (needsPalletCount) {
-    right = h`
-      <div class="pallet-mismatch">
-        <span class="t-body-sm t-caption">Expected ${m.expectedCount} pallets</span>
-        <sl-input id="pallet-input-${m.id}" class="pallet-mismatch__input" type="number" size="small" placeholder="Actual count"></sl-input>
-      </div>
-    `;
-  } else if (editing) {
+  if (editing) {
     right = h`
       <div class="timestamp-edit">
         <sl-input id="ts-input-${m.id}" type="time" size="small" value="${m.timestamp || ''}"></sl-input>
@@ -845,9 +849,9 @@ function stageItem(trip, stop, m) {
   } else if (m.status === 'pending') {
     right = h`<span class="t-body-sm t-caption">Not yet reached</span>`;
   } else if (!m.timestamp) {
+    // 'ready' with no timestamp yet — true for 'pod'/'pallet-exchange' while
+    // some per-order rows below are still unconfirmed.
     right = h`<span class="t-body-sm t-caption">Awaiting driver</span>`;
-  } else if (m.kind === 'pallet-exchange') {
-    right = h`<span class="t-body-sm t-caption"><button type="button" class="timestamp-btn" onclick="App.startEditTimestamp('${stop.id}','${m.id}')">${m.timestamp}</button> &middot; ${m.actualCount} pallets ${m.mismatch ? `(expected ${m.expectedCount})` : 'confirmed'}</span>`;
   } else {
     const sourceLabel = stageSourceLabel(m);
     right = h`<span class="t-body-sm t-caption"><button type="button" class="timestamp-btn" onclick="App.startEditTimestamp('${stop.id}','${m.id}')">${m.timestamp}</button>${sourceLabel ? ' &middot; ' + sourceLabel : ''}</span>`;
@@ -855,9 +859,7 @@ function stageItem(trip, stop, m) {
 
   let action = '';
   if (!editing) {
-    if (needsPalletCount) {
-      action = h`<sl-button size="small" variant="primary" onclick="App.confirmPalletCount('${trip.id}','${stop.id}','${m.id}')">Confirm</sl-button>`;
-    } else if (m.status === 'proposed') {
+    if (m.status === 'proposed') {
       action = h`<sl-button size="small" variant="primary" onclick="App.confirmMilestone('${trip.id}','${stop.id}','${m.id}')">Confirm</sl-button>`;
     } else if (m.status === 'ready' && m.kind === 'manual') {
       action = h`<sl-button size="small" variant="primary" onclick="App.markManualDone('${trip.id}','${stop.id}','${m.id}')">Mark done</sl-button>`;
@@ -871,13 +873,13 @@ function stageItem(trip, stop, m) {
         <div class="stage-item__main">
           <div class="stage-item__label-line">
             <span class="t-body-md ${m.status === 'pending' ? 't-muted' : ''}">${m.label}</span>
-            ${m.kind === 'pallet-exchange' && m.mismatch ? h`<span class="badge badge--warning">Mismatch</span>` : ''}
+            ${anyPalletMismatch ? h`<span class="badge badge--warning">Mismatch</span>` : ''}
           </div>
           ${right}
         </div>
         <div class="stage-item__action">${action}</div>
       </div>
-      ${m.kind === 'pod' && m.status !== 'pending' ? h`<div class="stage-item__sub">${stop.orders.map(o => orderRow(trip, stop, o)).join('')}</div>` : ''}
+      ${hasOrderRows && m.status !== 'pending' ? h`<div class="stage-item__sub">${stop.orders.map(o => m.kind === 'pod' ? orderRow(trip, stop, o) : palletExchangeOrderRow(trip, stop, o)).join('')}</div>` : ''}
     </div>
   `;
 }
@@ -892,6 +894,38 @@ function orderRow(trip, stop, order) {
       ${order.podUploaded
         ? h`<span class="badge badge--success"><sl-icon name="check2"></sl-icon> Done</span>`
         : h`<sl-button size="small" onclick="App.openPodSheet('${trip.id}','${stop.id}','${order.id}')">Upload POD</sl-button>`}
+    </div>
+  `;
+}
+
+/* Pallet exchange, logged per customer order (kickoff-pack.md line 40) —
+   same row shape as orderRow() above, but a driver-typed count instead of
+   a file upload. No pre-filled value: there's no automated extraction to
+   seed it with (see keep-brand-artifacts-separate re: Corax/NewCold). */
+function palletExchangeOrderRow(trip, stop, order) {
+  if (order.palletConfirmed) {
+    return h`
+      <div class="order-row">
+        <div class="order-row__label">
+          <span class="t-body-sm t-label-md">${order.ref}</span>
+          <span class="t-body-sm t-caption">${order.actualPallets} pallets${order.palletMismatch ? ` (expected ${order.expectedPallets})` : ''}</span>
+        </div>
+        ${order.palletMismatch
+          ? h`<span class="badge badge--warning"><sl-icon name="exclamation-triangle"></sl-icon> Mismatch</span>`
+          : h`<span class="badge badge--success"><sl-icon name="check2"></sl-icon> Confirmed</span>`}
+      </div>
+    `;
+  }
+  return h`
+    <div class="order-row order-row--stacked">
+      <div class="order-row__label">
+        <span class="t-body-sm t-label-md">${order.ref}</span>
+        <span class="t-body-sm t-caption">Expected ${order.expectedPallets} pallets</span>
+      </div>
+      <div class="order-row__pallet-entry">
+        <sl-input id="pallet-input-${order.id}" class="pallet-count-input" type="number" size="small" placeholder="Actual count"></sl-input>
+        <sl-button size="small" variant="primary" onclick="App.confirmPalletCount('${trip.id}','${stop.id}','${order.id}')">Confirm</sl-button>
+      </div>
     </div>
   `;
 }
