@@ -990,7 +990,7 @@ button { font-family: inherit; }
    how it's re-skinned to look native to CCA instead of a foreign UI kit. */
 .active-trip { border: 1px solid var(--border-neutral-default); border-radius: var(--radius-md); padding: 16px; background: var(--surface-neutral-light); }
 .active-trip__summary { display: flex; flex-direction: column; gap: 2px; width: 100%; cursor: pointer; }
-.active-trip__summary-top { display: flex; align-items: center; justify-content: space-between; }
+.active-trip__summary-top { display: flex; align-items: center; gap: 8px; }
 .active-trip__timeline { display: flex; flex-direction: column; gap: 4px; }
 
 /* Report-an-issue action — always a legible label, never an icon alone: a
@@ -1030,7 +1030,7 @@ button { font-family: inherit; }
    once "Pickup · <long shipper name>, <city>" wraps to two lines, a dot fixed
    at top:6px no longer sits anywhere near the title's actual vertical center. */
 .stop-item::before {
-  content: ''; position: absolute; left: 7px; top: 0; bottom: -2px; width: 2px;
+  content: ''; position: absolute; left: 7px; top: 24px; bottom: -2px; width: 2px;
   background: var(--border-neutral-default);
 }
 .stop-item:last-child::before { display: none; }
