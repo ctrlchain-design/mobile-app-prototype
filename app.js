@@ -1608,10 +1608,12 @@ const SCREENS = {
         <div class="dash-section">
           <div class="t-label-sm t-caption dash-section__label">ACTIVE</div>
           ${active.map(trip => h`
-            <div class="card" onclick="App.goTab('dashboard')" style="cursor:pointer;">
-              <div class="trip-card__top"><span class="t-label-md">${trip.id}</span><span class="badge badge--info">In Transit</span></div>
+            <div class="card trip-card trip-card--tappable" onclick="App.goTab('dashboard')">
+              <div class="trip-card__top">
+                <span class="t-label-md">${trip.id}</span>
+                <div class="trip-card__top-right"><span class="badge badge--info">In Transit</span><sl-icon name="chevron-right"></sl-icon></div>
+              </div>
               <div class="t-body-sm t-muted">${trip.stops.length} stop${trip.stops.length === 1 ? '' : 's'} &middot; ${distinctOrderCount(trip)} order${distinctOrderCount(trip) === 1 ? '' : 's'}</div>
-              <div class="t-body-sm t-caption">Tap to open on the dashboard</div>
             </div>
           `).join('')}
         </div>

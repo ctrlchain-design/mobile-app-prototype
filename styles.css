@@ -329,6 +329,7 @@ button { font-family: inherit; }
   justify-content: center;
 }
 .app-header__back:hover { background: var(--surface-neutral-dark); }
+.app-header__back:active { background: var(--surface-neutral-darker); }
 .app-header__title { flex: 1; color: var(--text-neutral-title); text-align: center; }
 .app-header__spacer { width: 36px; flex-shrink: 0; }
 .app-header__step { color: var(--text-neutral-caption); }
@@ -397,11 +398,17 @@ button { font-family: inherit; }
   border: 1.5px solid var(--button-secondary-border-default);
 }
 .btn-secondary:hover { background: var(--button-secondary-bg-hovered); }
+/* :active is the one that actually matters on a touchscreen — :hover never
+   fires on tap. The design system already ships dedicated "-pressed" tokens
+   for every button variant below; they just weren't wired up anywhere. */
+.btn-secondary:active { background: var(--button-secondary-bg-pressed); border-color: var(--button-secondary-border-pressed); }
 .btn-subtle {
   background: transparent;
   color: var(--button-subtle-label-default);
   border: 1.5px solid var(--button-subtle-border-default);
 }
+.btn-subtle:hover { border-color: var(--button-subtle-border-hovered); color: var(--button-subtle-label-hovered); }
+.btn-subtle:active { background: var(--button-subtle-bg-pressed); border-color: var(--button-subtle-border-pressed); color: var(--button-subtle-label-pressed); }
 .btn-text {
   background: transparent;
   color: var(--button-text-label);
@@ -409,6 +416,7 @@ button { font-family: inherit; }
   width: auto;
 }
 .btn-text:hover { background: var(--button-text-bg-hover); }
+.btn-text:active { background: var(--button-text-bg-pressed); }
 .btn-link {
   background: none;
   border: none;
@@ -419,6 +427,8 @@ button { font-family: inherit; }
   padding: 0;
   width: auto;
 }
+.btn-link:hover { color: var(--button-link-hovered); }
+.btn-link:active { color: var(--button-link-pressed); }
 .btn-social {
   background: var(--surface-neutral-light);
   color: var(--text-neutral-title);
@@ -426,6 +436,7 @@ button { font-family: inherit; }
   gap: 10px;
 }
 .btn-social:hover { background: var(--surface-neutral-dark); }
+.btn-social:active { background: var(--surface-neutral-darker); }
 .btn-social__icon { width: 20px; height: 20px; flex-shrink: 0; }
 
 /* ---------- Form fields ---------- */
@@ -472,6 +483,7 @@ button { font-family: inherit; }
   cursor: pointer;
 }
 .phone-input__code:hover { background: var(--surface-neutral-dark); }
+.phone-input__code:active { background: var(--surface-neutral-darker); }
 .phone-input__flag { font-size: 18px; line-height: 1; }
 .phone-input__chevron { color: var(--icon-neutral-darker); flex-shrink: 0; }
 .phone-input__number-wrap {
@@ -568,6 +580,7 @@ button { font-family: inherit; }
   cursor: pointer;
 }
 .pin-key:hover { background: var(--color-neutrals-300); }
+.pin-key:active { background: var(--color-neutrals-400); }
 .pin-key.pin-key--ghost { background: transparent; cursor: default; }
 
 /* ---------- Checkbox row (GDPR) ---------- */
@@ -633,6 +646,7 @@ button { font-family: inherit; }
   display: flex; align-items: center; justify-content: center;
 }
 .dash-hero__bell:hover { background: var(--surface-neutral-darker); }
+.dash-hero__bell:active { background: var(--surface-neutral-darker); }
 .dash-hero__bell-dot {
   position: absolute; top: 4px; right: 5px;
   width: 8px; height: 8px; border-radius: 50%;
@@ -785,6 +799,7 @@ button { font-family: inherit; }
   min-height: 48px;
 }
 .launch-hero__secondary:hover { background: rgba(255,255,255,0.18); }
+.launch-hero__secondary:active { background: rgba(255,255,255,0.28); }
 .launch-hero__signin {
   color: rgba(255,255,255,0.85);
   text-decoration: underline;
@@ -936,9 +951,20 @@ button { font-family: inherit; }
 }
 
 /* ---------- Trip cards (dashboard) ---------- */
-.trip-card { cursor: pointer; gap: 4px; }
-.trip-card:hover { border-color: var(--border-brand-default); }
+/* Scheduled/History cards use this base with no cursor/interaction styling
+   at all — they're read-only previews (V1 has no detail screen for a trip
+   that isn't the active one), so they shouldn't look tappable. Only the
+   Active card (My Trips, .trip-card--tappable) actually navigates, and gets
+   its own cursor, hover (desktop), :active (mobile — :hover never fires on
+   a touchscreen, so this is the only tap feedback a driver actually sees),
+   and a trailing chevron as a persistent "this goes somewhere" cue that
+   doesn't depend on hovering to discover. */
+.trip-card { gap: 4px; }
+.trip-card--tappable { cursor: pointer; }
+.trip-card--tappable:hover { border-color: var(--border-brand-default); }
+.trip-card--tappable:active { background: var(--surface-neutral-dark); }
 .trip-card__top { display: flex; align-items: center; justify-content: space-between; }
+.trip-card__top-right { display: flex; align-items: center; gap: 6px; color: var(--text-neutral-subtitle); }
 
 /* ---------- Dashboard header / sections ---------- */
 .dash-header { display: flex; flex-direction: column; gap: 4px; }
@@ -989,7 +1015,14 @@ button { font-family: inherit; }
    than a bespoke expand/collapse — see the Shoelace theme bridge above for
    how it's re-skinned to look native to CCA instead of a foreign UI kit. */
 .active-trip { border: 1px solid var(--border-neutral-default); border-radius: var(--radius-md); padding: 16px; background: var(--surface-neutral-light); }
-.active-trip__summary { display: flex; flex-direction: column; gap: 2px; width: 100%; cursor: pointer; }
+/* :hover never fires on a touchscreen, so this row's only tap feedback
+   without an explicit :active rule would be the accordion actually opening
+   — a delayed, easy-to-miss signal. A brief background dim on press gives
+   the driver instant confirmation the tap registered, the same instant a
+   mouse user gets from :hover. Negative margin/padding so the dim reaches
+   the row's true edges without fighting .active-trip's own padding. */
+.active-trip__summary { display: flex; flex-direction: column; gap: 2px; width: 100%; cursor: pointer; margin: -16px; padding: 16px; border-radius: var(--radius-md); }
+.active-trip__summary:active { background: var(--surface-neutral-dark); }
 .active-trip__summary-top { display: flex; align-items: center; gap: 8px; }
 .active-trip__timeline { display: flex; flex-direction: column; gap: 4px; }
 
@@ -1014,7 +1047,7 @@ button { font-family: inherit; }
   color: var(--text-neutral-subtitle);
   cursor: pointer;
 }
-.report-issue-link:hover { color: var(--critical-text); }
+.report-issue-link:hover, .report-issue-link:active { color: var(--critical-text); }
 
 /* One stop within the trip timeline — a hairline-and-dot list, not a card.
    The connecting line/dot pattern repeats one level deeper for the stages
@@ -1048,7 +1081,12 @@ button { font-family: inherit; }
 .stop-item--active .stop-item__dot { background: var(--surface-brand-default); box-shadow: 0 0 0 3px var(--surface-brand-lighter); }
 .stop-item--completed .stop-item__dot { background: var(--success-surface); }
 
-.stop-summary { display: flex; align-items: center; gap: 10px; cursor: pointer; width: 100%; padding: 6px 0; }
+.stop-summary { display: flex; align-items: center; gap: 10px; cursor: pointer; width: 100%; padding: 6px 0; border-radius: var(--radius-xs); }
+/* No horizontal margin/padding trick here (unlike .active-trip__summary) —
+   this row's dot uses a tuned negative margin to sit in .stop-item's line
+   gutter (see .stop-item__dot); shifting the row itself would drag the dot
+   out of alignment with the connecting line again. */
+.stop-summary:active { background: var(--surface-neutral-dark); }
 .stop-summary__main { min-width: 0; }
 .stop-summary__title { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .stop-summary__meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
@@ -1094,6 +1132,7 @@ button { font-family: inherit; }
   font: inherit; color: var(--text-neutral-subtitle); cursor: pointer; text-decoration: underline dotted;
 }
 .timestamp-btn:hover { background: var(--surface-neutral-dark); }
+.timestamp-btn:active { background: var(--surface-neutral-darker); }
 .timestamp-edit { display: flex; align-items: center; gap: 6px; }
 
 /* Order / POD / pallet-exchange rows — label grows to fill the space, so
