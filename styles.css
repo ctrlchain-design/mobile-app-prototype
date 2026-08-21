@@ -332,6 +332,25 @@ button { font-family: inherit; }
 .app-header__back:active { background: var(--surface-neutral-darker); }
 .app-header__title { flex: 1; color: var(--text-neutral-title); text-align: center; }
 .app-header__spacer { width: 36px; flex-shrink: 0; }
+.app-header__bell {
+  position: relative;
+  width: 36px; height: 36px; flex-shrink: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  border: none;
+  color: var(--icon-neutral-darker);
+  font-size: 18px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.app-header__bell:hover { background: var(--surface-neutral-dark); }
+.app-header__bell:active { background: var(--surface-neutral-darker); }
+.app-header__bell-dot {
+  position: absolute; top: 5px; right: 6px;
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--warning-surface);
+  border: 1.5px solid var(--surface-neutral-light);
+}
 .app-header__step { color: var(--text-neutral-caption); }
 .app-progress {
   height: 4px;
@@ -632,27 +651,7 @@ button { font-family: inherit; }
   flex-direction: column;
   gap: 10px;
 }
-.dash-hero__top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .dash-hero__sub { margin-top: 2px; }
-.dash-hero__bell {
-  position: relative;
-  width: 34px; height: 34px; flex-shrink: 0;
-  border-radius: 50%;
-  background: var(--surface-neutral-dark);
-  border: none;
-  color: var(--text-neutral-title);
-  font-size: 15px;
-  cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-}
-.dash-hero__bell:hover { background: var(--surface-neutral-darker); }
-.dash-hero__bell:active { background: var(--surface-neutral-darker); }
-.dash-hero__bell-dot {
-  position: absolute; top: 4px; right: 5px;
-  width: 8px; height: 8px; border-radius: 50%;
-  background: var(--warning-surface);
-  border: 1.5px solid var(--surface-neutral-light);
-}
 
 /* ---------- Bottom tab bar ---------- */
 .app-tabbar {

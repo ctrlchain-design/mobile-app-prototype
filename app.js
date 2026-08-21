@@ -1563,20 +1563,11 @@ const SCREENS = {
     }
     // full
     const { name, carrier } = currentDriverIdentity();
-    const unreadCount = notificationItems().length;
     return {
       content: h`
         <div class="dash-hero">
-          <div class="dash-hero__top">
-            <div>
-              <div class="t-headline-md">${greeting()}, ${name.split(' ')[0] || 'driver'}</div>
-              <div class="dash-hero__sub t-body-sm">${carrier}</div>
-            </div>
-            <button type="button" class="dash-hero__bell" onclick="App.goTab('nav-notifications')" aria-label="Notifications">
-              <sl-icon name="bell"></sl-icon>
-              ${unreadCount ? h`<span class="dash-hero__bell-dot"></span>` : ''}
-            </button>
-          </div>
+          <div class="t-headline-md">${greeting()}, ${name.split(' ')[0] || 'driver'}</div>
+          <div class="dash-hero__sub t-body-sm">${carrier}</div>
           ${trackingStatusBanner()}
         </div>
         <div class="dash-section">
@@ -1832,12 +1823,25 @@ function render() {
   let headerHtml = '';
   if (!screen.hideHeader) {
     const progressPct = meta ? Math.round((meta.step / meta.total) * 100) : 0;
+    // The notification bell lives in the persistent header (not the
+    // scrollable dashboard hero) specifically so it stays reachable no
+    // matter how far the driver has scrolled down the trip timeline —
+    // "always accessible" per Samuel's direct feedback, not just visible
+    // at the top of the page.
+    const showBell = route === 'dashboard' && state.dashboardMode === 'full';
+    const unreadCount = showBell ? notificationItems().length : 0;
+    const rightSlot = showBell
+      ? h`<button type="button" class="app-header__bell" onclick="App.goTab('nav-notifications')" aria-label="Notifications">
+            <sl-icon name="bell"></sl-icon>
+            ${unreadCount ? h`<span class="app-header__bell-dot"></span>` : ''}
+          </button>`
+      : meta ? h`<div class="app-header__step t-body-sm">${meta.step} / ${meta.total}</div>` : h`<div class="app-header__spacer"></div>`;
     headerHtml = h`
       <div class="app-header">
         <div class="app-header__row">
           <button class="app-header__back" onclick="App.back()" ${canGoBack ? '' : 'style="visibility:hidden"'}><sl-icon name="arrow-left"></sl-icon></button>
           <div class="app-header__title t-headline-md">${TITLES[route] || ''}</div>
-          ${meta ? h`<div class="app-header__step t-body-sm">${meta.step} / ${meta.total}</div>` : h`<div class="app-header__spacer"></div>`}
+          ${rightSlot}
         </div>
         ${meta ? h`<div class="app-progress"><div class="app-progress__fill" style="width:${progressPct}%"></div></div>` : ''}
       </div>
