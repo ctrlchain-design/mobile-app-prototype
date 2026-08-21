@@ -861,14 +861,13 @@ function stageItem(trip, stop, m) {
       action = h`<sl-button size="small" variant="primary" onclick="App.confirmMilestone('${trip.id}','${stop.id}','${m.id}')">Confirm</sl-button>`;
     } else if (m.status === 'ready' && m.kind === 'manual') {
       action = h`<sl-button size="small" variant="primary" onclick="App.markManualDone('${trip.id}','${stop.id}','${m.id}')">Mark done</sl-button>`;
-    } else if (m.status === 'confirmed') {
-      action = h`<sl-icon class="stage-item__check" name="check-circle-fill" title="Done"></sl-icon>`;
     }
   }
 
   return h`
     <div class="stage-item stage-item--${dotClass}">
       <div class="stage-item__row">
+        <span class="stage-item__dot">${dotClass === 'done' ? h`<sl-icon name="check"></sl-icon>` : ''}</span>
         <div class="stage-item__main">
           <div class="stage-item__label-line">
             <span class="t-body-md ${m.status === 'pending' ? 't-muted' : ''}">${m.label}</span>

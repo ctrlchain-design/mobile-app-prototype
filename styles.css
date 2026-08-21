@@ -1056,26 +1056,37 @@ button { font-family: inherit; }
 
 /* Stage list — same dot/line timeline language as .stop-item, one indent
    level in, so a stop's stages read as a natural continuation of the trip
-   timeline rather than a visually distinct component. */
+   timeline rather than a visually distinct component. Like .stop-item__dot,
+   the dot is a real flex child of .stage-item__row rather than a
+   pseudo-element pinned to a fixed top offset — a fixed offset can't track
+   a row whose height varies (a two-line label, a Confirm button, a pallet-
+   count input), so it drifts out of vertical alignment with the text next
+   to it. */
 .stage-list { position: relative; display: flex; flex-direction: column; padding-left: 4px; }
 .stage-item { position: relative; padding-left: 18px; padding-bottom: 12px; }
 .stage-item::before {
-  content: ''; position: absolute; left: 3px; top: 14px; bottom: -2px; width: 2px;
+  content: ''; position: absolute; left: 6px; top: 26px; bottom: -2px; width: 2px;
   background: var(--border-neutral-lighter, var(--color-neutrals-200));
 }
 .stage-item:last-child::before { display: none; }
-.stage-item::after {
-  content: ''; position: absolute; left: 0; top: 5px; width: 8px; height: 8px;
-  border-radius: 50%; background: var(--color-neutrals-300);
+.stage-item__dot {
+  width: 14px; height: 14px; flex-shrink: 0;
+  margin-left: -18px; /* pull back into the line's gutter, same trick as .stop-item__dot */
+  border-radius: 50%; background: var(--color-neutrals-300); border: 2px solid var(--surface-neutral-light);
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 9px;
 }
-.stage-item--done::after { background: var(--surface-brand-default); }
-.stage-item--active::after { background: var(--surface-brand-default); box-shadow: 0 0 0 3px var(--surface-brand-lighter); }
-.stage-item--eta::after { background: var(--surface-neutral-light); border: 1.5px solid var(--border-neutral-dark); width: 7px; height: 7px; }
+.stage-item--active .stage-item__dot { background: var(--surface-brand-default); box-shadow: 0 0 0 3px var(--surface-brand-lighter); }
+/* Done gets an actual checkmark (not just a color) but stays visually quiet —
+   a muted success tint, no glow ring — so it doesn't compete with the active
+   stage's bright ring, which is the one that actually needs the driver's
+   attention. */
+.stage-item--done .stage-item__dot { background: var(--success-surface-lighter); color: var(--success-text); }
+.stage-item--eta .stage-item__dot { background: var(--surface-neutral-light); border: 1.5px solid var(--border-neutral-dark); width: 12px; height: 12px; margin-left: -17px; }
 .stage-item__row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .stage-item__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .stage-item__label-line { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .stage-item__action { flex-shrink: 0; }
-.stage-item__check { color: var(--success-text); font-size: 20px; }
 .stage-item__sub { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
 
 /* Pallet-exchange count entry — the driver's own typed-in count, checked
