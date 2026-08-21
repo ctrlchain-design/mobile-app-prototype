@@ -35,14 +35,18 @@ const MOCK_RETURNING_DRIVER = { firstName: 'Jordan', lastName: 'Reyes', carrier:
                 this stop has a POD uploaded (see submitPod()).
      'pallet-exchange' — pickup-only, conditional (only present on stops that
                 actually need one — per uat-findings.md, "if pallet exchange
-                isn't required, don't ask at all"). Corax extracts a count from
-                the exchange paperwork; per the 2026-08-12 kickoff notes, if
-                that count matches what was expected it completes itself
-                silently — the driver is only ever prompted when extraction
-                fails or the count doesn't match (see completeMilestone()).
+                isn't required, don't ask at all"). No automated extraction is
+                assumed here: Corax's OCR-based count extraction is confirmed
+                working today, but only for NewCold — not something CtrlChain
+                can assume for an arbitrary broker-model shipper (see
+                keep-brand-artifacts-separate). The driver always enters the
+                actual count by hand; a count that doesn't match what was
+                expected is flagged as a structured exception for ops to
+                review, not resolved silently (see completeMilestone()).
    Status values: 'eta' (informational) | 'pending' (blocked, future) |
-   'ready' (manual stage unlocked) | 'proposed' (auto/pallet-exchange stage
-   awaiting confirm) | 'confirmed' (done). completeMilestone() advances a stop
+   'ready' (manual stage unlocked, or pallet-exchange awaiting a driver-
+   entered count) | 'proposed' (auto stage awaiting confirm) | 'confirmed'
+   (done). completeMilestone() advances a stop
    to its next stage and, on a stop's last stage, hands the trip's
    activeStopId to the next stop — so the whole trip progresses, not just one
    stop in isolation. */
@@ -55,7 +59,7 @@ function pickupStages(etaTime, palletExchange) {
     stages.push({
       id: 'pallet-exchange', label: 'Pallet exchange — ' + palletExchange.dock, kind: 'pallet-exchange',
       status: 'pending', source: null, timestamp: null,
-      expectedCount: palletExchange.expectedCount, extractedCount: palletExchange.extractedCount, actualCount: null,
+      expectedCount: palletExchange.expectedCount, actualCount: null, mismatch: false,
     });
   }
   stages.push(
@@ -99,11 +103,11 @@ const MOCK_ACTIVE_TRIPS = [
         ],
         milestones: (() => {
           // Pallet exchange required at this shipper — exchange dock is a
-          // per-warehouse constant per uat-findings.md, not per-trip. Corax
-          // extracted 10 from the exchange paperwork against an expected 12:
-          // a real mismatch, exactly the case the driver should be prompted
-          // for (a match would complete silently — see completeMilestone()).
-          const s = pickupStages('07:55', { dock: 'Dock 018', expectedCount: 12, extractedCount: 10 });
+          // per-warehouse constant per uat-findings.md, not per-trip. No
+          // extraction happens here (that's NewCold-specific Corax tech,
+          // not something CtrlChain can assume for an arbitrary shipper) —
+          // the driver types in the actual count themselves.
+          const s = pickupStages('07:55', { dock: 'Dock 018', expectedCount: 12 });
           // Geofence fired 2 minutes early against the calculated ETA — a real
           // case for the timestamp-edit feature, not just a round number.
           s[1].status = 'proposed'; s[1].source = 'automated'; s[1].timestamp = '08:02';
@@ -453,18 +457,20 @@ const App = {
     render();
   },
 
-  /* The driver's response to a flagged pallet-exchange mismatch — records
-     whatever count they confirm (the Corax-extracted number, corrected, or
-     entered from scratch if extraction failed) as the actual count, then
-     completes the stage like any other. */
+  /* Records the pallet count the driver typed in by hand — there's no
+     automated extraction to confirm or correct, just a number they counted
+     themselves — then completes the stage like any other. A count that
+     doesn't match what was expected is flagged (`mismatch`) as a structured
+     exception for ops to review, not reconciled silently. */
   confirmPalletCount(tripId, stopId, milestoneId) {
     const input = document.getElementById(`pallet-input-${milestoneId}`);
     const trip = findActiveTrip(tripId);
     const stop = trip && findStop(trip, stopId);
     const m = stop && stop.milestones.find(x => x.id === milestoneId);
-    if (m && input && input.value !== '') m.actualCount = parseInt(input.value, 10);
-    // A driver had to actually look at this and confirm/correct it — this was
-    // never the silent auto-match path, so it isn't "automated" any more.
+    if (m && input && input.value !== '') {
+      m.actualCount = parseInt(input.value, 10);
+      m.mismatch = m.actualCount !== m.expectedCount;
+    }
     if (m) m.source = 'manual';
     completeMilestoneByIds(tripId, stopId, milestoneId);
     render();
@@ -700,22 +706,9 @@ function completeMilestone(trip, stop, index) {
       next.source = 'automated';
       next.timestamp = formatNowTime();
     } else if (next.kind === 'pallet-exchange') {
-      const matches = next.extractedCount != null && next.extractedCount === next.expectedCount;
-      if (matches) {
-        // Corax's own extracted count already matches what was expected —
-        // per the documented rule, don't ask; complete it silently and keep
-        // cascading straight past it.
-        next.actualCount = next.extractedCount;
-        next.source = 'automated';
-        next.timestamp = formatNowTime();
-        completeMilestone(trip, stop, index + 1);
-        return;
-      }
-      // Mismatch, or extraction failed outright (extractedCount is null) —
-      // exactly the case the driver should be prompted for.
-      next.status = 'proposed';
-      next.source = 'automated';
-      next.timestamp = formatNowTime();
+      // No automated count to check against — the driver always enters it
+      // themselves, same as any other manual stage.
+      next.status = 'ready';
     }
   }
 
@@ -807,10 +800,10 @@ function stopItem(trip, stop) {
 }
 
 /* "Automated" was papering over two genuinely different mechanisms: a
-   geofence detecting arrival/departure vs. Corax extracting a pallet count
-   from paperwork. Naming the actual mechanism is more meaningful to a driver
-   than the generic word — and more honest, since they're really not the same
-   thing under the hood. */
+   geofence detecting arrival/departure vs. a driver's own manual action.
+   Naming the actual mechanism is more meaningful to a driver than the
+   generic word — and more honest, since they're really not the same thing
+   under the hood. */
 function stageSourceLabel(m) {
   if (m.source === 'manual') return 'Manual';
   if (m.source === 'automated') return m.kind === 'auto' ? 'Geofence' : 'Automated';
@@ -824,17 +817,16 @@ function stageItem(trip, stop, m) {
   const dotClass = m.status === 'confirmed' ? 'done'
     : (m.status === 'proposed' || m.status === 'ready') ? 'active'
     : m.status === 'eta' ? 'eta' : 'todo';
-  // Flagged mismatch (or failed extraction) — the one case Corax doesn't
-  // resolve silently, so the driver sees it front and center.
-  const isPalletMismatch = m.kind === 'pallet-exchange' && m.status === 'proposed';
+  // Pallet exchange is always driver-entered — there's no automated count
+  // to check against, so the input shows as soon as the stage unlocks.
+  const needsPalletCount = m.kind === 'pallet-exchange' && m.status === 'ready';
 
   let right;
-  if (isPalletMismatch) {
-    const detected = m.extractedCount != null ? `${m.extractedCount}` : 'unreadable';
+  if (needsPalletCount) {
     right = h`
       <div class="pallet-mismatch">
-        <span class="t-body-sm t-caption">Expected ${m.expectedCount} pallets &middot; Corax detected ${detected}</span>
-        <sl-input id="pallet-input-${m.id}" class="pallet-mismatch__input" type="number" size="small" placeholder="Actual count" value="${m.extractedCount != null ? m.extractedCount : ''}"></sl-input>
+        <span class="t-body-sm t-caption">Expected ${m.expectedCount} pallets</span>
+        <sl-input id="pallet-input-${m.id}" class="pallet-mismatch__input" type="number" size="small" placeholder="Actual count"></sl-input>
       </div>
     `;
   } else if (editing) {
@@ -855,8 +847,7 @@ function stageItem(trip, stop, m) {
   } else if (!m.timestamp) {
     right = h`<span class="t-body-sm t-caption">Awaiting driver</span>`;
   } else if (m.kind === 'pallet-exchange') {
-    const sourceLabel = m.source === 'automated' ? 'Automated match' : 'Driver-confirmed';
-    right = h`<span class="t-body-sm t-caption"><button type="button" class="timestamp-btn" onclick="App.startEditTimestamp('${stop.id}','${m.id}')">${m.timestamp}</button> &middot; ${sourceLabel} &middot; ${m.actualCount} pallets</span>`;
+    right = h`<span class="t-body-sm t-caption"><button type="button" class="timestamp-btn" onclick="App.startEditTimestamp('${stop.id}','${m.id}')">${m.timestamp}</button> &middot; ${m.actualCount} pallets ${m.mismatch ? `(expected ${m.expectedCount})` : 'confirmed'}</span>`;
   } else {
     const sourceLabel = stageSourceLabel(m);
     right = h`<span class="t-body-sm t-caption"><button type="button" class="timestamp-btn" onclick="App.startEditTimestamp('${stop.id}','${m.id}')">${m.timestamp}</button>${sourceLabel ? ' &middot; ' + sourceLabel : ''}</span>`;
@@ -864,8 +855,8 @@ function stageItem(trip, stop, m) {
 
   let action = '';
   if (!editing) {
-    if (isPalletMismatch) {
-      action = h`<sl-button size="small" variant="warning" onclick="App.confirmPalletCount('${trip.id}','${stop.id}','${m.id}')">Confirm</sl-button>`;
+    if (needsPalletCount) {
+      action = h`<sl-button size="small" variant="primary" onclick="App.confirmPalletCount('${trip.id}','${stop.id}','${m.id}')">Confirm</sl-button>`;
     } else if (m.status === 'proposed') {
       action = h`<sl-button size="small" variant="primary" onclick="App.confirmMilestone('${trip.id}','${stop.id}','${m.id}')">Confirm</sl-button>`;
     } else if (m.status === 'ready' && m.kind === 'manual') {
@@ -881,7 +872,7 @@ function stageItem(trip, stop, m) {
         <div class="stage-item__main">
           <div class="stage-item__label-line">
             <span class="t-body-md ${m.status === 'pending' ? 't-muted' : ''}">${m.label}</span>
-            ${isPalletMismatch ? h`<span class="badge badge--warning">Mismatch</span>` : ''}
+            ${m.kind === 'pallet-exchange' && m.mismatch ? h`<span class="badge badge--warning">Mismatch</span>` : ''}
           </div>
           ${right}
         </div>

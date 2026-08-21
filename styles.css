@@ -1078,9 +1078,9 @@ button { font-family: inherit; }
 .stage-item__check { color: var(--success-text); font-size: 20px; }
 .stage-item__sub { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
 
-/* Pallet-exchange mismatch — Corax's extracted count vs what was expected,
-   with the actual count left editable right there (pre-filled with whatever
-   Corax detected, or blank if extraction failed outright). */
+/* Pallet-exchange count entry — the driver's own typed-in count, checked
+   against what was expected once submitted; no pre-filled value since
+   there's no automated extraction to seed it with. */
 .pallet-mismatch { display: flex; flex-direction: column; gap: 6px; margin-top: 2px; }
 .pallet-mismatch__input { max-width: 140px; }
 
