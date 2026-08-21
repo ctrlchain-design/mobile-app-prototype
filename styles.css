@@ -651,6 +651,7 @@ button { font-family: inherit; }
   flex-direction: column;
   gap: 10px;
 }
+.dash-hero__top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .dash-hero__sub { margin-top: 2px; }
 
 /* ---------- Bottom tab bar ---------- */

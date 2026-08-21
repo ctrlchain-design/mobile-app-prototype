@@ -1566,8 +1566,13 @@ const SCREENS = {
     return {
       content: h`
         <div class="dash-hero">
-          <div class="t-headline-md">${greeting()}, ${name.split(' ')[0] || 'driver'}</div>
-          <div class="dash-hero__sub t-body-sm">${carrier}</div>
+          <div class="dash-hero__top">
+            <div>
+              <div class="t-headline-md">${greeting()}, ${name.split(' ')[0] || 'driver'}</div>
+              <div class="dash-hero__sub t-body-sm">${carrier}</div>
+            </div>
+            <button type="button" class="btn-link" style="font-size:12px;" onclick="App.openAddTripSheet()">+ Add trip</button>
+          </div>
           ${trackingStatusBanner()}
         </div>
         <div class="dash-section">
@@ -1575,10 +1580,7 @@ const SCREENS = {
           ${activeTripSection(state.activeTrips)}
         </div>
         <div class="dash-section">
-          <div class="dash-section__row">
-            <span class="t-label-sm t-caption dash-section__label">SCHEDULED</span>
-            <button type="button" class="btn-link" style="font-size:12px;" onclick="App.openAddTripSheet()">+ Add trip</button>
-          </div>
+          <div class="t-label-sm t-caption dash-section__label">SCHEDULED</div>
           ${state.scheduledTrips.length
             ? state.scheduledTrips.map(t => tripCard(t)).join('')
             : h`<div class="t-body-sm t-caption dash-empty-note">Nothing scheduled beyond the active trip.</div>`}
