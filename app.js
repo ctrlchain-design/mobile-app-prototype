@@ -746,10 +746,15 @@ function activeTripSection(trips) {
     <sl-details class="active-trip" ${isExpanded(trip.id, true) ? 'open' : ''} onclick="if (event.target.closest('sl-details') === this && event.target.closest('[data-role=summary]')) App.toggleExpand('${trip.id}', ${isExpanded(trip.id, true)})">
       <div slot="summary" data-role="summary" class="active-trip__summary">
         <div class="active-trip__summary-top">
-          <span class="t-label-lg">${trip.id}</span>
-          <span class="badge badge--info">In Transit</span>
+          <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span class="t-label-md">${trip.id}</span>
+              <span class="badge badge--info">In Transit</span>
+            </div>
+            <span class="t-body-sm t-caption">${trip.stops.length} stop${trip.stops.length === 1 ? '' : 's'} &middot; ${distinctOrderCount(trip)} order${distinctOrderCount(trip) === 1 ? '' : 's'}</span>
+          </div>
+          <sl-icon class="active-trip__summary-chevron" name="chevron-down"></sl-icon>
         </div>
-        <span class="t-body-sm t-caption">${trip.stops.length} stop${trip.stops.length === 1 ? '' : 's'} &middot; ${distinctOrderCount(trip)} order${distinctOrderCount(trip) === 1 ? '' : 's'}</span>
       </div>
       <div class="active-trip__timeline">${stopTimelineList(trip)}</div>
     </sl-details>
@@ -781,27 +786,32 @@ function stopItem(trip, stop) {
   const isActive = stop.id === trip.activeStopId;
   const expanded = isExpanded(stop.id, isActive);
   const orderCount = stop.orders.length;
+  const isCollapsed = !expanded && status === 'upcoming';
   return h`
     <div class="stop-item stop-item--${status}">
       <sl-details ${expanded ? 'open' : ''} onclick="if (event.target.closest('sl-details') === this && event.target.closest('[data-role=summary]')) App.toggleExpand('${stop.id}', ${expanded})">
-        <div slot="summary" data-role="summary" class="stop-summary">
+        <div slot="summary" data-role="summary" class="stop-summary ${isCollapsed ? 'stop-summary--collapsed' : ''}">
           <span class="stop-item__dot">${status === 'completed' ? h`<sl-icon name="check-lg"></sl-icon>` : ''}</span>
-          <div class="stop-summary__main">
-            <div class="stop-summary__title">
-              <span class="t-label-md">${stop.type === 'pickup' ? 'Pickup' : 'Delivery'} &middot; ${stop.location}</span>
-              ${stop.exceptions.length ? h`<sl-icon class="exception-flag" name="exclamation-triangle" title="Exception reported"></sl-icon>` : ''}
+          <div class="stop-summary__content ${isCollapsed ? 'stop-summary__content--collapsed' : ''}">
+            <div class="stop-summary__main">
+              <div class="stop-summary__title">
+                <span class="t-label-md">${stop.type === 'pickup' ? 'Pickup' : 'Delivery'}</span>
+                <span class="badge badge--category">${orderCount} Order${orderCount === 1 ? '' : 's'}</span>
+                ${stop.exceptions.length ? h`<sl-icon class="exception-flag" name="exclamation-triangle" title="Exception reported"></sl-icon>` : ''}
+              </div>
+              <span class="t-body-sm" style="color:var(--text-neutral-subtitle)">${stop.location}</span>
+              <div class="stop-summary__window">
+                <span class="t-label-sm">Window:</span>
+                <span class="t-label-sm">${stop.appointment}</span>
+              </div>
             </div>
-            <div class="stop-summary__meta">
-              <span class="t-body-sm t-caption">${stop.appointment}</span>
-              ${status === 'completed' ? h`<span class="badge badge--success">Completed</span>` : ''}
-              ${orderCount > 1 ? h`<span class="badge badge--info">${orderCount} orders</span>` : ''}
-            </div>
+            <sl-icon class="stop-summary__chevron" name="${expanded ? 'chevron-down' : 'chevron-right'}"></sl-icon>
           </div>
         </div>
         <div class="stop-body">
           <div class="stage-list">${stop.milestones.map(m => stageItem(trip, stop, m)).join('')}</div>
           <button type="button" class="report-issue-link" onclick="App.openExceptionSheet('${trip.id}','${stop.id}')">
-            <sl-icon name="exclamation-triangle" aria-hidden="true"></sl-icon> Report an issue with this stop
+            <sl-icon name="flag" aria-hidden="true"></sl-icon> Report an issue with this stop
           </button>
         </div>
       </sl-details>
@@ -832,6 +842,7 @@ function stageItem(trip, stop, m) {
   const hasOrderRows = m.kind === 'pod' || m.kind === 'pallet-exchange';
   const anyPalletMismatch = m.kind === 'pallet-exchange' && m.status === 'confirmed' && stop.orders.some(o => o.palletMismatch);
 
+  const editIconSvg = '<img class="stage-item__edit-icon" src="assets/icon-edit.svg" alt="edit" />';
   let right;
   if (editing) {
     right = h`
@@ -842,37 +853,34 @@ function stageItem(trip, stop, m) {
       </div>
     `;
   } else if (m.kind === 'eta') {
-    // Still a system-calculated estimate, not a detected event — but a
-    // driver on the road often knows better than the ETA engine, so it's
-    // editable like everything else, just labeled for what it actually is.
-    right = h`<span class="t-body-sm t-caption"><button type="button" class="timestamp-btn" onclick="App.startEditTimestamp('${stop.id}','${m.id}')">${m.timestamp}</button> &middot; System calculated</span>`;
+    right = h`<div class="stage-item__time-row"><span class="stage-item__time-chip"><button type="button" class="timestamp-btn" onclick="App.startEditTimestamp('${stop.id}','${m.id}')">${m.timestamp}</button>${editIconSvg}</span><span class="stage-item__source">Calculated</span></div>`;
   } else if (m.status === 'pending') {
-    right = h`<span class="t-body-sm t-caption">Not yet reached</span>`;
+    right = h`<span class="stage-item__status-text">Not yet reached</span>`;
   } else if (!m.timestamp) {
-    // 'ready' with no timestamp yet — true for 'pod'/'pallet-exchange' while
-    // some per-order rows below are still unconfirmed.
-    right = h`<span class="t-body-sm t-caption">Awaiting driver</span>`;
+    right = h`<span class="stage-item__status-text">Awaiting driver</span>`;
   } else {
     const sourceLabel = stageSourceLabel(m);
-    right = h`<span class="t-body-sm t-caption"><button type="button" class="timestamp-btn" onclick="App.startEditTimestamp('${stop.id}','${m.id}')">${m.timestamp}</button>${sourceLabel ? ' &middot; ' + sourceLabel : ''}</span>`;
+    right = h`<div class="stage-item__time-row"><span class="stage-item__time-chip stage-item__time-chip--filled"><button type="button" class="timestamp-btn timestamp-btn--bold" onclick="App.startEditTimestamp('${stop.id}','${m.id}')">${m.timestamp}</button>${editIconSvg}</span>${sourceLabel ? h`<span class="stage-item__source">${sourceLabel}</span>` : ''}</div>`;
   }
 
   let action = '';
   if (!editing) {
     if (m.status === 'proposed') {
-      action = h`<sl-button size="small" variant="primary" onclick="App.confirmMilestone('${trip.id}','${stop.id}','${m.id}')">Confirm</sl-button>`;
+      action = h`<button type="button" class="stage-confirm-btn" onclick="App.confirmMilestone('${trip.id}','${stop.id}','${m.id}')">Confirm</button>`;
     } else if (m.status === 'ready' && m.kind === 'manual') {
-      action = h`<sl-button size="small" variant="primary" onclick="App.markManualDone('${trip.id}','${stop.id}','${m.id}')">Mark done</sl-button>`;
+      action = h`<button type="button" class="stage-confirm-btn" onclick="App.markManualDone('${trip.id}','${stop.id}','${m.id}')">Mark done</button>`;
     }
   }
 
+  const labelClass = m.status === 'pending' ? 't-body-sm' : (m.status === 'proposed' || m.status === 'ready') ? 't-label-sm' : 't-body-sm';
+  const labelColor = m.status === 'pending' ? 'color:var(--text-neutral-subtitle)' : 'color:var(--text-neutral-body)';
   return h`
     <div class="stage-item stage-item--${dotClass}">
       <div class="stage-item__row">
         <span class="stage-item__dot">${dotClass === 'done' ? h`<sl-icon name="check"></sl-icon>` : ''}</span>
         <div class="stage-item__main">
           <div class="stage-item__label-line">
-            <span class="t-body-md ${m.status === 'pending' ? 't-muted' : ''}">${m.label}</span>
+            <span class="${labelClass}" style="${labelColor}">${m.label}</span>
             ${anyPalletMismatch ? h`<span class="badge badge--warning">Mismatch</span>` : ''}
           </div>
           ${right}
@@ -1093,9 +1101,11 @@ function notificationRow(item) {
    Only shown once a driver has real dashboard access (dashboardMode 'full') —
    guest access stays deliberately minimal (single trip, no account, no nav),
    and the locked/pending-approval state has nothing yet to navigate to. */
+const ICON_DASHBOARD = '<svg class="app-tabbar__icon-img" width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12M21 12C21 7.02944 16.9706 3 12 3M21 12H18.75M3 12C3 7.02944 7.02944 3 12 3M3 12H5.25M12 3V5.25M18.3706 5.7L13.3499 10.65M18.3706 18.3706L18.1871 18.1871C17.5645 17.5644 17.2531 17.2531 16.8898 17.0305C16.5677 16.8331 16.2166 16.6877 15.8492 16.5995C15.4349 16.5 14.9946 16.5 14.1141 16.5L9.88586 16.5C9.00534 16.5 8.56508 16.5 8.15076 16.5995C7.78343 16.6877 7.43228 16.8332 7.11018 17.0305C6.74688 17.2532 6.43557 17.5645 5.81294 18.1871L5.62947 18.3706M5.62947 5.7L7.19227 7.26281M13.8 12C13.8 12.9941 12.9941 13.8 12 13.8C11.0059 13.8 10.2 12.9941 10.2 12C10.2 11.0059 11.0059 10.2 12 10.2C12.9941 10.2 13.8 11.0059 13.8 12Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const ICON_TRIP = '<svg class="app-tabbar__icon-img" width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M11.4999 5.00064H11.9343C14.9816 5.00064 16.5052 5.00064 17.0836 5.54793C17.5835 6.02101 17.8051 6.71792 17.6701 7.39285C17.5139 8.17366 16.27 9.0535 13.7822 10.8132L9.71763 13.6881C7.22982 15.4478 5.9859 16.3276 5.82975 17.1084C5.69477 17.7834 5.91633 18.4803 6.41628 18.9534C6.99465 19.5006 8.51827 19.5006 11.5655 19.5006H12.4999M18.0576 17.0006V17.0106M6.05762 6.00061V6.01061M20.1786 19.1216C20.5983 18.7021 20.8841 18.1676 20.9999 17.5856C21.1158 17.0036 21.0564 16.4004 20.8294 15.8522C20.6023 15.3039 20.2178 14.8353 19.7244 14.5057C19.2311 14.176 18.651 14 18.0576 14C17.4642 14 16.8842 14.176 16.3908 14.5057C15.8975 14.8353 15.5129 15.3039 15.2859 15.8522C15.0589 16.4004 14.9995 17.0036 15.1153 17.5856C15.2312 18.1676 15.517 18.7021 15.9366 19.1216C16.3546 19.5406 17.0616 20.1666 18.0576 21.0006C19.1086 20.1106 19.8166 19.4846 20.1786 19.1216ZM8.17862 8.12161C8.59827 7.70209 8.88408 7.16754 8.99991 6.58557C9.11574 6.00361 9.05638 5.40036 8.82934 4.85213C8.60231 4.3039 8.21779 3.83531 7.72442 3.50562C7.23106 3.17594 6.651 2.99997 6.05762 2.99997C5.46423 2.99997 4.88418 3.17594 4.39081 3.50562C3.89745 3.83531 3.51293 4.3039 3.28589 4.85213C3.05886 5.40036 2.9995 6.00361 3.11533 6.58557C3.23116 7.16754 3.51697 7.70209 3.93662 8.12161C4.35462 8.54061 5.06162 9.16661 6.05762 10.0006C7.10862 9.11061 7.81662 8.48461 8.17862 8.12161Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const TAB_ITEMS = [
-  { route: 'dashboard', icon: 'house', label: 'Dashboard' },
-  { route: 'nav-trips', icon: 'clipboard-check', label: 'My Trips' },
+  { route: 'dashboard', svg: ICON_DASHBOARD, label: 'Dashboard' },
+  { route: 'nav-trips', svg: ICON_TRIP, label: 'My Trips' },
   { route: 'nav-chats', icon: 'chat-dots', label: 'Chats' },
   { route: 'nav-profile', icon: 'person', label: 'Profile' },
 ];
@@ -1106,7 +1116,7 @@ function tabBarMarkup(activeRoute) {
     <div class="app-tabbar">
       ${TAB_ITEMS.map(item => h`
         <button type="button" class="app-tabbar__item ${item.route === activeRoute ? 'is-active' : ''}" onclick="App.goTab('${item.route}')">
-          <sl-icon class="app-tabbar__icon" name="${item.icon}"></sl-icon>
+          ${item.svg ? item.svg : h`<sl-icon class="app-tabbar__icon" name="${item.icon}"></sl-icon>`}
           <span class="app-tabbar__label">${item.label}</span>
         </button>
       `).join('')}
@@ -1601,12 +1611,15 @@ const SCREENS = {
         <div class="dash-section">
           <div class="t-label-sm t-caption dash-section__label">ACTIVE</div>
           ${active.map(trip => h`
-            <div class="card trip-card trip-card--tappable" onclick="App.goTab('dashboard')">
+            <div class="card trip-card trip-card--tappable" style="border-radius:10px;padding:12px;" onclick="App.goTab('dashboard')">
               <div class="trip-card__top">
-                <span class="t-label-md">${trip.id}</span>
-                <div class="trip-card__top-right"><span class="badge badge--info">In Transit</span><sl-icon name="chevron-right"></sl-icon></div>
+                <div style="display:flex;align-items:center;gap:10px;">
+                  <span class="t-label-md">${trip.id}</span>
+                  <span class="badge badge--info">In Transit</span>
+                </div>
+                <sl-icon name="chevron-right" style="font-size:20px;color:var(--text-neutral-caption);"></sl-icon>
               </div>
-              <div class="t-body-sm t-muted">${trip.stops.length} stop${trip.stops.length === 1 ? '' : 's'} &middot; ${distinctOrderCount(trip)} order${distinctOrderCount(trip) === 1 ? '' : 's'}</div>
+              <div class="t-body-sm t-caption">${trip.stops.length} stop${trip.stops.length === 1 ? '' : 's'} &middot; ${distinctOrderCount(trip)} order${distinctOrderCount(trip) === 1 ? '' : 's'}</div>
             </div>
           `).join('')}
         </div>

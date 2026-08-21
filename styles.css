@@ -85,6 +85,7 @@
    back on sl-details so a stop card reads as one of our cards, not two nested ones. */
 sl-details::part(base) { border: none; background: transparent; }
 sl-details::part(header) { padding: 0; }
+sl-details::part(summary-icon) { display: none; }
 sl-details::part(content) { padding: 8px 0 0; }
 /* Drawers styled as bottom sheets (placement="bottom" set per-instance) with
    rounded top corners rather than Shoelace's default square panel. */
@@ -678,6 +679,7 @@ button { font-family: inherit; }
   cursor: pointer;
 }
 .app-tabbar__icon { font-size: 18px; line-height: 1.2; }
+.app-tabbar__icon-img { width: 24px; height: 24px; }
 .app-tabbar__item.is-active { color: var(--text-brand-default); }
 
 /* ---------- Notifications ---------- */
@@ -1014,17 +1016,12 @@ button { font-family: inherit; }
    Built on <sl-details> (accordion behavior, a11y, focus handling) rather
    than a bespoke expand/collapse — see the Shoelace theme bridge above for
    how it's re-skinned to look native to CCA instead of a foreign UI kit. */
-.active-trip { border: 1px solid var(--border-neutral-default); border-radius: var(--radius-md); padding: 16px; background: var(--surface-neutral-light); }
-/* :hover never fires on a touchscreen, so this row's only tap feedback
-   without an explicit :active rule would be the accordion actually opening
-   — a delayed, easy-to-miss signal. A brief background dim on press gives
-   the driver instant confirmation the tap registered, the same instant a
-   mouse user gets from :hover. Negative margin/padding so the dim reaches
-   the row's true edges without fighting .active-trip's own padding. */
-.active-trip__summary { display: flex; flex-direction: column; gap: 2px; width: 100%; cursor: pointer; margin: -16px; padding: 16px; border-radius: var(--radius-md); }
+.active-trip { border: 1px solid var(--border-neutral-default); border-radius: 10px; padding: 12px; background: var(--surface-neutral-light); }
+.active-trip__summary { display: flex; flex-direction: column; gap: 2px; width: 100%; cursor: pointer; margin: -12px; padding: 12px; border-radius: 10px; }
 .active-trip__summary:active { background: var(--surface-neutral-dark); }
-.active-trip__summary-top { display: flex; align-items: center; gap: 8px; }
-.active-trip__timeline { display: flex; flex-direction: column; gap: 4px; }
+.active-trip__summary-top { display: flex; align-items: center; gap: 10px; }
+.active-trip__summary-chevron { width: 20px; height: 20px; flex-shrink: 0; color: var(--text-neutral-caption); }
+.active-trip__timeline { display: flex; flex-direction: column; gap: 4px; margin-top: 16px; }
 
 /* Report-an-issue action — always a legible label, never an icon alone: a
    lone warning-triangle button reads as ambiguous status chrome rather than
@@ -1063,34 +1060,41 @@ button { font-family: inherit; }
    once "Pickup · <long shipper name>, <city>" wraps to two lines, a dot fixed
    at top:6px no longer sits anywhere near the title's actual vertical center. */
 .stop-item::before {
-  content: ''; position: absolute; left: 7px; top: 24px; bottom: -2px; width: 2px;
-  background: var(--border-neutral-default);
+  content: ''; position: absolute; left: 7px; top: 16px; bottom: -2px; width: 2px;
+  background: var(--border-neutral-lighter, #ebeef4);
 }
 .stop-item:last-child::before { display: none; }
-/* Bigger than the nested stage dots (16px vs 8px) so the outer/inner
-   hierarchy is legible at a glance, not just implied by indentation. A
-   completed stop gets an actual checkmark glyph inside it, not just a color
-   change — color alone reads as a rendering glitch as easily as a status. */
 .stop-item__dot {
-  width: 16px; height: 16px; flex-shrink: 0;
-  margin-left: -20px; /* pull back into the line's gutter, out of the summary's own padding */
-  border-radius: 50%; background: var(--color-neutrals-300); border: 2px solid var(--surface-neutral-light);
+  width: 12px; height: 12px; flex-shrink: 0;
+  margin-left: -20px;
+  border-radius: 8px; background: transparent;
+  border: 1.8px solid var(--surface-NC-blue-default);
   display: flex; align-items: center; justify-content: center;
-  color: #fff; font-size: 10px;
+  color: #fff; font-size: 8px;
 }
-.stop-item--active .stop-item__dot { background: var(--surface-brand-default); box-shadow: 0 0 0 3px var(--surface-brand-lighter); }
-.stop-item--completed .stop-item__dot { background: var(--success-surface); }
+.stop-item--active .stop-item__dot { border-color: var(--surface-NC-blue-default); }
+.stop-item--completed .stop-item__dot { background: var(--success-surface); border-color: var(--success-surface); }
 
-.stop-summary { display: flex; align-items: center; gap: 10px; cursor: pointer; width: 100%; padding: 6px 0; border-radius: var(--radius-xs); }
-/* No horizontal margin/padding trick here (unlike .active-trip__summary) —
-   this row's dot uses a tuned negative margin to sit in .stop-item's line
-   gutter (see .stop-item__dot); shifting the row itself would drag the dot
-   out of alignment with the connecting line again. */
+.stop-summary { display: flex; align-items: center; gap: 8px; cursor: pointer; width: 100%; padding: 0; border-radius: var(--radius-xs); }
 .stop-summary:active { background: var(--surface-neutral-dark); }
-.stop-summary__main { min-width: 0; }
-.stop-summary__title { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.stop-summary__meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
+.stop-summary__main { flex: 1; min-width: 0; }
+.stop-summary__title { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.stop-summary__meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.stop-summary__window { display: flex; align-items: center; gap: 2px; padding-top: 2px; }
+.stop-summary__chevron { width: 20px; height: 20px; flex-shrink: 0; color: var(--text-neutral-caption); }
 .stop-body { padding: 2px 0 12px; display: flex; flex-direction: column; gap: 4px; }
+.badge--category {
+  background: var(--badge-bg-NCblue-light, #e7e8ea);
+  color: var(--badge-text-NCBlue, var(--surface-NC-blue-default));
+  font-size: 10px; line-height: 14px; font-weight: 400;
+  padding: 2px 4px; border-radius: 8px;
+}
+.stop-summary__content { display: flex; align-items: center; flex: 1; min-width: 0; gap: 0; }
+.stop-summary__content--collapsed {
+  background: var(--surface-neutral-default);
+  border-radius: 8px;
+  padding: 4px 2px 4px 6px;
+}
 
 /* Stage list — same dot/line timeline language as .stop-item, one indent
    level in, so a stop's stages read as a natural continuation of the trip
@@ -1103,36 +1107,52 @@ button { font-family: inherit; }
 .stage-list { position: relative; display: flex; flex-direction: column; padding-left: 4px; }
 .stage-item { position: relative; padding-left: 18px; padding-bottom: 12px; }
 .stage-item::before {
-  content: ''; position: absolute; left: 6px; top: 26px; bottom: -2px; width: 2px;
-  background: var(--border-neutral-lighter, var(--color-neutrals-200));
+  content: ''; position: absolute; left: 5px; top: 16px; bottom: -2px; width: 2px;
+  background: var(--border-neutral-lighter, #ebebeb);
 }
 .stage-item:last-child::before { display: none; }
 .stage-item__dot {
-  width: 14px; height: 14px; flex-shrink: 0;
-  margin-left: -18px; /* pull back into the line's gutter, same trick as .stop-item__dot */
-  border-radius: 50%; background: var(--color-neutrals-300); border: 2px solid var(--surface-neutral-light);
+  width: 12px; height: 12px; flex-shrink: 0;
+  margin-left: -18px;
+  border-radius: 50%; background: transparent;
+  border: 1.5px solid var(--border-neutral-dark);
   display: flex; align-items: center; justify-content: center;
-  color: #fff; font-size: 9px;
+  color: #fff; font-size: 8px;
 }
-.stage-item--active .stage-item__dot { background: var(--surface-brand-default); box-shadow: 0 0 0 3px var(--surface-brand-lighter); }
-/* Done gets an actual checkmark (not just a color) but stays visually quiet —
-   a muted success tint, no glow ring — so it doesn't compete with the active
-   stage's bright ring, which is the one that actually needs the driver's
-   attention. */
-.stage-item--done .stage-item__dot { background: var(--success-surface-lighter); color: var(--success-text); }
-.stage-item--eta .stage-item__dot { background: var(--surface-neutral-light); border: 1.5px solid var(--border-neutral-dark); width: 12px; height: 12px; margin-left: -17px; }
+.stage-item--active .stage-item__dot { background: var(--surface-neutral-light); border-color: transparent; box-shadow: 0 6px 7.5px rgba(62,62,62,0.2); }
+.stage-item--done .stage-item__dot { background: var(--success-surface); opacity: 0.4; border-color: transparent; color: #fff; }
+.stage-item--eta .stage-item__dot { background: transparent; border: 1.5px solid var(--border-neutral-dark); width: 12px; height: 12px; }
 .stage-item__row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .stage-item__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .stage-item__label-line { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .stage-item__action { flex-shrink: 0; }
 .stage-item__sub { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
 
-.timestamp-btn {
-  background: none; border: none; padding: 2px 4px; margin: -2px -4px; border-radius: var(--radius-xs);
-  font: inherit; color: var(--text-neutral-subtitle); cursor: pointer; text-decoration: underline dotted;
+.stage-item__time-row { display: flex; align-items: center; gap: 0; }
+.stage-item__time-chip {
+  display: inline-flex; align-items: center; gap: 2px;
+  padding: 2px; border-radius: var(--radius-xs);
 }
+.stage-item__time-chip--filled { background: var(--surface-neutral-default); }
+.timestamp-btn {
+  background: none; border: none; padding: 0;
+  font: inherit; font-size: 10px; line-height: 12px; font-weight: 400;
+  color: var(--text-neutral-body); cursor: pointer; text-decoration: underline;
+}
+.timestamp-btn--bold { font-weight: 700; }
 .timestamp-btn:hover { background: var(--surface-neutral-dark); }
 .timestamp-btn:active { background: var(--surface-neutral-darker); }
+.stage-item__edit-icon { width: 12px; height: 12px; flex-shrink: 0; }
+.stage-item__source {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 10px; line-height: 12px; font-weight: 400;
+  color: var(--text-neutral-subtitle);
+}
+.stage-item__source::before { content: '•'; margin-right: -4px; }
+.stage-item__status-text {
+  font-size: 10px; line-height: 12px; font-weight: 400;
+  color: var(--text-neutral-subtitle); padding: 2px;
+}
 .timestamp-edit { display: flex; align-items: center; gap: 6px; }
 
 /* Order / POD / pallet-exchange rows — label grows to fill the space, so
@@ -1148,6 +1168,16 @@ button { font-family: inherit; }
 .order-row__pallet-entry { display: flex; gap: 8px; }
 .pallet-count-input { flex: 1; }
 
+.stage-confirm-btn {
+  height: 32px; padding: 0 8px;
+  border: 1px solid var(--surface-brand-default);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--surface-brand-default);
+  font-family: inherit; font-size: 12px; font-weight: 500; line-height: 16px;
+  cursor: pointer; white-space: nowrap; flex-shrink: 0;
+}
+.stage-confirm-btn:active { background: var(--button-secondary-bg-pressed); border-color: var(--button-secondary-border-pressed); }
 .exception-flag { color: var(--critical-text); }
 
 /* ---------- POD / exception drawers (bottom sheets) ---------- */
