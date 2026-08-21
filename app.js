@@ -1546,7 +1546,7 @@ const SCREENS = {
           <div class="dash-hero__top">
             <div>
               <div class="t-headline-md">${greeting()}, ${name.split(' ')[0] || 'driver'}</div>
-              <div class="dash-hero__sub t-body-sm">${carrier} &middot; Full trip visibility</div>
+              <div class="dash-hero__sub t-body-sm">${carrier}</div>
             </div>
             <button type="button" class="dash-hero__bell" onclick="App.goTab('nav-notifications')" aria-label="Notifications">
               <sl-icon name="bell"></sl-icon>
