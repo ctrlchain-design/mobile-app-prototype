@@ -101,14 +101,11 @@ const MOCK_ACTIVE_TRIPS = [
     stops: [
       {
         id: 'STOP-1', type: 'pickup', location: 'Meridian Distribution Centre, Coventry', appointment: 'Today, 08:00',
-        // expectedPallets/actualPallets/palletConfirmed/palletMismatch are
-        // pallet-exchange fields, logged per customer order (kickoff-pack.md
-        // line 40) — same shape as podUploaded on the delivery-side orders
-        // below. No pre-filled actualPallets: no automated extraction exists
-        // to seed it with, the driver always types it in themselves.
         orders: [
-          { id: 'ORD-8841937', ref: 'PO-33210', expectedPallets: 7, actualPallets: null, palletConfirmed: false, palletMismatch: false },
-          { id: 'ORD-8841938', ref: 'PO-33211', expectedPallets: 5, actualPallets: null, palletConfirmed: false, palletMismatch: false },
+          { id: 'ORD-8841937', ref: 'PO-33210', stopRef: 'REF-555-ABC', expectedPallets: 7, actualPallets: null, palletConfirmed: false, palletMismatch: false,
+            instructions: 'IMPORTANT: include in Assign Driver this information:\nFirst Name: First and Last Name\nLast Name: Driver\'s ID\n\n1- The driver must present himself at the access control and register.\n2- Once registered, he/she will check if he/she can enter the pier or must wait until called by phone.\n3- Once assigned the pier will be directed towards him/her, if it is busy you must wait for another vehicle.\n\nThe use of PPE, reflective waistcoat and safety shoes is mandatory.' },
+          { id: 'ORD-8841938', ref: 'PO-33211', stopRef: 'REF-556-DEF', expectedPallets: 5, actualPallets: null, palletConfirmed: false, palletMismatch: false,
+            instructions: 'Use Gate B for trailers over 13.6m. Report to bay office on arrival. Max dwell time 2 hours.' },
         ],
         milestones: (() => {
           // Pallet exchange required at this shipper — exchange dock is a
@@ -124,8 +121,10 @@ const MOCK_ACTIVE_TRIPS = [
       {
         id: 'STOP-2', type: 'delivery', location: 'Aldi RDC, Bristol', appointment: 'Today, 14:30',
         orders: [
-          { id: 'ORD-8841937', ref: 'PO-33210', podUploaded: false },
-          { id: 'ORD-8841938', ref: 'PO-33211', podUploaded: false },
+          { id: 'ORD-8841937', ref: 'PO-33210', stopRef: 'REF-ALDI-210', podUploaded: false,
+            instructions: 'No double-stack trailers. Max height 4.2m. Use bay 12–18 for chilled goods.' },
+          { id: 'ORD-8841938', ref: 'PO-33211', stopRef: 'REF-ALDI-211', podUploaded: false,
+            instructions: 'No double-stack trailers. Max height 4.2m. Use bay 12–18 for chilled goods.' },
         ],
         milestones: deliveryStages('14:30'),
         exceptions: [],
@@ -146,6 +145,31 @@ const MOCK_UPCOMING_TRIPS = [
 const MOCK_TRIP_HISTORY = [
   { id: 'TRIP2026-000098', pickup: 'Dover Freight Village', dropoff: 'Meridian Distribution Centre, Coventry', status: 'Completed', badge: 'success', eta: 'Yesterday, 18:45' },
 ];
+
+const MOCK_CHAT_THREADS = {
+  'TRIP2026-000123': {
+    plannerName: 'Sarah Chen',
+    plannerRole: 'Planner',
+    messages: [
+      { id: 'm1', from: 'system', text: 'Chat started for trip TRIP2026-000123', time: '07:30' },
+      { id: 'm2', from: 'planner', text: 'Hi Jordan, your pickup at Meridian Distribution Centre is confirmed for 08:00. Head to Dock 018 for pallet exchange.', time: '07:32' },
+      { id: 'm3', from: 'driver', text: 'Thanks, on my way. Should arrive around 07:55.', time: '07:35' },
+      { id: 'm4', from: 'planner', text: 'The warehouse requires PPE and safety shoes — just a heads up.', time: '07:36' },
+      { id: 'm5', from: 'driver', text: 'Noted, I have my gear ready.', time: '07:38' },
+      { id: 'm6', from: 'planner', text: 'Quick update — Bay 3 is occupied, please use Bay 5 instead when you arrive.', time: '07:52', unread: true },
+    ],
+  },
+  'TRIP2026-000098': {
+    plannerName: 'Sarah Chen',
+    plannerRole: 'Planner',
+    messages: [
+      { id: 'h1', from: 'system', text: 'Chat started for trip TRIP2026-000098', time: 'Yesterday, 08:00' },
+      { id: 'h2', from: 'planner', text: 'Hi Jordan, pickup at Dover Freight Village is confirmed. Gate 2 for your trailer size.', time: 'Yesterday, 08:05' },
+      { id: 'h3', from: 'driver', text: 'Arrived at Dover. Slight queue at the gate.', time: 'Yesterday, 09:12' },
+      { id: 'h4', from: 'planner', text: 'Thanks for the update. Safe drive to Coventry.', time: 'Yesterday, 09:15' },
+    ],
+  },
+};
 
 const MOCK_GUEST_TRIP = {
   id: 'TRIP2026-000142',
@@ -247,6 +271,7 @@ const ROUTE_META = {
   'nav-trips': null,
   'nav-notifications': null,
   'nav-chats': null,
+  'chat-conversation': null,
   'nav-profile': null,
 };
 
@@ -278,6 +303,7 @@ const TITLES = {
   'nav-trips': 'My Trips',
   'nav-notifications': 'Notifications',
   'nav-chats': 'Chats',
+  'chat-conversation': '',
   'nav-profile': 'Profile',
 };
 
@@ -291,6 +317,7 @@ function freshState() {
     password: '',
     firstName: '',
     lastName: '',
+    carrierName: '',
     gdprAccepted: false,
     portalCode: '',
     pin: '',
@@ -314,10 +341,15 @@ function freshState() {
     // Dashboard UI-only state (expand/collapse, open modals) — not part of the
     // trip data itself, reset on every restart along with everything else.
     stopExpandOverride: {}, // stopId/tripId -> boolean, overrides the default (active stop open)
+    instructionsExpanded: {}, // stopId -> boolean
     editingMilestone: null, // { stopId, milestoneId } | null — which timestamp is mid-edit
     podSheet: null,         // { tripId, stopId, orderId } | null
     exceptionSheet: null,   // { tripId, stopId } | null
     addTripSheet: false,
+
+    chatThreads: deepClone(MOCK_CHAT_THREADS),
+    activeChatTripId: null,
+    chatInput: '',
   };
 }
 
@@ -449,6 +481,11 @@ const App = {
     render();
   },
 
+  toggleInstructions(stopId) {
+    state.instructionsExpanded[stopId] = !state.instructionsExpanded[stopId];
+    render();
+  },
+
   confirmMilestone(tripId, stopId, milestoneId) {
     completeMilestoneByIds(tripId, stopId, milestoneId);
     render();
@@ -471,6 +508,27 @@ const App = {
      itself. A count that doesn't match what was expected for that order is
      flagged (`palletMismatch`) as a structured exception for ops to
      review, not reconciled silently. */
+  confirmPalletMatch(tripId, stopId, orderId) {
+    const trip = findActiveTrip(tripId);
+    const stop = trip && findStop(trip, stopId);
+    const order = stop && stop.orders.find(o => o.id === orderId);
+    if (order) {
+      order.actualPallets = order.expectedPallets;
+      order.palletMismatch = false;
+      order.palletConfirmed = true;
+    }
+    this._tryCompletePalletExchange(trip, stop);
+    render();
+  },
+
+  showPalletMismatch(tripId, stopId, orderId) {
+    const trip = findActiveTrip(tripId);
+    const stop = trip && findStop(trip, stopId);
+    const order = stop && stop.orders.find(o => o.id === orderId);
+    if (order) order.palletMismatchEntry = true;
+    render();
+  },
+
   confirmPalletCount(tripId, stopId, orderId) {
     const input = document.getElementById(`pallet-input-${orderId}`);
     const trip = findActiveTrip(tripId);
@@ -480,14 +538,19 @@ const App = {
       order.actualPallets = parseInt(input.value, 10);
       order.palletMismatch = order.actualPallets !== order.expectedPallets;
       order.palletConfirmed = true;
+      order.palletMismatchEntry = false;
     }
+    this._tryCompletePalletExchange(trip, stop);
+    render();
+  },
+
+  _tryCompletePalletExchange(trip, stop) {
     if (stop && stop.orders.every(o => o.palletConfirmed)) {
       const idx = stop.milestones.findIndex(m => m.kind === 'pallet-exchange');
       if (idx >= 0 && stop.milestones[idx].status !== 'confirmed') {
         completeMilestone(trip, stop, idx);
       }
     }
-    render();
   },
 
   startEditTimestamp(stopId, milestoneId) {
@@ -617,6 +680,37 @@ const App = {
       this.nav('dashboard');
     }
   },
+
+  openChat(tripId) {
+    state.activeChatTripId = tripId;
+    state.chatInput = '';
+    const thread = state.chatThreads[tripId];
+    if (thread) thread.messages.forEach(m => { m.unread = false; });
+    this.nav('chat-conversation');
+  },
+
+  setChatInput(value) {
+    state.chatInput = value;
+  },
+
+  sendChatMessage() {
+    const text = state.chatInput.trim();
+    if (!text || !state.activeChatTripId) return;
+    const thread = state.chatThreads[state.activeChatTripId];
+    if (!thread) return;
+    thread.messages.push({
+      id: 'msg-' + Date.now(),
+      from: 'driver',
+      text: text,
+      time: formatNowTime(),
+    });
+    state.chatInput = '';
+    render();
+    requestAnimationFrame(() => {
+      const container = document.querySelector('.chat-messages');
+      if (container) container.scrollTop = container.scrollHeight;
+    });
+  },
 };
 
 function currentRoute() {
@@ -702,9 +796,11 @@ function formatNowTime() {
 
 /* Completes one stage of a stop's lifecycle and cascades: unlocks the next
    stage (proposed for an auto stage, ready for a manual one, ready for POD so
-   its per-order rows appear), and — on a stop's last stage — hands the trip's
-   activeStopId to the next stop in route order, so the whole trip advances,
-   not just one stop in isolation. */
+   its per-order rows appear), and — on a stop's last non-pallet stage — hands
+   the trip's activeStopId to the next stop in route order.
+   Pallet exchange is NON-BLOCKING: it runs in parallel with the main flow
+   (unlocked at the same time as loaded/unloaded) and does not gate departure.
+   Unresolved pallet exchange shows an attention flag instead. */
 function completeMilestone(trip, stop, index) {
   const m = stop.milestones[index];
   m.status = 'confirmed';
@@ -713,7 +809,19 @@ function completeMilestone(trip, stop, index) {
 
   const next = stop.milestones[index + 1];
   if (next && next.status === 'pending') {
-    if (next.kind === 'manual' || next.kind === 'pod' || next.kind === 'pallet-exchange') {
+    if (next.kind === 'pallet-exchange') {
+      next.status = 'ready';
+      const afterPallet = stop.milestones[index + 2];
+      if (afterPallet && afterPallet.status === 'pending') {
+        if (afterPallet.kind === 'manual' || afterPallet.kind === 'pod') {
+          afterPallet.status = 'ready';
+        } else if (afterPallet.kind === 'auto') {
+          afterPallet.status = 'proposed';
+          afterPallet.source = 'automated';
+          afterPallet.timestamp = formatNowTime();
+        }
+      }
+    } else if (next.kind === 'manual' || next.kind === 'pod') {
       next.status = 'ready';
     } else if (next.kind === 'auto') {
       next.status = 'proposed';
@@ -722,7 +830,8 @@ function completeMilestone(trip, stop, index) {
     }
   }
 
-  if (index === stop.milestones.length - 1) {
+  const lastNonPallet = stop.milestones.filter(ms => ms.kind !== 'pallet-exchange').slice(-1)[0];
+  if (m.id === lastNonPallet.id) {
     const stopIdx = trip.stops.findIndex(s => s.id === stop.id);
     const nextStop = trip.stops[stopIdx + 1];
     if (nextStop) trip.activeStopId = nextStop.id;
@@ -734,6 +843,34 @@ function completeMilestoneByIds(tripId, stopId, milestoneId) {
   const stop = trip && findStop(trip, stopId);
   const idx = stop ? stop.milestones.findIndex(x => x.id === milestoneId) : -1;
   if (idx >= 0) completeMilestone(trip, stop, idx);
+}
+
+function stopInstructionsBlock(stop) {
+  const withInstructions = stop.orders.filter(o => o.instructions);
+  if (!withInstructions.length) return '';
+  const expanded = state.instructionsExpanded && state.instructionsExpanded[stop.id];
+  const singleOrder = withInstructions.length === 1;
+  return h`
+    <div class="stop-instructions">
+      <button type="button" class="stop-instructions__toggle" onclick="event.stopPropagation(); App.toggleInstructions('${stop.id}')">
+        <sl-icon name="info-circle" style="font-size:14px"></sl-icon>
+        <span class="t-label-sm">Instructions</span>
+        <span class="t-body-sm t-caption">${withInstructions.length} order${singleOrder ? '' : 's'}</span>
+        <sl-icon class="stop-instructions__chevron" name="${expanded ? 'chevron-up' : 'chevron-down'}"></sl-icon>
+      </button>
+      ${expanded ? h`
+        <div class="stop-instructions__body">
+          ${withInstructions.map(o => h`
+            <div class="stop-instructions__order ${singleOrder ? '' : 'stop-instructions__order--multi'}">
+              ${!singleOrder ? h`<div class="stop-instructions__order-header"><span class="t-label-sm">${o.ref}</span>${o.stopRef ? h`<span class="t-body-sm t-caption">${o.stopRef}</span>` : ''}</div>` : ''}
+              ${singleOrder && o.stopRef ? h`<div class="stop-instructions__order-header"><span class="t-body-sm t-caption">${o.stopRef}</span></div>` : ''}
+              <div class="stop-instructions__text t-body-sm">${o.instructions.replace(/\n/g, '<br/>')}</div>
+            </div>
+          `).join('')}
+        </div>
+      ` : ''}
+    </div>
+  `;
 }
 
 /* One or more "Active Trip" accordions — the dashboard's main content. Each is
@@ -761,19 +898,19 @@ function activeTripSection(trips) {
   `).join('');
 }
 
-/* Current stop pinned to the top (not chronological-from-start), everything
-   else following in actual route order below — scroll to reach any other
-   stop, past or future, non-sequentially. */
 function stopTimelineList(trip) {
-  const active = findStop(trip, trip.activeStopId);
-  const rest = trip.stops.filter(s => s.id !== trip.activeStopId);
-  const ordered = active ? [active, ...rest] : trip.stops;
-  return h`<div class="stop-list">${ordered.map(stop => stopItem(trip, stop)).join('')}</div>`;
+  return h`<div class="stop-list">${trip.stops.map(stop => stopItem(trip, stop)).join('')}</div>`;
+}
+
+function hasPendingPallets(stop) {
+  const pe = stop.milestones.find(m => m.kind === 'pallet-exchange');
+  return pe && pe.status !== 'pending' && pe.status !== 'confirmed';
 }
 
 function stopStatus(stop) {
   const real = stop.milestones.filter(m => m.kind !== 'eta');
-  if (real.every(m => m.status === 'confirmed')) return 'completed';
+  const blocking = real.filter(m => m.kind !== 'pallet-exchange');
+  if (blocking.every(m => m.status === 'confirmed')) return 'completed';
   if (real.some(m => m.status !== 'pending')) return 'active';
   return 'upcoming';
 }
@@ -786,7 +923,7 @@ function stopItem(trip, stop) {
   const isActive = stop.id === trip.activeStopId;
   const expanded = isExpanded(stop.id, isActive);
   const orderCount = stop.orders.length;
-  const isCollapsed = !expanded && status === 'upcoming';
+  const isCollapsed = !expanded && status !== 'active';
   return h`
     <div class="stop-item stop-item--${status}">
       <sl-details ${expanded ? 'open' : ''} onclick="if (event.target.closest('sl-details') === this && event.target.closest('[data-role=summary]')) App.toggleExpand('${stop.id}', ${expanded})">
@@ -797,7 +934,8 @@ function stopItem(trip, stop) {
               <div class="stop-summary__title">
                 <span class="t-label-md">${stop.type === 'pickup' ? 'Pickup' : 'Delivery'}</span>
                 <span class="badge badge--category">${orderCount} Order${orderCount === 1 ? '' : 's'}</span>
-                ${stop.exceptions.length ? h`<sl-icon class="exception-flag" name="exclamation-triangle" title="Exception reported"></sl-icon>` : ''}
+                ${hasPendingPallets(stop) ? h`<span class="badge badge--attention" title="Pallet exchange pending"><sl-icon name="exclamation-circle"></sl-icon> Pallets</span>` : ''}
+              ${stop.exceptions.length ? h`<sl-icon class="exception-flag" name="exclamation-triangle" title="Exception reported"></sl-icon>` : ''}
               </div>
               <span class="t-body-sm" style="color:var(--text-neutral-subtitle)">${stop.location}</span>
               <div class="stop-summary__window">
@@ -809,6 +947,7 @@ function stopItem(trip, stop) {
           </div>
         </div>
         <div class="stop-body">
+          ${stopInstructionsBlock(stop)}
           <div class="stage-list">${stop.milestones.map(m => stageItem(trip, stop, m)).join('')}</div>
           <button type="button" class="report-issue-link" onclick="App.openExceptionSheet('${trip.id}','${stop.id}')">
             <sl-icon name="flag" aria-hidden="true"></sl-icon> Report an issue with this stop
@@ -887,7 +1026,7 @@ function stageItem(trip, stop, m) {
         </div>
         <div class="stage-item__action">${action}</div>
       </div>
-      ${hasOrderRows && m.status !== 'pending' ? h`<div class="stage-item__sub">${stop.orders.map(o => m.kind === 'pod' ? orderRow(trip, stop, o) : palletExchangeOrderRow(trip, stop, o)).join('')}</div>` : ''}
+      ${hasOrderRows && m.status !== 'pending' && !(m.kind === 'pallet-exchange' && m.status === 'confirmed' && !anyPalletMismatch) ? h`<div class="stage-item__sub">${stop.orders.map(o => m.kind === 'pod' ? orderRow(trip, stop, o) : palletExchangeOrderRow(trip, stop, o)).join('')}</div>` : ''}
     </div>
   `;
 }
@@ -897,6 +1036,7 @@ function orderRow(trip, stop, order) {
     <div class="order-row">
       <div class="order-row__label">
         <span class="t-body-sm t-label-md">${order.ref}</span>
+        ${order.stopRef ? h`<span class="t-body-sm t-caption">${order.stopRef}</span>` : ''}
         <span class="t-body-sm t-caption">${order.podUploaded ? 'POD uploaded' : 'POD not yet uploaded'}</span>
       </div>
       ${order.podUploaded
@@ -906,33 +1046,46 @@ function orderRow(trip, stop, order) {
   `;
 }
 
-/* Pallet exchange, logged per customer order (kickoff-pack.md line 40) —
-   same row shape as orderRow() above, but a driver-typed count instead of
-   a file upload. No pre-filled value: there's no automated extraction to
-   seed it with (see keep-brand-artifacts-separate re: Corax/NewCold). */
 function palletExchangeOrderRow(trip, stop, order) {
   if (order.palletConfirmed) {
     return h`
-      <div class="order-row">
+      <div class="order-row order-row--confirmed">
         <div class="order-row__label">
           <span class="t-body-sm t-label-md">${order.ref}</span>
-          <span class="t-body-sm t-caption">${order.actualPallets} pallets${order.palletMismatch ? ` (expected ${order.expectedPallets})` : ''}</span>
+          ${order.stopRef ? h`<span class="t-body-sm t-caption">${order.stopRef}</span>` : ''}
+          <span class="t-body-sm t-caption">${order.palletMismatch ? `${order.actualPallets} of ${order.expectedPallets} pallets` : `${order.expectedPallets} pallets`}</span>
         </div>
         ${order.palletMismatch
           ? h`<span class="badge badge--warning"><sl-icon name="exclamation-triangle"></sl-icon> Mismatch</span>`
-          : h`<span class="badge badge--success"><sl-icon name="check2"></sl-icon> Confirmed</span>`}
+          : h`<span class="badge badge--success"><sl-icon name="check2"></sl-icon></span>`}
+      </div>
+    `;
+  }
+  if (order.palletMismatchEntry) {
+    return h`
+      <div class="order-row order-row--stacked">
+        <div class="order-row__label">
+          <span class="t-body-sm t-label-md">${order.ref}</span>
+          ${order.stopRef ? h`<span class="t-body-sm t-caption">${order.stopRef}</span>` : ''}
+          <span class="t-body-sm t-caption">Expected ${order.expectedPallets} — enter actual count</span>
+        </div>
+        <div class="order-row__pallet-entry">
+          <sl-input id="pallet-input-${order.id}" class="pallet-count-input" type="number" size="small" placeholder="Actual count"></sl-input>
+          <sl-button size="small" variant="primary" onclick="App.confirmPalletCount('${trip.id}','${stop.id}','${order.id}')">Confirm</sl-button>
+        </div>
       </div>
     `;
   }
   return h`
-    <div class="order-row order-row--stacked">
+    <div class="order-row">
       <div class="order-row__label">
         <span class="t-body-sm t-label-md">${order.ref}</span>
+        ${order.stopRef ? h`<span class="t-body-sm t-caption">${order.stopRef}</span>` : ''}
         <span class="t-body-sm t-caption">Expected ${order.expectedPallets} pallets</span>
       </div>
-      <div class="order-row__pallet-entry">
-        <sl-input id="pallet-input-${order.id}" class="pallet-count-input" type="number" size="small" placeholder="Actual count"></sl-input>
-        <sl-button size="small" variant="primary" onclick="App.confirmPalletCount('${trip.id}','${stop.id}','${order.id}')">Confirm</sl-button>
+      <div class="order-row__pallet-actions">
+        <button type="button" class="stage-confirm-btn" onclick="App.confirmPalletMatch('${trip.id}','${stop.id}','${order.id}')">Confirm</button>
+        <button type="button" class="pallet-mismatch-link" onclick="App.showPalletMismatch('${trip.id}','${stop.id}','${order.id}')">Mismatch?</button>
       </div>
     </div>
   `;
@@ -1112,14 +1265,22 @@ const TAB_ITEMS = [
 const TAB_ROUTES = TAB_ITEMS.map(t => t.route);
 
 function tabBarMarkup(activeRoute) {
+  const unreadChats = totalUnreadChats();
   return h`
     <div class="app-tabbar">
-      ${TAB_ITEMS.map(item => h`
-        <button type="button" class="app-tabbar__item ${item.route === activeRoute ? 'is-active' : ''}" onclick="App.goTab('${item.route}')">
-          ${item.svg ? item.svg : h`<sl-icon class="app-tabbar__icon" name="${item.icon}"></sl-icon>`}
-          <span class="app-tabbar__label">${item.label}</span>
-        </button>
-      `).join('')}
+      ${TAB_ITEMS.map(item => {
+        const badge = item.route === 'nav-chats' && unreadChats
+          ? h`<span class="app-tabbar__badge">${unreadChats}</span>` : '';
+        return h`
+          <button type="button" class="app-tabbar__item ${item.route === activeRoute ? 'is-active' : ''}" onclick="App.goTab('${item.route}')">
+            <span class="app-tabbar__icon-wrap">
+              ${item.svg ? item.svg : h`<sl-icon class="app-tabbar__icon" name="${item.icon}"></sl-icon>`}
+              ${badge}
+            </span>
+            <span class="app-tabbar__label">${item.label}</span>
+          </button>
+        `;
+      }).join('')}
     </div>
   `;
 }
@@ -1236,6 +1397,10 @@ const SCREENS = {
       <div class="field">
         <label class="field__label">Last name</label>
         <input class="field__input" placeholder="Reyes" value="${state.lastName}" oninput="App.set('lastName', this.value); updateFooterState();" />
+      </div>
+      <div class="field">
+        <label class="field__label">Current carrier</label>
+        <input class="field__input" placeholder="e.g. GTS Transport" value="${state.carrierName}" oninput="App.set('carrierName', this.value);" />
       </div>
     `,
     footer: () => h`<button class="btn btn-primary" ${(state.firstName && state.lastName) ? '' : 'disabled'} onclick="App.nav('self-reg-gdpr')">Continue</button>`,
@@ -1653,13 +1818,12 @@ const SCREENS = {
   },
 
   'nav-chats': () => ({
-    content: h`
-      <div class="center-state">
-        <sl-icon class="center-state__icon center-state__icon--warning" name="chat-dots"></sl-icon>
-        <div class="t-headline-md">Chat with back-office</div>
-        <div class="t-body-md t-muted">Structured messaging with your carrier's back office is planned but not yet defined for this prototype.</div>
-      </div>
-    `,
+    content: h`${chatListScreen()}`,
+  }),
+
+  'chat-conversation': () => ({
+    hideHeader: true,
+    content: h`${chatConversationScreen()}`,
   }),
 
   'nav-profile': () => {
@@ -1805,6 +1969,115 @@ function trackingStatusBanner() {
       <span class="tracking-status__dot tracking-status__dot--limited"></span>
       <span class="tracking-status__text">Background tracking limited — arrival won't auto-detect.</span>
       <button type="button" class="tracking-status__fix" onclick="App.nav('location-priming')">Fix</button>
+    </div>
+  `;
+}
+
+/* ---------------------------------------------------------------- */
+/* Chat screens                                                      */
+/* ---------------------------------------------------------------- */
+
+function chatUnreadCount(thread) {
+  return thread ? thread.messages.filter(m => m.unread).length : 0;
+}
+
+function totalUnreadChats() {
+  return Object.values(state.chatThreads).reduce((n, t) => n + chatUnreadCount(t), 0);
+}
+
+function chatListScreen() {
+  const tripIds = Object.keys(state.chatThreads);
+  if (!tripIds.length) {
+    return h`
+      <div class="center-state">
+        <sl-icon class="center-state__icon" name="chat-dots"></sl-icon>
+        <div class="t-headline-md">No conversations yet</div>
+        <div class="t-body-md t-muted">Chats with your carrier's back office will appear here once a trip is assigned.</div>
+      </div>
+    `;
+  }
+  return h`
+    <div class="chat-list">
+      ${tripIds.map(tripId => {
+        const thread = state.chatThreads[tripId];
+        const msgs = thread.messages.filter(m => m.from !== 'system');
+        const last = msgs[msgs.length - 1];
+        const unread = chatUnreadCount(thread);
+        const isActive = state.activeTrips.some(t => t.id === tripId);
+        return h`
+          <button type="button" class="chat-row" onclick="App.openChat('${tripId}')">
+            <div class="chat-row__avatar">
+              <sl-icon name="person-circle"></sl-icon>
+            </div>
+            <div class="chat-row__body">
+              <div class="chat-row__top">
+                <span class="chat-row__name t-label-md">${thread.plannerName}</span>
+                <span class="chat-row__time t-body-sm t-caption">${last ? last.time : ''}</span>
+              </div>
+              <div class="chat-row__trip t-body-sm t-caption">
+                ${tripId}${isActive ? h` <span class="badge badge--info" style="font-size:10px;padding:1px 5px;">Active</span>` : ''}
+              </div>
+              <div class="chat-row__bottom">
+                <span class="chat-row__preview t-body-sm t-muted">${last ? (last.from === 'driver' ? 'You: ' : '') + last.text : ''}</span>
+                ${unread ? h`<span class="chat-row__unread">${unread}</span>` : ''}
+              </div>
+            </div>
+          </button>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+function chatConversationScreen() {
+  const tripId = state.activeChatTripId;
+  const thread = tripId && state.chatThreads[tripId];
+  if (!thread) return h`<div class="center-state"><div class="t-body-md t-muted">Chat not found.</div></div>`;
+
+  const isActive = state.activeTrips.some(t => t.id === tripId);
+
+  return h`
+    <div class="chat-screen">
+      <div class="chat-header">
+        <button type="button" class="chat-header__back" onclick="App.back()">
+          <sl-icon name="arrow-left"></sl-icon>
+        </button>
+        <div class="chat-header__info">
+          <div class="chat-header__name t-label-md">${thread.plannerName}</div>
+          <div class="chat-header__meta t-body-sm t-caption">${thread.plannerRole} · ${tripId}</div>
+        </div>
+      </div>
+      <div class="chat-messages">
+        ${isActive ? h`
+          <div class="chat-trip-pill">
+            <sl-icon name="truck" style="font-size:13px"></sl-icon>
+            <span class="t-body-sm">${tripId}</span>
+            <span class="badge badge--info" style="font-size:10px;padding:1px 5px;">In Transit</span>
+          </div>
+        ` : ''}
+        ${thread.messages.map(m => {
+          if (m.from === 'system') {
+            return h`<div class="chat-msg chat-msg--system"><span class="t-body-sm t-caption">${m.text}</span></div>`;
+          }
+          const isDriver = m.from === 'driver';
+          return h`
+            <div class="chat-msg ${isDriver ? 'chat-msg--driver' : 'chat-msg--planner'}">
+              <div class="chat-bubble ${isDriver ? 'chat-bubble--driver' : 'chat-bubble--planner'}">
+                <div class="t-body-sm">${m.text}</div>
+              </div>
+              <div class="chat-msg__time t-body-sm t-caption">${m.time}</div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+      <div class="chat-input-bar">
+        <input class="chat-input" type="text" placeholder="Type a message…" value="${state.chatInput}"
+          oninput="App.setChatInput(this.value)"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();App.sendChatMessage();}" />
+        <button type="button" class="chat-send-btn${state.chatInput.trim() ? ' chat-send-btn--active' : ''}" onclick="App.sendChatMessage()">
+          <sl-icon name="send"></sl-icon>
+        </button>
+      </div>
     </div>
   `;
 }
