@@ -25,12 +25,16 @@ const MOCK_RETURNING_DRIVER = { firstName: 'Jordan', lastName: 'Reyes', carrier:
    CtrlChain's real trip model (05-projects/carrier-tms/trip-details.md): a trip
    is a sequence of stops, and a stop can carry one or more customer orders. */
 /* The real, logical lifecycle of a stop — a live ETA leads into it, then
-   geofence-detectable arrival/departure bookend a manual load/unload action,
-   with POD its own gated step on delivery stops. `kind` drives both how a
-   stage is rendered and how it can complete:
+   geofence-detectable arrival/departure bookend cargo loading/unloading,
+   with POD its own gated step on delivery stops. There's no sensor inside
+   the trailer, so "cargo loaded/unloaded" can't be detected on its own —
+   it's inferred from the same geofence-exit signal that detects departure
+   and proposed alongside it, same as arrival, with the driver able to
+   correct the timestamp if the geofence fired early/late (Samuel's call,
+   2026-08-24: this used to be a manual-only "Mark done" stage). `kind`
+   drives both how a stage is rendered and how it can complete:
      'eta'    — informational only, never confirmable, always visible once set.
      'auto'   — geofence-detectable; proposed automatically, driver confirms.
-     'manual' — only the driver knows this happened; driver marks it done.
      'pod'    — gated on the prior stage; completes itself once every order at
                 this stop has a POD uploaded (see submitPod()).
      'pallet-exchange' — pickup-only, conditional (only present on stops that
@@ -49,7 +53,7 @@ const MOCK_RETURNING_DRIVER = { firstName: 'Jordan', lastName: 'Reyes', carrier:
                 what was expected for that order is flagged as a structured
                 exception for ops to review, not resolved silently.
    Status values: 'eta' (informational) | 'pending' (blocked, future) |
-   'ready' (manual/pod/pallet-exchange stage unlocked, awaiting the driver)
+   'ready' (pod/pallet-exchange stage unlocked, awaiting the driver)
    | 'proposed' (auto stage awaiting confirm) | 'confirmed' (done).
    completeMilestone() advances a stop
    to its next stage and, on a stop's last stage, hands the trip's
@@ -67,7 +71,7 @@ function pickupStages(etaTime, palletDock) {
     });
   }
   stages.push(
-    { id: 'loaded', label: 'Cargo loaded', kind: 'manual', status: 'pending', source: null, timestamp: null },
+    { id: 'loaded', label: 'Cargo loaded', kind: 'auto', status: 'pending', source: null, timestamp: null },
     { id: 'departed', label: 'Departed pickup', kind: 'auto', status: 'pending', source: null, timestamp: null }
   );
   return stages;
@@ -76,7 +80,7 @@ function deliveryStages(etaTime) {
   return [
     { id: 'eta', label: 'Delivery ETA', kind: 'eta', status: 'eta', source: null, timestamp: etaTime },
     { id: 'arrived', label: 'Arrived at delivery', kind: 'auto', status: 'pending', source: null, timestamp: null },
-    { id: 'unloaded', label: 'Cargo unloaded', kind: 'manual', status: 'pending', source: null, timestamp: null },
+    { id: 'unloaded', label: 'Cargo unloaded', kind: 'auto', status: 'pending', source: null, timestamp: null },
     { id: 'pod', label: 'POD uploaded', kind: 'pod', status: 'pending', source: null, timestamp: null },
     { id: 'departed', label: 'Departed delivery', kind: 'auto', status: 'pending', source: null, timestamp: null },
   ];
@@ -493,15 +497,6 @@ const App = {
     render();
   },
 
-  /* Same completion mechanics as confirmMilestone — a separate method name
-     because the two are semantically different actions for the driver: this
-     one attests to something the app has no way to detect on its own (cargo
-     physically loaded/unloaded), not confirming an automated proposal. */
-  markManualDone(tripId, stopId, milestoneId) {
-    completeMilestoneByIds(tripId, stopId, milestoneId);
-    render();
-  },
-
   /* Records the pallet count the driver typed in by hand for one order —
      there's no automated extraction to confirm or correct, just a number
      they counted themselves. Pallet exchange is logged per customer order
@@ -815,9 +810,9 @@ function formatNowTime() {
 }
 
 /* Completes one stage of a stop's lifecycle and cascades: unlocks the next
-   stage (proposed for an auto stage, ready for a manual one, ready for POD so
-   its per-order rows appear), and — on a stop's last non-pallet stage — hands
-   the trip's activeStopId to the next stop in route order.
+   stage (proposed for an auto stage, ready for POD so its per-order rows
+   appear), and — on a stop's last non-pallet stage — hands the trip's
+   activeStopId to the next stop in route order.
    Pallet exchange is NON-BLOCKING: it runs in parallel with the main flow
    (unlocked at the same time as loaded/unloaded) and does not gate departure.
    Unresolved pallet exchange shows an attention flag instead. */
@@ -825,7 +820,6 @@ function completeMilestone(trip, stop, index) {
   const m = stop.milestones[index];
   m.status = 'confirmed';
   if (!m.timestamp) m.timestamp = formatNowTime();
-  if (m.kind === 'manual' && !m.source) m.source = 'manual';
 
   const next = stop.milestones[index + 1];
   if (next && next.status === 'pending') {
@@ -833,7 +827,7 @@ function completeMilestone(trip, stop, index) {
       next.status = 'ready';
       const afterPallet = stop.milestones[index + 2];
       if (afterPallet && afterPallet.status === 'pending') {
-        if (afterPallet.kind === 'manual' || afterPallet.kind === 'pod') {
+        if (afterPallet.kind === 'pod') {
           afterPallet.status = 'ready';
         } else if (afterPallet.kind === 'auto') {
           afterPallet.status = 'proposed';
@@ -841,7 +835,7 @@ function completeMilestone(trip, stop, index) {
           afterPallet.timestamp = formatNowTime();
         }
       }
-    } else if (next.kind === 'manual' || next.kind === 'pod') {
+    } else if (next.kind === 'pod') {
       next.status = 'ready';
     } else if (next.kind === 'auto') {
       next.status = 'proposed';
@@ -978,19 +972,13 @@ function stopItem(trip, stop) {
   `;
 }
 
-/* "Automated" was papering over two genuinely different mechanisms: a
-   geofence detecting arrival/departure vs. a driver's own manual action.
-   Naming the actual mechanism is more meaningful to a driver than the
-   generic word — and more honest, since they're really not the same thing
-   under the hood. */
 function stageSourceLabel(m) {
-  if (m.source === 'manual') return 'Manual';
   if (m.source === 'automated') return m.kind === 'auto' ? 'Geofence' : 'Automated';
   return '';
 }
 
 /* One stage in a stop's lifecycle — see pickupStages()/deliveryStages() for
-   the 'eta' | 'auto' | 'manual' | 'pod' kinds this renders differently. */
+   the 'eta' | 'auto' | 'pod' | 'pallet-exchange' kinds this renders differently. */
 function stageItem(trip, stop, m) {
   const editing = state.editingMilestone && state.editingMilestone.milestoneId === m.id;
   const dotClass = m.status === 'confirmed' ? 'done'
@@ -1023,12 +1011,8 @@ function stageItem(trip, stop, m) {
   }
 
   let action = '';
-  if (!editing) {
-    if (m.status === 'proposed') {
-      action = h`<button type="button" class="stage-confirm-btn" onclick="App.confirmMilestone('${trip.id}','${stop.id}','${m.id}')">Confirm</button>`;
-    } else if (m.status === 'ready' && m.kind === 'manual') {
-      action = h`<button type="button" class="stage-confirm-btn" onclick="App.markManualDone('${trip.id}','${stop.id}','${m.id}')">Mark done</button>`;
-    }
+  if (!editing && m.status === 'proposed') {
+    action = h`<button type="button" class="stage-confirm-btn" onclick="App.confirmMilestone('${trip.id}','${stop.id}','${m.id}')">Confirm</button>`;
   }
 
   const labelClass = m.status === 'pending' ? 't-body-sm' : (m.status === 'proposed' || m.status === 'ready') ? 't-label-sm' : 't-body-sm';
