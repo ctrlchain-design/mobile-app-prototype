@@ -1363,7 +1363,85 @@ button { font-family: inherit; }
 }
 
 /* ---------- Chat list ---------- */
-.chat-list { display: flex; flex-direction: column; }
+.chat-list-screen { display: flex; flex-direction: column; }
+
+.chat-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 16px 4px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--form-border);
+  background: var(--form-bg);
+}
+.chat-search__icon { font-size: 16px; color: var(--text-neutral-caption); flex-shrink: 0; }
+.chat-search-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: none;
+  font: inherit;
+  font-size: var(--type-body-lg-size, 15px);
+  color: var(--form-value);
+  min-width: 0;
+}
+.chat-search-input::placeholder { color: var(--placeholder); }
+.chat-search__clear {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 16px;
+  color: var(--text-neutral-caption);
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex;
+}
+.chat-search__clear:active { opacity: 0.6; }
+
+.chat-filter-pills {
+  display: flex;
+  gap: 8px;
+  margin: 10px 16px 4px;
+}
+.chat-filter-pill {
+  padding: 6px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--border-neutral-lighter, #d8dce6);
+  background: none;
+  color: var(--text-neutral-body);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.dark .chat-filter-pill { border-color: var(--border-neutral-lighter, #3a3d48); }
+.chat-filter-pill:active { opacity: 0.7; }
+.chat-filter-pill.is-selected {
+  background: var(--color-brand-500, #4f7942);
+  border-color: var(--color-brand-500, #4f7942);
+  color: #fff;
+}
+.chat-filter-pill__count {
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.3);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 16px;
+  text-align: center;
+}
+.chat-filter-pill:not(.is-selected) .chat-filter-pill__count {
+  background: var(--color-red-500, #ef4444);
+  color: #fff;
+}
+
+.chat-list { display: flex; flex-direction: column; margin-top: 6px; }
 .chat-row {
   display: flex;
   align-items: flex-start;

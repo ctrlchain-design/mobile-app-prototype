@@ -350,6 +350,8 @@ function freshState() {
     chatThreads: deepClone(MOCK_CHAT_THREADS),
     activeChatTripId: null,
     chatInput: '',
+    chatSearchQuery: '',
+    chatFilter: 'all', // 'all' | 'unread'
   };
 }
 
@@ -679,6 +681,24 @@ const App = {
     } else {
       this.nav('dashboard');
     }
+  },
+
+  setChatSearch(value) {
+    state.chatSearchQuery = value;
+    render();
+    // render() rebuilds #app from scratch, which would otherwise drop focus
+    // out of the search box after every keystroke.
+    const input = document.querySelector('.chat-search-input');
+    if (input) {
+      input.focus();
+      const len = input.value.length;
+      input.setSelectionRange(len, len);
+    }
+  },
+
+  setChatFilter(value) {
+    state.chatFilter = value;
+    render();
   },
 
   openChat(tripId) {
@@ -1985,6 +2005,17 @@ function totalUnreadChats() {
   return Object.values(state.chatThreads).reduce((n, t) => n + chatUnreadCount(t), 0);
 }
 
+/* Search matches on trip id, planner name, and message text — the three
+   things a driver would actually remember about a conversation they're
+   trying to find again ("that one about Bay 5", "Sarah", "the Bristol trip"). */
+function chatMatchesSearch(tripId, thread, query) {
+  if (!query) return true;
+  const q = query.toLowerCase();
+  if (tripId.toLowerCase().includes(q)) return true;
+  if (thread.plannerName.toLowerCase().includes(q)) return true;
+  return thread.messages.some(m => m.text.toLowerCase().includes(q));
+}
+
 function chatListScreen() {
   const tripIds = Object.keys(state.chatThreads);
   if (!tripIds.length) {
@@ -1996,35 +2027,76 @@ function chatListScreen() {
       </div>
     `;
   }
+
+  const query = state.chatSearchQuery.trim();
+  const filter = state.chatFilter;
+  const visibleTripIds = tripIds.filter(tripId => {
+    const thread = state.chatThreads[tripId];
+    if (filter === 'unread' && chatUnreadCount(thread) === 0) return false;
+    return chatMatchesSearch(tripId, thread, query);
+  });
+  const totalUnread = tripIds.filter(id => chatUnreadCount(state.chatThreads[id]) > 0).length;
+
   return h`
-    <div class="chat-list">
-      ${tripIds.map(tripId => {
-        const thread = state.chatThreads[tripId];
-        const msgs = thread.messages.filter(m => m.from !== 'system');
-        const last = msgs[msgs.length - 1];
-        const unread = chatUnreadCount(thread);
-        const isActive = state.activeTrips.some(t => t.id === tripId);
-        return h`
-          <button type="button" class="chat-row" onclick="App.openChat('${tripId}')">
-            <div class="chat-row__avatar">
-              <sl-icon name="person-circle"></sl-icon>
-            </div>
-            <div class="chat-row__body">
-              <div class="chat-row__top">
-                <span class="chat-row__name t-label-md">${thread.plannerName}</span>
-                <span class="chat-row__time t-body-sm t-caption">${last ? last.time : ''}</span>
-              </div>
-              <div class="chat-row__trip t-body-sm t-caption">
-                ${tripId}${isActive ? h` <span class="badge badge--info" style="font-size:10px;padding:1px 5px;">Active</span>` : ''}
-              </div>
-              <div class="chat-row__bottom">
-                <span class="chat-row__preview t-body-sm t-muted">${last ? (last.from === 'driver' ? 'You: ' : '') + last.text : ''}</span>
-                ${unread ? h`<span class="chat-row__unread">${unread}</span>` : ''}
-              </div>
-            </div>
+    <div class="chat-list-screen">
+      <div class="chat-search">
+        <sl-icon name="search" class="chat-search__icon"></sl-icon>
+        <input
+          class="chat-search-input"
+          type="text"
+          placeholder="Search chats"
+          value="${state.chatSearchQuery}"
+          oninput="App.setChatSearch(this.value)"
+        />
+        ${query ? h`
+          <button type="button" class="chat-search__clear" onclick="App.setChatSearch('')" aria-label="Clear search">
+            <sl-icon name="x-circle-fill"></sl-icon>
           </button>
-        `;
-      }).join('')}
+        ` : ''}
+      </div>
+      <div class="chat-filter-pills">
+        <button type="button" class="chat-filter-pill ${filter === 'all' ? 'is-selected' : ''}" onclick="App.setChatFilter('all')">All</button>
+        <button type="button" class="chat-filter-pill ${filter === 'unread' ? 'is-selected' : ''}" onclick="App.setChatFilter('unread')">
+          Unread${totalUnread ? h` <span class="chat-filter-pill__count">${totalUnread}</span>` : ''}
+        </button>
+      </div>
+      ${visibleTripIds.length ? h`
+        <div class="chat-list">
+          ${visibleTripIds.map(tripId => {
+            const thread = state.chatThreads[tripId];
+            const msgs = thread.messages.filter(m => m.from !== 'system');
+            const last = msgs[msgs.length - 1];
+            const unread = chatUnreadCount(thread);
+            const isActive = state.activeTrips.some(t => t.id === tripId);
+            return h`
+              <button type="button" class="chat-row" onclick="App.openChat('${tripId}')">
+                <div class="chat-row__avatar">
+                  <sl-icon name="person-circle"></sl-icon>
+                </div>
+                <div class="chat-row__body">
+                  <div class="chat-row__top">
+                    <span class="chat-row__name t-label-md">${thread.plannerName}</span>
+                    <span class="chat-row__time t-body-sm t-caption">${last ? last.time : ''}</span>
+                  </div>
+                  <div class="chat-row__trip t-body-sm t-caption">
+                    ${tripId}${isActive ? h` <span class="badge badge--info" style="font-size:10px;padding:1px 5px;">Active</span>` : ''}
+                  </div>
+                  <div class="chat-row__bottom">
+                    <span class="chat-row__preview t-body-sm t-muted">${last ? (last.from === 'driver' ? 'You: ' : '') + last.text : ''}</span>
+                    ${unread ? h`<span class="chat-row__unread">${unread}</span>` : ''}
+                  </div>
+                </div>
+              </button>
+            `;
+          }).join('')}
+        </div>
+      ` : h`
+        <div class="center-state">
+          <sl-icon class="center-state__icon" name="chat-dots"></sl-icon>
+          <div class="t-headline-md">${filter === 'unread' ? 'No unread chats' : 'No matches'}</div>
+          <div class="t-body-md t-muted">${query ? `Nothing matches "${query}".` : 'Nothing to show here right now.'}</div>
+        </div>
+      `}
     </div>
   `;
 }
