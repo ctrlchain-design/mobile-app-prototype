@@ -1635,8 +1635,8 @@ button { font-family: inherit; }
   border: 1px solid var(--border-neutral-subtle, #dde0e4);
 }
 .hero-card--info {
-  background: var(--surface-neutral-subtle, #f0f2f5);
-  border: 1px solid var(--border-neutral-subtle, #dde0e4);
+  background: var(--color-brand-50, #f0f5ee);
+  border: 1px solid var(--color-brand-200, #b8d4ae);
 }
 .dark .hero-card--action {
   background: color-mix(in srgb, var(--color-brand-500, #4f7942) 15%, transparent);
@@ -1646,10 +1646,13 @@ button { font-family: inherit; }
   background: color-mix(in srgb, var(--color-warning-500, #ff9800) 12%, transparent);
   border-color: color-mix(in srgb, var(--color-warning-500, #ff9800) 30%, transparent);
 }
-.dark .hero-card--complete,
-.dark .hero-card--info {
+.dark .hero-card--complete {
   background: var(--surface-neutral-subtle, #1c1e22);
   border-color: var(--border-neutral-subtle, #33363d);
+}
+.dark .hero-card--info {
+  background: color-mix(in srgb, var(--color-brand-500, #4f7942) 15%, transparent);
+  border-color: color-mix(in srgb, var(--color-brand-500, #4f7942) 40%, transparent);
 }
 .hero-card__context {
   font-size: 11px;
