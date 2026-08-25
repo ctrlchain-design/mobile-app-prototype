@@ -139,7 +139,7 @@ const MOCK_ACTIVE_TRIPS = [
   },
   {
     id: 'TRIP2026-000125',
-    activeStopId: 'STOP-3',
+    activeStopId: 'STOP-4',
     stops: [
       {
         id: 'STOP-3', type: 'pickup', location: 'Rotterdam Europoort Terminal', appointment: '10:00 – 11:00',
@@ -1031,9 +1031,13 @@ function activeTripSection(trips) {
   }
   const multi = trips.length > 1;
   return trips.map(trip => {
+    const activeStop = trip.stops.find(s => s.id === trip.activeStopId) || trip.stops[0];
     const inner = h`
       ${heroCard(trip)}
       ${compactRouteStrip(trip)}
+      <button type="button" class="report-issue-link" onclick="App.openExceptionSheet('${trip.id}','${activeStop.id}')">
+        <sl-icon name="flag" aria-hidden="true"></sl-icon> Report an issue
+      </button>
       ${unconfirmedProposals(trip)}
     `;
     return multi
@@ -1548,29 +1552,40 @@ function compactRouteStrip(trip) {
 
 function unconfirmedProposals(trip) {
   const all = [];
-  trip.stops.forEach(stop => {
+  trip.stops.forEach((stop, idx) => {
     stop.milestones.forEach(m => {
-      if (m.status === 'proposed') all.push({ milestone: m, stop });
+      if (m.status === 'proposed') all.push({ milestone: m, stop, stopIndex: idx });
     });
   });
   if (all.length <= 1) return '';
   const missed = all.slice(0, -1);
+  const grouped = {};
+  missed.forEach(item => {
+    if (!grouped[item.stop.id]) grouped[item.stop.id] = { stop: item.stop, stopIndex: item.stopIndex, milestones: [] };
+    grouped[item.stop.id].milestones.push(item.milestone);
+  });
+  const groups = Object.values(grouped);
   return h`
     <div class="unconfirmed-list">
       <div class="unconfirmed-list__header">
         <sl-icon name="clock-history" style="font-size:14px"></sl-icon>
         <span class="t-label-sm">${missed.length} unconfirmed</span>
       </div>
-      ${missed.map(({ milestone: m, stop }) => h`
-        <div class="unconfirmed-row">
-          <div class="unconfirmed-row__info">
-            <span class="t-body-sm">${m.label}</span>
-            <span class="t-body-sm t-caption">${m.timestamp} · ${stageSourceLabel(m) || 'Automated'}</span>
-          </div>
-          <div class="unconfirmed-row__actions">
-            <button type="button" class="unconfirmed-row__btn" onclick="App.confirmMilestone('${trip.id}','${stop.id}','${m.id}')">Confirm</button>
-          </div>
+      ${groups.map(group => h`
+        <div class="unconfirmed-group__label">
+          <span class="t-label-sm">Stop ${group.stopIndex + 1}: ${group.stop.type === 'pickup' ? 'Pickup' : 'Delivery'} — ${group.stop.location}</span>
         </div>
+        ${group.milestones.map(m => h`
+          <div class="unconfirmed-row">
+            <div class="unconfirmed-row__info">
+              <span class="t-body-sm">${m.label}</span>
+              <span class="t-body-sm t-caption">${m.timestamp} · ${stageSourceLabel(m) || 'Automated'}</span>
+            </div>
+            <div class="unconfirmed-row__actions">
+              <button type="button" class="unconfirmed-row__btn" onclick="App.confirmMilestone('${trip.id}','${group.stop.id}','${m.id}')">Confirm</button>
+            </div>
+          </div>
+        `).join('')}
       `).join('')}
     </div>
   `;
@@ -2159,11 +2174,18 @@ const SCREENS = {
         ${addTripSheetMarkup()}
       `,
       reviewerNote: state.activeTrips.length ? state.activeTrips.map(t => {
-        const s = t.stops.find(s2 => s2.id === t.activeStopId) || t.stops[0];
+        const pendingStops = t.stops.filter(s2 => stopStatus(s2) !== 'completed');
+        if (!pendingStops.length) return h`<div class="reviewer-sticky__title">${t.id} — complete</div>`;
         return h`
           <div class="reviewer-sticky__title">${t.id}</div>
-          <button type="button" class="reviewer-sticky__action" onclick="App.triggerGeofenceEntry('${t.id}','${s.id}')">Entry at ${s.location}</button>
-          <button type="button" class="reviewer-sticky__action" onclick="App.triggerGeofenceExit('${t.id}','${s.id}')">Exit from ${s.location}</button>
+          ${pendingStops.map(s => {
+            const stopNum = t.stops.indexOf(s) + 1;
+            return h`
+              <div class="reviewer-sticky__stop-label">Stop ${stopNum}: ${s.type === 'pickup' ? 'Pickup' : 'Delivery'}</div>
+              <button type="button" class="reviewer-sticky__action" onclick="App.triggerGeofenceEntry('${t.id}','${s.id}')">Entry at ${s.location}</button>
+              <button type="button" class="reviewer-sticky__action" onclick="App.triggerGeofenceExit('${t.id}','${s.id}')">Exit from ${s.location}</button>
+            `;
+          }).join('')}
         `;
       }).join('') : '',
     };

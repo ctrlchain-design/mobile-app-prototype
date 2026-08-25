@@ -262,6 +262,15 @@ button { font-family: inherit; }
   text-align: center;
 }
 .reviewer-sticky__action:hover { background: rgba(255,255,255,0.6); }
+.reviewer-sticky__stop-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.55;
+  margin-top: 12px;
+  margin-bottom: -2px;
+}
 
 /* ---------- Phone frame ---------- */
 .phone-frame {
@@ -1902,6 +1911,16 @@ button { font-family: inherit; }
   color: var(--text-neutral-caption);
 }
 .dark .unconfirmed-list__header {
+  background: var(--surface-neutral-subtle, #1c1e22);
+  border-bottom-color: var(--border-neutral-subtle, #33363d);
+}
+.unconfirmed-group__label {
+  padding: 6px 14px;
+  background: var(--surface-neutral-subtle, #f8f9fa);
+  border-bottom: 1px solid var(--border-neutral-subtle, #eee);
+  color: var(--text-neutral-subtitle);
+}
+.dark .unconfirmed-group__label {
   background: var(--surface-neutral-subtle, #1c1e22);
   border-bottom-color: var(--border-neutral-subtle, #33363d);
 }
