@@ -106,9 +106,9 @@ const MOCK_ACTIVE_TRIPS = [
       {
         id: 'STOP-1', type: 'pickup', location: 'Meridian Distribution Centre, Coventry', appointment: '08:00 – 09:00',
         orders: [
-          { id: 'ORD-8841937', ref: 'PO-33210', stopRef: 'REF-555-ABC', expectedPallets: 7, actualPallets: null, palletConfirmed: false, palletMismatch: false,
+          { id: 'ORD-8841937', ref: '#CCA2025-001030.1', customer: 'Freiberger UK Ltd', expectedPallets: 7, actualPallets: null, palletConfirmed: false, palletMismatch: false,
             instructions: 'IMPORTANT: include in Assign Driver this information:\nFirst Name: First and Last Name\nLast Name: Driver\'s ID\n\n1- The driver must present himself at the access control and register.\n2- Once registered, he/she will check if he/she can enter the pier or must wait until called by phone.\n3- Once assigned the pier will be directed towards him/her, if it is busy you must wait for another vehicle.\n\nThe use of PPE, reflective waistcoat and safety shoes is mandatory.' },
-          { id: 'ORD-8841938', ref: 'PO-33211', stopRef: 'REF-556-DEF', expectedPallets: 5, actualPallets: null, palletConfirmed: false, palletMismatch: false,
+          { id: 'ORD-8841938', ref: '#CCA2025-001020.1', customer: 'R&R Ice Cream UK Ltd', expectedPallets: 5, actualPallets: null, palletConfirmed: false, palletMismatch: false,
             instructions: 'Use Gate B for trailers over 13.6m. Report to bay office on arrival. Max dwell time 2 hours.' },
         ],
         milestones: pickupStages('07:55', 'Dock 018'),
@@ -117,10 +117,10 @@ const MOCK_ACTIVE_TRIPS = [
       {
         id: 'STOP-2', type: 'delivery', location: 'Aldi RDC, Bristol', appointment: '14:30 – 15:30',
         orders: [
-          { id: 'ORD-8841937', ref: 'PO-33210', stopRef: 'REF-ALDI-210',
+          { id: 'ORD-8841937', ref: '#CCA2025-001030.1', customer: 'Freiberger UK Ltd',
             podStatus: 'rejected', podRejectedReason: 'Wrong document — the file doesn\'t relate to this shipment.',
             instructions: 'No double-stack trailers. Max height 4.2m. Use bay 12–18 for chilled goods.' },
-          { id: 'ORD-8841938', ref: 'PO-33211', stopRef: 'REF-ALDI-211',
+          { id: 'ORD-8841938', ref: '#CCA2025-001020.1', customer: 'R&R Ice Cream UK Ltd',
             podStatus: 'approved', podRejectedReason: null,
             instructions: 'No double-stack trailers. Max height 4.2m. Use bay 12–18 for chilled goods.' },
         ],
@@ -136,7 +136,7 @@ const MOCK_ACTIVE_TRIPS = [
       {
         id: 'STOP-3', type: 'pickup', location: 'Rotterdam Europoort Terminal', appointment: '10:00 – 11:00',
         orders: [
-          { id: 'ORD-9920001', ref: 'PO-44010', stopRef: 'REF-ROT-010' },
+          { id: 'ORD-9920001', ref: '#CCA2025-001045.1', customer: 'Lidl Netherlands BV' },
         ],
         milestones: pickupStages('09:50'),
         exceptions: [],
@@ -144,7 +144,7 @@ const MOCK_ACTIVE_TRIPS = [
       {
         id: 'STOP-4', type: 'delivery', location: 'Lidl DC, Bridgend', appointment: '16:00 – 17:00',
         orders: [
-          { id: 'ORD-9920001', ref: 'PO-44010', stopRef: 'REF-LDL-010', podStatus: 'pending', podRejectedReason: null },
+          { id: 'ORD-9920001', ref: '#CCA2025-001045.1', customer: 'Lidl Netherlands BV', podStatus: 'pending', podRejectedReason: null },
         ],
         milestones: deliveryStages('15:45'),
         exceptions: [],
@@ -160,8 +160,8 @@ const MOCK_UPCOMING_TRIPS = [
   {
     id: 'TRIP2026-000124',
     stops: [
-      { type: 'pickup', location: 'Heathrow Cargo Terminal', appointment: '08:00 – 09:00', orders: 1 },
-      { type: 'delivery', location: 'Southampton Docks', appointment: '13:00 – 14:00', orders: 1 },
+      { type: 'pickup', location: 'Heathrow Cargo Terminal', appointment: '08:00 – 09:00', orders: 2 },
+      { type: 'delivery', location: 'Southampton Docks', appointment: '14:00 – 14:30', orders: 2 },
     ],
     date: 'Tomorrow',
   },
@@ -380,6 +380,7 @@ function freshState() {
     stopExpandOverride: {}, // stopId/tripId -> boolean, overrides the default (active stop open)
     instructionsExpanded: {}, // stopId -> boolean
     tripsTab: 'active', // 'new' | 'active' | 'finished'
+    hideSecondActiveTrip: true, // reviewer-only — collapses dashboard to the single-active-trip case; toggle from the sticky
     editingMilestone: null, // { stopId, milestoneId } | null — which timestamp is mid-edit
     podSheet: null,         // { tripId, stopId, orderId } | null
     exceptionSheet: null,   // { tripId, stopId } | null
@@ -584,6 +585,14 @@ const App = {
     render();
   },
 
+  cancelPalletMismatch(tripId, stopId, orderId) {
+    const trip = findActiveTrip(tripId);
+    const stop = trip && findStop(trip, stopId);
+    const order = stop && stop.orders.find(o => o.id === orderId);
+    if (order) order.palletMismatchEntry = false;
+    render();
+  },
+
   confirmPalletCount(tripId, stopId, orderId) {
     const input = document.getElementById(`pallet-input-${orderId}`);
     const trip = findActiveTrip(tripId);
@@ -664,6 +673,16 @@ const App = {
       }
     }
     state.podSheet = null;
+    render();
+  },
+
+  openPalletExchangeSheet(tripId, stopId) {
+    state.palletExchangeSheet = { tripId, stopId };
+    render();
+  },
+
+  closePalletExchangeSheet() {
+    state.palletExchangeSheet = null;
     render();
   },
 
@@ -822,30 +841,35 @@ function h(strings, ...values) {
 
 function tripCard(trip) {
   const done = trip.completed;
+  const totalStops = trip.stops.length;
   return h`
     <div class="sched-card ${done ? 'sched-card--done' : ''}">
       <div class="sched-card__header">
-        <span class="t-body-sm t-caption">${trip.id}</span>
-        <span class="t-body-sm t-caption">${trip.date}</span>
+        <span class="t-label-sm t-caption">${trip.id} • ${totalStops} Stop${totalStops === 1 ? '' : 's'}</span>
       </div>
-      ${trip.stops.map((stop, i) => {
-        const isLast = i === trip.stops.length - 1;
-        const dotDone = done ? 'route-stop__dot--done' : '';
-        const typeClass = stop.type === 'pickup' ? 'route-stop__dot--pickup' : 'route-stop__dot--delivery';
-        return h`
-          <div class="sched-card__stop">
-            <div class="route-stop__rail">
-              <span class="route-stop__dot ${dotDone} ${typeClass}"></span>
-              ${!isLast ? h`<span class="route-stop__line ${done ? 'route-stop__line--done' : ''}"></span>` : ''}
+      <div class="route-strip route-strip--sched">
+        ${trip.stops.map((stop, i) => {
+          const isLast = i === trip.stops.length - 1;
+          const orderCount = stop.orders;
+          return h`
+            <div class="route-strip__dot-cell">
+              <span class="route-stop__dot route-stop__dot--faded"></span>
+              ${!isLast ? h`<span class="route-stop__line route-stop__line--faded"></span>` : ''}
             </div>
-            <div class="sched-card__info">
-              <div class="sched-card__loc">Stop ${i + 1}: ${stop.type === 'pickup' ? 'Pickup' : 'Delivery'}</div>
-              <div class="sched-card__addr">${stop.location}</div>
-              <div class="sched-card__meta">Window: ${stop.appointment} · ${stop.orders} order${stop.orders === 1 ? '' : 's'}</div>
+            <div class="route-stop-card">
+              <div class="route-stop-card__content">
+                <div class="route-stop-card__title-row">
+                  <span class="route-stop-card__loc">Stop ${i + 1}: ${stop.type === 'pickup' ? 'Pickup' : 'Delivery'}</span>
+                  <span class="route-stop-card__badge">${orderCount} Order${orderCount === 1 ? '' : 's'}</span>
+                </div>
+                <div class="route-stop-card__addr">${stop.location}</div>
+                <div class="route-stop-card__meta">Window: ${trip.date || 'Today'}, ${stop.appointment}</div>
+              </div>
+              <sl-icon name="chevron-right" class="route-stop-card__chevron"></sl-icon>
             </div>
-          </div>
-        `;
-      }).join('')}
+          `;
+        }).join('')}
+      </div>
     </div>
   `;
 }
@@ -921,6 +945,16 @@ function confirmProposal(trip, stop, milestoneId) {
   const m = stop.milestones.find(x => x.id === milestoneId);
   if (m && m.status === 'proposed') {
     m.status = 'confirmed';
+    if (m.id === 'loaded' || m.id === 'unloaded') {
+      const departed = stop.milestones.find(x => x.id === 'departed');
+      if (departed && departed.status === 'proposed') {
+        departed.status = 'confirmed';
+        departed.timestamp = m.timestamp;
+      }
+      const stopIdx = trip.stops.findIndex(s => s.id === stop.id);
+      const nextStop = trip.stops[stopIdx + 1];
+      if (nextStop) trip.activeStopId = nextStop.id;
+    }
   }
 }
 
@@ -936,18 +970,13 @@ function simulateGeofenceEntry(trip, stop) {
 
 function simulateGeofenceExit(trip, stop) {
   const loaded = stop.milestones.find(m => m.id === 'loaded' || m.id === 'unloaded');
-  const departed = stop.milestones.find(m => m.id === 'departed');
   const ts = formatNowTime();
   if (loaded && (loaded.status === 'pending' || loaded.status === 'proposed')) {
     loaded.status = 'proposed';
     loaded.source = 'automated';
     loaded.timestamp = ts;
   }
-  if (departed && (departed.status === 'pending' || departed.status === 'proposed')) {
-    departed.status = 'proposed';
-    departed.source = 'automated';
-    departed.timestamp = ts;
-  }
+  // departed is auto-confirmed when driver confirms loaded/unloaded (confirmProposal)
   const arrived = stop.milestones.find(m => m.id === 'arrived');
   if (arrived && arrived.status === 'pending') {
     arrived.status = 'proposed';
@@ -956,9 +985,6 @@ function simulateGeofenceExit(trip, stop) {
   }
   const pod = stop.milestones.find(m => m.kind === 'pod');
   if (pod && pod.status === 'pending') pod.status = 'ready';
-  const stopIdx = trip.stops.findIndex(s => s.id === stop.id);
-  const nextStop = trip.stops[stopIdx + 1];
-  if (nextStop) trip.activeStopId = nextStop.id;
 }
 
 function completeMilestone(trip, stop, index) {
@@ -990,8 +1016,7 @@ function stopInstructionsBlock(stop) {
         <div class="stop-instructions__body">
           ${withInstructions.map(o => h`
             <div class="stop-instructions__order ${singleOrder ? '' : 'stop-instructions__order--multi'}">
-              ${!singleOrder ? h`<div class="stop-instructions__order-header"><span class="t-label-sm">${o.ref}</span>${o.stopRef ? h`<span class="t-body-sm t-caption">${o.stopRef}</span>` : ''}</div>` : ''}
-              ${singleOrder && o.stopRef ? h`<div class="stop-instructions__order-header"><span class="t-body-sm t-caption">${o.stopRef}</span></div>` : ''}
+              ${!singleOrder ? h`<div class="stop-instructions__order-header"><span class="t-label-sm">${o.customer || o.ref}</span><span class="t-body-sm t-caption">${o.ref}</span></div>` : ''}
               <div class="stop-instructions__text t-body-sm">${o.instructions.replace(/\n/g, '<br/>')}</div>
             </div>
           `).join('')}
@@ -1018,17 +1043,21 @@ function activeTripSection(trips) {
   const multi = trips.length > 1;
   return trips.map(trip => {
     const activeStop = trip.stops.find(s => s.id === trip.activeStopId) || trip.stops[0];
-    const inner = h`
-      ${heroCard(trip)}
-      ${compactRouteStrip(trip)}
-      <button type="button" class="report-issue-link" onclick="App.openExceptionSheet('${trip.id}','${activeStop.id}')">
-        <sl-icon name="flag" aria-hidden="true"></sl-icon> Report an issue
-      </button>
-      ${unconfirmedProposals(trip)}
+    const totalStops = trip.stops.length;
+    return h`
+      <div class="trip-group">
+        <div class="trip-header">
+          <span class="trip-header__id">${trip.id} • ${totalStops} Stop${totalStops === 1 ? '' : 's'}</span>
+        </div>
+        ${heroCard(trip)}
+        <div class="all-stops-label">All Stops</div>
+        ${compactRouteStrip(trip)}
+        <button type="button" class="report-issue-link" onclick="App.openExceptionSheet('${trip.id}','${activeStop.id}')">
+          <sl-icon name="flag" aria-hidden="true"></sl-icon> Report an issue
+        </button>
+        ${unconfirmedProposals(trip)}
+      </div>
     `;
-    return multi
-      ? h`<div class="trip-group">${inner}</div>`
-      : inner;
   }).join('');
 }
 
@@ -1173,9 +1202,8 @@ function orderRow(trip, stop, order) {
   return h`
     <div class="order-row ${isRejected ? 'order-row--rejected' : ''}">
       <div class="order-row__label">
-        <span class="t-body-sm t-label-md">${order.ref}</span>
-        ${order.stopRef ? h`<span class="t-body-sm t-caption">${order.stopRef}</span>` : ''}
-        <span class="t-body-sm t-caption">${podStatusLabel(order)}</span>
+        <span class="t-body-sm t-label-md">${order.customer || order.ref}</span>
+        <span class="t-body-sm t-caption">${order.ref} · ${podStatusLabel(order)}</span>
         ${isRejected && order.podRejectedReason ? h`<span class="t-body-sm pod-rejected-reason">${order.podRejectedReason}</span>` : ''}
       </div>
       ${isDone
@@ -1194,9 +1222,8 @@ function palletExchangeOrderRow(trip, stop, order) {
     return h`
       <div class="order-row order-row--confirmed">
         <div class="order-row__label">
-          <span class="t-body-sm t-label-md">${order.ref}</span>
-          ${order.stopRef ? h`<span class="t-body-sm t-caption">${order.stopRef}</span>` : ''}
-          <span class="t-body-sm t-caption">${order.palletMismatch ? `${order.actualPallets} of ${order.expectedPallets} pallets` : `${order.expectedPallets} pallets`}</span>
+          <span class="t-body-sm t-label-md">${order.customer || order.ref}</span>
+          <span class="t-body-sm t-caption">${order.ref} · ${order.palletMismatch ? `${order.actualPallets} of ${order.expectedPallets} pallets` : `${order.expectedPallets} pallets`}</span>
         </div>
         ${order.palletMismatch
           ? h`<span class="badge badge--warning"><sl-icon name="exclamation-triangle"></sl-icon> Mismatch</span>`
@@ -1208,12 +1235,12 @@ function palletExchangeOrderRow(trip, stop, order) {
     return h`
       <div class="order-row order-row--stacked">
         <div class="order-row__label">
-          <span class="t-body-sm t-label-md">${order.ref}</span>
-          ${order.stopRef ? h`<span class="t-body-sm t-caption">${order.stopRef}</span>` : ''}
-          <span class="t-body-sm t-caption">Expected ${order.expectedPallets} — enter actual count</span>
+          <span class="t-body-sm t-label-md">${order.customer || order.ref}</span>
+          <span class="t-body-sm t-caption">${order.ref} · Expected ${order.expectedPallets} — enter actual count</span>
         </div>
         <div class="order-row__pallet-entry">
           <sl-input id="pallet-input-${order.id}" class="pallet-count-input" type="number" size="small" placeholder="Actual count"></sl-input>
+          <sl-button size="small" onclick="App.cancelPalletMismatch('${trip.id}','${stop.id}','${order.id}')">Back</sl-button>
           <sl-button size="small" variant="primary" onclick="App.confirmPalletCount('${trip.id}','${stop.id}','${order.id}')">Confirm</sl-button>
         </div>
       </div>
@@ -1222,9 +1249,8 @@ function palletExchangeOrderRow(trip, stop, order) {
   return h`
     <div class="order-row">
       <div class="order-row__label">
-        <span class="t-body-sm t-label-md">${order.ref}</span>
-        ${order.stopRef ? h`<span class="t-body-sm t-caption">${order.stopRef}</span>` : ''}
-        <span class="t-body-sm t-caption">Expected ${order.expectedPallets} pallets</span>
+        <span class="t-body-sm t-label-md">${order.customer || order.ref}</span>
+        <span class="t-body-sm t-caption">${order.ref} · Expected ${order.expectedPallets} pallets</span>
       </div>
       <div class="order-row__pallet-actions">
         <button type="button" class="stage-confirm-btn" onclick="App.confirmPalletMatch('${trip.id}','${stop.id}','${order.id}')">Confirm</button>
@@ -1250,7 +1276,7 @@ function podSheetMarkup() {
     <sl-drawer id="pod-drawer" label="${open && order && order.podStatus === 'rejected' ? 'Re-upload POD' : 'Upload POD'}" placement="bottom" ${open ? 'open' : ''}>
       ${open ? h`
         <div class="sheet-body">
-          <div class="t-body-sm t-muted">${order.ref} &middot; ${stop.location}</div>
+          <div class="t-body-sm t-muted">${order.customer || order.ref} (${order.ref}) &middot; ${stop.location}</div>
           ${order.podStatus === 'rejected' && order.podRejectedReason ? h`
             <div class="pod-rejection-banner">
               <sl-icon name="exclamation-triangle" style="font-size:16px;color:var(--color-warning-600,#e65100);"></sl-icon>
@@ -1318,7 +1344,7 @@ function exceptionSheetMarkup() {
               <label class="t-label-sm">Affected order</label>
               <sl-select id="exception-order" value="__all">
                 <sl-option value="__all">Whole stop</sl-option>
-                ${stop.orders.map(o => h`<sl-option value="${o.id}">${o.ref}</sl-option>`).join('')}
+                ${stop.orders.map(o => h`<sl-option value="${o.id}">${o.customer || o.ref} (${o.ref})</sl-option>`).join('')}
               </sl-select>
             </div>
           ` : ''}
@@ -1334,6 +1360,80 @@ function exceptionSheetMarkup() {
         <div slot="footer" style="display:flex; gap:8px;">
           <sl-button style="flex:1;" onclick="App.closeExceptionSheet()">Cancel</sl-button>
           <sl-button style="flex:1;" variant="primary" onclick="App.submitException()">Submit</sl-button>
+        </div>
+      ` : ''}
+    </sl-drawer>
+  `;
+}
+
+function palletExchangeSheetMarkup() {
+  const open = !!state.palletExchangeSheet;
+  let trip = null, stop = null;
+  if (open) {
+    trip = findActiveTrip(state.palletExchangeSheet.tripId);
+    stop = trip && findStop(trip, state.palletExchangeSheet.stopId);
+  }
+  const orders = stop ? stop.orders.filter(o => o.expectedPallets != null) : [];
+  const allDone = orders.length > 0 && orders.every(o => o.palletConfirmed);
+  return h`
+    <sl-drawer id="pallet-exchange-drawer" label="Confirm Pallet Exchange" placement="bottom" ${open ? 'open' : ''}>
+      ${open ? h`
+        <div class="pex-sheet">
+          <div class="pex-sheet__summary t-body-sm t-muted">${stop.location}</div>
+          <div class="pex-sheet__cards">
+            ${orders.map(order => {
+              if (order.palletConfirmed) {
+                const countLabel = `${order.actualPallets} of ${order.expectedPallets} Pallets Exchanged`;
+                return h`
+                  <div class="pex-card pex-card--done">
+                    <div class="pex-card__header">
+                      <span class="pex-card__customer t-label-md">${order.customer || order.ref} (${order.ref})</span>
+                    </div>
+                    <div class="pex-card__body">
+                      <span class="pex-card__count t-body-sm">${countLabel}</span>
+                      ${order.palletMismatch
+                        ? h`<span class="pex-badge pex-badge--mismatch"><sl-icon name="exclamation-triangle"></sl-icon> Mismatch</span>`
+                        : h`<span class="pex-badge pex-badge--match">Match</span>`}
+                    </div>
+                  </div>
+                `;
+              }
+              if (order.palletMismatchEntry) {
+                return h`
+                  <div class="pex-card pex-card--entry">
+                    <div class="pex-card__header">
+                      <span class="pex-card__customer t-label-md">${order.customer || order.ref} (${order.ref})</span>
+                    </div>
+                    <div class="pex-card__body pex-card__body--stacked">
+                      <span class="pex-card__expected t-label-md">Expected ${order.expectedPallets} Pallets</span><span class="pex-card__count t-body-sm"> — enter actual count</span>
+                      <div class="pex-card__input-row">
+                        <sl-input id="pallet-input-${order.id}" class="pex-card__input" type="number" size="small" placeholder="Actual count"></sl-input>
+                        <button type="button" class="pex-card__action-btn pex-card__action-btn--mismatch" onclick="App.cancelPalletMismatch('${trip.id}','${stop.id}','${order.id}')">Back</button>
+                        <button type="button" class="pex-card__confirm-btn" onclick="App.confirmPalletCount('${trip.id}','${stop.id}','${order.id}')">Confirm</button>
+                      </div>
+                    </div>
+                  </div>
+                `;
+              }
+              return h`
+                <div class="pex-card">
+                  <div class="pex-card__header">
+                    <span class="pex-card__customer t-label-md">${order.customer || order.ref} (${order.ref})</span>
+                  </div>
+                  <div class="pex-card__body pex-card__body--stacked">
+                    <span class="pex-card__expected t-label-md">Expected ${order.expectedPallets} Pallets</span>
+                    <div class="pex-card__actions">
+                      <button type="button" class="pex-card__action-btn pex-card__action-btn--confirm" onclick="App.confirmPalletMatch('${trip.id}','${stop.id}','${order.id}')">Confirm</button>
+                      <button type="button" class="pex-card__action-btn pex-card__action-btn--mismatch" onclick="App.showPalletMismatch('${trip.id}','${stop.id}','${order.id}')">Mismatch?</button>
+                    </div>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+        <div slot="footer">
+          <sl-button style="width:100%;" onclick="App.closePalletExchangeSheet()">${allDone ? 'Done' : 'Close'}</sl-button>
         </div>
       ` : ''}
     </sl-drawer>
@@ -1396,103 +1496,129 @@ function getHeroState(trip) {
   );
   if (allDone) return { type: 'complete', current: null, unconfirmed: [], manualActions: [] };
   const activeStop = trip.stops.find(s => s.id === trip.activeStopId) || trip.stops[0];
-  const arrivedM = activeStop.milestones.find(m => m.id === 'arrived');
-  const departedM = activeStop.milestones.find(m => m.id === 'departed');
-  if (arrivedM && arrivedM.status === 'confirmed' && (!departedM || departedM.status === 'pending')) {
-    return { type: 'at-stop', current: { stop: activeStop, milestone: null }, unconfirmed: [], manualActions };
-  }
   return { type: 'info', current: { stop: activeStop, milestone: null }, unconfirmed: [], manualActions };
 }
 
 function heroTripContext(trip, stop) {
-  const stopIdx = stop ? trip.stops.indexOf(stop) : -1;
-  const stopLabel = stop
-    ? `${stop.type === 'pickup' ? 'Pickup' : 'Delivery'} · Stop ${stopIdx + 1} of ${trip.stops.length}`
-    : '';
-  return h`<div class="hero-card__context">${trip.id}${stopLabel ? h` · ${stopLabel}` : ''}</div>`;
+  const stopIdx = stop ? trip.stops.indexOf(stop) + 1 : 0;
+  const totalStops = trip.stops.length;
+  const stopType = stop ? (stop.type === 'pickup' ? 'Pickup' : 'Delivery') : '';
+  return stopType
+    ? `${trip.id} • ${stopType} • Stop ${stopIdx} of ${totalStops}`
+    : trip.id;
 }
 
 function heroCard(trip) {
   const hero = getHeroState(trip);
   if (hero.type === 'proposal') {
     const { milestone: m, stop } = hero.current;
-    const label = m.label.replace('Arrived at ', 'Arrival at ').replace('Departed ', 'Departure from ').replace('Cargo loaded', 'Cargo loaded').replace('Cargo unloaded', 'Cargo unloaded');
+    const stopIdx = trip.stops.indexOf(stop) + 1;
+    const totalStops = trip.stops.length;
+    const eventMap = {
+      arrived: stop.type === 'pickup' ? 'Arrival at pickup' : 'Arrival at delivery',
+      loaded: 'Cargo loaded',
+      unloaded: 'Cargo unloaded',
+    };
+    const eventLabel = eventMap[m.id] || m.label;
+    const source = stageSourceLabel(m) || 'Geofence';
     return h`
       <div class="hero-card hero-card--action">
-        ${heroTripContext(trip, stop)}
-        <div class="hero-card__eyebrow"><sl-icon name="broadcast" style="font-size:14px"></sl-icon> Tracking update</div>
-        <div class="hero-card__title">${label} detected</div>
-        <div class="hero-card__sub">${stop.location}</div>
-        <div class="hero-card__meta"><span class="hero-card__chip">${m.timestamp}</span> <span class="hero-card__source">${stageSourceLabel(m) || 'Automated'}</span></div>
-        ${state.editingMilestone && state.editingMilestone.milestoneId === m.id
-          ? h`<div class="hero-card__edit-row">
-              <sl-input id="ts-input-${m.id}" type="time" size="small" value="${m.timestamp || ''}" class="hero-card__time-input"></sl-input>
-              <button type="button" class="hero-card__cta" onclick="App.saveHeroTimestamp('${trip.id}','${hero.current.stop.id}','${m.id}')">Save</button>
-              <button type="button" class="hero-card__edit" onclick="App.cancelEditTimestamp()">Cancel</button>
-            </div>`
-          : h`<div class="hero-card__actions">
-              <button type="button" class="hero-card__cta" onclick="App.confirmMilestone('${trip.id}','${hero.current.stop.id}','${m.id}')">Looks right</button>
-              <button type="button" class="hero-card__edit" onclick="App.startEditTimestamp('${hero.current.stop.id}','${m.id}')">Edit time</button>
-            </div>`
-        }
+        <div class="hero-card__top">
+          <div class="hero-card__eyebrow"><sl-icon name="broadcast" style="font-size:14px"></sl-icon> Tracking update</div>
+        </div>
         ${progressBar(trip)}
+        <div class="hero-card__update">
+          <div class="hero-card__content-block">
+            <div class="hero-card__title"><strong>Stop ${stopIdx} of ${totalStops}:</strong> ${eventLabel} detected</div>
+            <div class="hero-card__sub">${stop.location}</div>
+            <div class="hero-card__timestamp-row">
+              <span class="hero-card__chip">At: <strong>${m.timestamp}</strong></span>
+              <span class="hero-card__source">• ${source}</span>
+            </div>
+          </div>
+          ${state.editingMilestone && state.editingMilestone.milestoneId === m.id
+            ? h`<div class="hero-card__edit-row">
+                <sl-input id="ts-input-${m.id}" type="time" size="small" value="${m.timestamp || ''}" class="hero-card__time-input"></sl-input>
+                <button type="button" class="hero-card__cta" onclick="App.saveHeroTimestamp('${trip.id}','${hero.current.stop.id}','${m.id}')">Save</button>
+                <button type="button" class="hero-card__edit" onclick="App.cancelEditTimestamp()">Cancel</button>
+              </div>`
+            : h`<div class="hero-card__actions">
+                <button type="button" class="hero-card__cta" onclick="App.confirmMilestone('${trip.id}','${hero.current.stop.id}','${m.id}')">Looks right!</button>
+                <button type="button" class="hero-card__edit" onclick="App.startEditTimestamp('${hero.current.stop.id}','${m.id}')">Edit time</button>
+              </div>`
+          }
+        </div>
       </div>
     `;
   }
   if (hero.type === 'manual') {
     const { milestone: m, stop } = hero.current;
+    const stopIdx = trip.stops.indexOf(stop) + 1;
+    const totalStops = trip.stops.length;
     const isPod = m.kind === 'pod';
     const isPallet = m.kind === 'pallet-exchange';
     const ordersLeft = isPod ? stop.orders.filter(o => o.podStatus !== 'approved' && o.podStatus !== 'uploaded').length
       : isPallet ? stop.orders.filter(o => !o.palletConfirmed).length : 0;
-    const label = isPod ? `Upload POD` : isPallet ? `Pallet exchange` : m.label;
-    const detail = isPod ? `${ordersLeft} order${ordersLeft === 1 ? '' : 's'} remaining`
-      : isPallet ? `${ordersLeft} order${ordersLeft === 1 ? '' : 's'} to confirm` : '';
+    const label = isPod ? 'Upload POD' : isPallet ? 'Pallet exchange needed' : m.label;
+    const detail = isPod ? `${ordersLeft} Order${ordersLeft === 1 ? '' : 's'} remaining`
+      : isPallet ? `${ordersLeft} Order${ordersLeft === 1 ? '' : 's'} to confirm` : '';
     return h`
       <div class="hero-card hero-card--manual">
-        ${heroTripContext(trip, stop)}
-        <div class="hero-card__eyebrow"><sl-icon name="${isPod ? 'file-earmark-arrow-up' : 'arrows-expand'}" style="font-size:14px"></sl-icon> Action needed</div>
-        <div class="hero-card__title">${label}</div>
-        <div class="hero-card__sub">${stop.location}</div>
-        ${detail ? h`<div class="hero-card__meta">${detail}</div>` : ''}
-        <button type="button" class="hero-card__cta" onclick="App.openStopDetail('${trip.id}','${stop.id}')">View details</button>
+        <div class="hero-card__top">
+          <div class="hero-card__eyebrow"><sl-icon name="exclamation-triangle" style="font-size:14px"></sl-icon> Action needed</div>
+        </div>
         ${progressBar(trip)}
+        <div class="hero-card__update">
+          <div class="hero-card__content-block">
+            <div class="hero-card__title hero-card__title--bold">Stop ${stopIdx} of ${totalStops}: ${label}</div>
+            <div class="hero-card__sub">${stop.location}</div>
+          </div>
+          ${detail ? h`<div class="hero-card__meta-row"><span class="hero-card__chip hero-card__chip--orders"><strong>${detail}</strong></span></div>` : ''}
+          <div class="hero-card__actions">
+            <button type="button" class="hero-card__cta hero-card__cta--secondary" onclick="${isPallet ? `App.openPalletExchangeSheet('${trip.id}','${stop.id}')` : `App.openStopDetail('${trip.id}','${stop.id}')`}">View details</button>
+          </div>
+        </div>
       </div>
     `;
   }
   if (hero.type === 'complete') {
     return h`
       <div class="hero-card hero-card--complete">
-        ${heroTripContext(trip, null)}
-        <div class="hero-card__eyebrow"><sl-icon name="check-circle" style="font-size:14px"></sl-icon> Trip complete</div>
-        <div class="hero-card__title">All milestones confirmed</div>
+        <div class="hero-card__top">
+          <div class="hero-card__eyebrow"><sl-icon name="check-circle" style="font-size:14px"></sl-icon> Trip complete</div>
+        </div>
         ${progressBar(trip)}
-      </div>
-    `;
-  }
-  if (hero.type === 'at-stop') {
-    const stop = hero.current.stop;
-    return h`
-      <div class="hero-card hero-card--info">
-        ${heroTripContext(trip, stop)}
-        <div class="hero-card__eyebrow"><sl-icon name="geo-alt-fill" style="font-size:14px"></sl-icon> At stop</div>
-        <div class="hero-card__title">${stop.type === 'pickup' ? 'Loading cargo' : 'Unloading cargo'}</div>
-        <div class="hero-card__sub">${stop.location}</div>
-        <div class="hero-card__meta">Window ${stop.appointment}</div>
-        ${progressBar(trip)}
+        <div class="hero-card__update">
+          <div class="hero-card__title hero-card__title--bold">All milestones confirmed</div>
+        </div>
       </div>
     `;
   }
   const stop = hero.current.stop;
+  const stopIdx = trip.stops.indexOf(stop) + 1;
+  const totalStops = trip.stops.length;
   const eta = stop.milestones.find(m => m.kind === 'eta');
   return h`
     <div class="hero-card hero-card--info">
-      ${heroTripContext(trip, stop)}
-      <div class="hero-card__eyebrow"><sl-icon name="truck" style="font-size:14px"></sl-icon> En route</div>
-      <div class="hero-card__title">Heading to ${stop.type === 'pickup' ? 'pickup' : 'delivery'}</div>
-      <div class="hero-card__sub">${stop.location}</div>
-      ${eta ? h`<div class="hero-card__meta">ETA ${eta.timestamp} · Window ${stop.appointment}</div>` : ''}
+      <div class="hero-card__top">
+        <div class="hero-card__eyebrow"><sl-icon name="truck" style="font-size:14px"></sl-icon> En route</div>
+      </div>
       ${progressBar(trip)}
+      <div class="hero-card__update">
+        <div class="hero-card__content-block">
+          <div class="hero-card__title"><strong>Stop ${stopIdx} of ${totalStops}:</strong> Heading to ${stop.type === 'pickup' ? 'pickup' : 'delivery'}</div>
+          <div class="hero-card__sub">${stop.location}</div>
+        </div>
+        ${eta ? h`
+          <div class="hero-card__meta-block">
+            <div class="hero-card__window-row"><span>Window:</span> <span>Today, ${stop.appointment}</span></div>
+            <div class="hero-card__timestamp-row">
+              <span class="hero-card__chip">ETA at: <strong>${eta.timestamp}</strong></span>
+              <span class="hero-card__source">• System Calculated</span>
+            </div>
+          </div>
+        ` : ''}
+      </div>
     </div>
   `;
 }
@@ -1529,24 +1655,23 @@ function compactRouteStrip(trip) {
   return h`
     <div class="route-strip">
       ${trip.stops.map((stop, i) => {
-        const status = stopStatus(stop);
-        const dotClass = status === 'completed' ? 'route-stop__dot--done'
-          : status === 'active' ? 'route-stop__dot--active' : '';
-        const typeClass = stop.type === 'pickup' ? 'route-stop__dot--pickup' : 'route-stop__dot--delivery';
-        const orderCount = stop.orders.length;
         const isLast = i === trip.stops.length - 1;
+        const orderCount = stop.orders.length;
         return h`
-          <button type="button" class="route-stop" onclick="App.openStopDetail('${trip.id}','${stop.id}')">
-            <div class="route-stop__rail">
-              <span class="route-stop__dot ${dotClass} ${typeClass}"></span>
-              ${!isLast ? h`<span class="route-stop__line ${status === 'completed' ? 'route-stop__line--done' : ''}"></span>` : ''}
+          <div class="route-strip__dot-cell">
+            <span class="route-stop__dot"></span>
+            ${!isLast ? h`<span class="route-stop__line"></span>` : ''}
+          </div>
+          <button type="button" class="route-stop-card" onclick="App.openStopDetail('${trip.id}','${stop.id}')">
+            <div class="route-stop-card__content">
+              <div class="route-stop-card__title-row">
+                <span class="route-stop-card__loc">${stop.type === 'pickup' ? 'Pickup' : 'Delivery'}</span>
+                <span class="route-stop-card__badge">${orderCount} Order${orderCount === 1 ? '' : 's'}</span>
+              </div>
+              <div class="route-stop-card__addr">${stop.location}</div>
+              <div class="route-stop-card__meta">Window: Today, ${stop.appointment}</div>
             </div>
-            <div class="route-stop__info">
-              <div class="route-stop__loc">Stop ${i + 1}: ${stop.type === 'pickup' ? 'Pickup' : 'Delivery'}</div>
-              <div class="route-stop__addr">${stop.location}</div>
-              <div class="route-stop__meta">Window: ${stop.appointment} · ${orderCount} order${orderCount === 1 ? '' : 's'}</div>
-            </div>
-            <sl-icon name="chevron-right" class="route-stop__chevron"></sl-icon>
+            <sl-icon name="chevron-right" class="route-stop-card__chevron"></sl-icon>
           </button>
         `;
       }).join('')}
@@ -1623,6 +1748,7 @@ function stopDetailScreen() {
     </div>
     ${podSheetMarkup()}
     ${exceptionSheetMarkup()}
+    ${palletExchangeSheetMarkup()}
   `;
 }
 
@@ -2144,6 +2270,7 @@ const SCREENS = {
           </div>
           ${podSheetMarkup()}
           ${exceptionSheetMarkup()}
+          ${palletExchangeSheetMarkup()}
         `,
       };
     }
@@ -2151,6 +2278,7 @@ const SCREENS = {
     const { name, carrier } = currentDriverIdentity();
     const activeTrip = state.activeTrips[0];
     const activeStop = activeTrip && (activeTrip.stops.find(s => s.id === activeTrip.activeStopId) || activeTrip.stops[0]);
+    const visibleActiveTrips = state.hideSecondActiveTrip ? state.activeTrips.slice(0, 1) : state.activeTrips;
     return {
       content: h`
         <div class="dash-hero">
@@ -2164,8 +2292,8 @@ const SCREENS = {
           ${trackingStatusBanner()}
         </div>
         <div class="dash-section">
-          <div class="t-label-sm t-caption dash-section__label">ACTIVE</div>
-          ${activeTripSection(state.activeTrips)}
+          <div class="t-label-sm t-caption dash-section__label">ACTIVE TRIP</div>
+          ${activeTripSection(visibleActiveTrips)}
         </div>
         <div class="dash-section">
           <div class="t-label-sm t-caption dash-section__label">SCHEDULED</div>
@@ -2175,9 +2303,14 @@ const SCREENS = {
         </div>
         ${podSheetMarkup()}
         ${exceptionSheetMarkup()}
+        ${palletExchangeSheetMarkup()}
         ${addTripSheetMarkup()}
       `,
-      reviewerNote: state.activeTrips.length ? state.activeTrips.map(t => {
+      reviewerNote: (state.activeTrips.length > 1 ? h`
+        <div class="reviewer-sticky__title">Active trips</div>
+        <button type="button" class="reviewer-sticky__action" onclick="App.setAndRerender('hideSecondActiveTrip', false)">Show 2nd active trip${!state.hideSecondActiveTrip ? ' &#10003;' : ''}</button>
+        <button type="button" class="reviewer-sticky__action" onclick="App.setAndRerender('hideSecondActiveTrip', true)">Hide 2nd active trip${state.hideSecondActiveTrip ? ' &#10003;' : ''}</button>
+      ` : '') + (visibleActiveTrips.length ? visibleActiveTrips.map(t => {
         const pendingStops = t.stops.filter(s2 => stopStatus(s2) !== 'completed');
         if (!pendingStops.length) return h`<div class="reviewer-sticky__title">${t.id} — complete</div>`;
         return h`
@@ -2191,7 +2324,7 @@ const SCREENS = {
             `;
           }).join('')}
         `;
-      }).join('') : '',
+      }).join('') : ''),
     };
   },
 
@@ -2216,34 +2349,39 @@ const SCREENS = {
 
   'nav-trips': () => {
     const tab = state.tripsTab || 'active';
-    const active = state.dashboardMode === 'guest' ? [state.guestTrip] : state.activeTrips;
+    const active = state.dashboardMode === 'guest' ? [state.guestTrip]
+      : (state.hideSecondActiveTrip ? state.activeTrips.slice(0, 1) : state.activeTrips);
 
     function activeTripCard(trip) {
-      const stopCount = trip.stops.length;
+      const totalStops = trip.stops.length;
       return h`
         <div class="sched-card tl-card--tappable" onclick="App.goTab('dashboard')">
           <div class="sched-card__header">
-            <span class="t-body-sm t-caption">${trip.id} (${stopCount} Stop${stopCount === 1 ? '' : 's'})</span>
+            <span class="t-label-sm t-caption">${trip.id} • ${totalStops} Stop${totalStops === 1 ? '' : 's'}</span>
           </div>
-          ${trip.stops.map((stop, i) => {
-            const status = stopStatus(stop);
-            const isLast = i === trip.stops.length - 1;
-            const dotDone = status === 'completed' ? 'route-stop__dot--done' : status === 'active' ? 'route-stop__dot--active' : '';
-            const typeClass = stop.type === 'pickup' ? 'route-stop__dot--pickup' : 'route-stop__dot--delivery';
-            return h`
-              <div class="sched-card__stop">
-                <div class="route-stop__rail">
-                  <span class="route-stop__dot ${dotDone} ${typeClass}"></span>
-                  ${!isLast ? h`<span class="route-stop__line ${status === 'completed' ? 'route-stop__line--done' : ''}"></span>` : ''}
+          <div class="route-strip route-strip--sched">
+            ${trip.stops.map((stop, i) => {
+              const isLast = i === trip.stops.length - 1;
+              const orderCount = stop.orders.length;
+              return h`
+                <div class="route-strip__dot-cell">
+                  <span class="route-stop__dot"></span>
+                  ${!isLast ? h`<span class="route-stop__line"></span>` : ''}
                 </div>
-                <div class="sched-card__info">
-                  <div class="sched-card__loc">Stop ${i + 1}: ${stop.type === 'pickup' ? 'Pickup' : 'Delivery'}</div>
-                  <div class="sched-card__addr">${stop.location}</div>
-                  <div class="sched-card__meta">Window: ${stop.appointment} · ${stop.orders.length} order${stop.orders.length === 1 ? '' : 's'}</div>
+                <div class="route-stop-card">
+                  <div class="route-stop-card__content">
+                    <div class="route-stop-card__title-row">
+                      <span class="route-stop-card__loc">Stop ${i + 1}: ${stop.type === 'pickup' ? 'Pickup' : 'Delivery'}</span>
+                      <span class="route-stop-card__badge">${orderCount} Order${orderCount === 1 ? '' : 's'}</span>
+                    </div>
+                    <div class="route-stop-card__addr">${stop.location}</div>
+                    <div class="route-stop-card__meta">Window: Today, ${stop.appointment}</div>
+                  </div>
+                  <sl-icon name="chevron-right" class="route-stop-card__chevron"></sl-icon>
                 </div>
-              </div>
-            `;
-          }).join('')}
+              `;
+            }).join('')}
+          </div>
           <button type="button" class="tl-card__btn" onclick="App.goTab('dashboard')">View Trip</button>
         </div>
       `;
@@ -2445,11 +2583,16 @@ function messagesAppScreen({ sender, body, link, onLinkTap, reviewerNote }) {
    not something competing with the trip data for attention. */
 function trackingStatusBanner() {
   if (state.locationPermission === 'always') {
-    return h`<div class="tracking-status"><span class="tracking-status__dot tracking-status__dot--active"></span>Automatic tracking active</div>`;
+    return h`
+      <div class="tracking-status">
+        <sl-icon name="broadcast-pin" class="tracking-status__icon" aria-hidden="true"></sl-icon>
+        Automatic tracking active
+      </div>
+    `;
   }
   return h`
     <div class="tracking-status tracking-status--limited">
-      <span class="tracking-status__dot tracking-status__dot--limited"></span>
+      <sl-icon name="exclamation-triangle-fill" class="tracking-status__icon" aria-hidden="true"></sl-icon>
       <span class="tracking-status__text">Background tracking limited — arrival won't auto-detect.</span>
       <button type="button" class="tracking-status__fix" onclick="App.nav('location-priming')">Fix</button>
     </div>
@@ -2697,6 +2840,7 @@ function render() {
   const drawerClosers = {
     'pod-drawer': () => App.closePodSheet(),
     'exception-drawer': () => App.closeExceptionSheet(),
+    'pallet-exchange-drawer': () => App.closePalletExchangeSheet(),
     'add-trip-drawer': () => App.closeAddTripSheet(),
   };
   Object.keys(drawerClosers).forEach(id => {
