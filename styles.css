@@ -1706,6 +1706,26 @@ button { font-family: inherit; }
   gap: 8px;
   margin-top: 12px;
 }
+.hero-card__edit-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+.hero-card__edit-row .hero-card__time-input {
+  flex: 1;
+  min-width: 0;
+}
+.hero-card__edit-row .hero-card__cta {
+  flex: none;
+  padding: 8px 14px;
+  font-size: var(--type-label-sm-size, 12px);
+}
+.hero-card__edit-row .hero-card__edit {
+  flex: none;
+  padding: 8px 14px;
+  font-size: var(--type-label-sm-size, 12px);
+}
 .hero-card__cta {
   flex: 1;
   padding: 10px 16px;

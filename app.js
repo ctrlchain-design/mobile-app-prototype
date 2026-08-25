@@ -637,7 +637,17 @@ const App = {
     const trip = findActiveTrip(tripId);
     const stop = trip && findStop(trip, stopId);
     const m = stop && stop.milestones.find(x => x.id === milestoneId);
-    if (m && input) m.timestamp = input.value || m.timestamp;
+    if (m && input) { m.timestamp = input.value || m.timestamp; m.source = 'manual'; }
+    state.editingMilestone = null;
+    render();
+  },
+
+  saveHeroTimestamp(tripId, stopId, milestoneId) {
+    const input = document.getElementById(`ts-input-${milestoneId}`);
+    const trip = findActiveTrip(tripId);
+    const stop = trip && findStop(trip, stopId);
+    const m = stop && stop.milestones.find(x => x.id === milestoneId);
+    if (m && input) { m.timestamp = input.value || m.timestamp; m.source = 'manual'; }
     state.editingMilestone = null;
     render();
   },
@@ -1093,6 +1103,7 @@ function stopItem(trip, stop) {
 }
 
 function stageSourceLabel(m) {
+  if (m.source === 'manual') return 'Updated by driver';
   if (m.source === 'automated') return m.kind === 'auto' ? 'Geofence' : 'Automated';
   return '';
 }
@@ -1418,10 +1429,17 @@ function heroCard(trip) {
         <div class="hero-card__title">${label} detected</div>
         <div class="hero-card__sub">${stop.location}</div>
         <div class="hero-card__meta"><span class="hero-card__chip">${m.timestamp}</span> <span class="hero-card__source">${stageSourceLabel(m) || 'Automated'}</span></div>
-        <div class="hero-card__actions">
-          <button type="button" class="hero-card__cta" onclick="App.confirmMilestone('${trip.id}','${hero.current.stop.id}','${m.id}')">Looks right</button>
-          <button type="button" class="hero-card__edit" onclick="App.openStopDetail('${trip.id}','${hero.current.stop.id}'); App.startEditTimestamp('${hero.current.stop.id}','${m.id}')">Edit time</button>
-        </div>
+        ${state.editingMilestone && state.editingMilestone.milestoneId === m.id
+          ? h`<div class="hero-card__edit-row">
+              <sl-input id="ts-input-${m.id}" type="time" size="small" value="${m.timestamp || ''}" class="hero-card__time-input"></sl-input>
+              <button type="button" class="hero-card__cta" onclick="App.saveHeroTimestamp('${trip.id}','${hero.current.stop.id}','${m.id}')">Save</button>
+              <button type="button" class="hero-card__edit" onclick="App.cancelEditTimestamp()">Cancel</button>
+            </div>`
+          : h`<div class="hero-card__actions">
+              <button type="button" class="hero-card__cta" onclick="App.confirmMilestone('${trip.id}','${hero.current.stop.id}','${m.id}')">Looks right</button>
+              <button type="button" class="hero-card__edit" onclick="App.startEditTimestamp('${hero.current.stop.id}','${m.id}')">Edit time</button>
+            </div>`
+        }
         ${progressBar(trip)}
       </div>
     `;
