@@ -104,7 +104,7 @@ const MOCK_ACTIVE_TRIPS = [
     // been picked up — fixed here).
     stops: [
       {
-        id: 'STOP-1', type: 'pickup', location: 'Meridian Distribution Centre, Coventry', appointment: 'Today, 08:00',
+        id: 'STOP-1', type: 'pickup', location: 'Meridian Distribution Centre, Coventry', appointment: '08:00 – 09:00',
         orders: [
           { id: 'ORD-8841937', ref: 'PO-33210', stopRef: 'REF-555-ABC', expectedPallets: 7, actualPallets: null, palletConfirmed: false, palletMismatch: false,
             instructions: 'IMPORTANT: include in Assign Driver this information:\nFirst Name: First and Last Name\nLast Name: Driver\'s ID\n\n1- The driver must present himself at the access control and register.\n2- Once registered, he/she will check if he/she can enter the pier or must wait until called by phone.\n3- Once assigned the pier will be directed towards him/her, if it is busy you must wait for another vehicle.\n\nThe use of PPE, reflective waistcoat and safety shoes is mandatory.' },
@@ -123,7 +123,7 @@ const MOCK_ACTIVE_TRIPS = [
         exceptions: [],
       },
       {
-        id: 'STOP-2', type: 'delivery', location: 'Aldi RDC, Bristol', appointment: 'Today, 14:30',
+        id: 'STOP-2', type: 'delivery', location: 'Aldi RDC, Bristol', appointment: '14:30 – 15:30',
         orders: [
           { id: 'ORD-8841937', ref: 'PO-33210', stopRef: 'REF-ALDI-210',
             podStatus: 'rejected', podRejectedReason: 'Wrong document — the file doesn\'t relate to this shipment.',
@@ -137,19 +137,62 @@ const MOCK_ACTIVE_TRIPS = [
       },
     ],
   },
+  {
+    id: 'TRIP2026-000125',
+    activeStopId: 'STOP-3',
+    stops: [
+      {
+        id: 'STOP-3', type: 'pickup', location: 'Rotterdam Europoort Terminal', appointment: '10:00 – 11:00',
+        orders: [
+          { id: 'ORD-9920001', ref: 'PO-44010', stopRef: 'REF-ROT-010' },
+        ],
+        milestones: (() => {
+          const s = pickupStages('09:50');
+          s[1].status = 'confirmed'; s[1].source = 'automated'; s[1].timestamp = '09:58';
+          s[s.length - 2].status = 'confirmed'; s[s.length - 2].source = 'automated'; s[s.length - 2].timestamp = '10:35';
+          s[s.length - 1].status = 'confirmed'; s[s.length - 1].source = 'automated'; s[s.length - 1].timestamp = '10:36';
+          return s;
+        })(),
+        exceptions: [],
+      },
+      {
+        id: 'STOP-4', type: 'delivery', location: 'Lidl DC, Bridgend', appointment: '16:00 – 17:00',
+        orders: [
+          { id: 'ORD-9920001', ref: 'PO-44010', stopRef: 'REF-LDL-010', podStatus: 'pending', podRejectedReason: null },
+        ],
+        milestones: deliveryStages('15:45'),
+        exceptions: [],
+      },
+    ],
+  },
 ];
 
 /* Scheduled trips not yet underway — shown collapsed in their own section,
    per Samuel's call that upcoming/scheduled trips get a separate list, not
    a timeline (nothing to act on until they become the active trip). */
 const MOCK_UPCOMING_TRIPS = [
-  { id: 'TRIP2026-000124', pickup: 'Heathrow Cargo Terminal', dropoff: 'Southampton Docks', status: 'Scheduled', badge: 'warning', eta: 'Tomorrow, 08:00' },
+  {
+    id: 'TRIP2026-000124',
+    stops: [
+      { type: 'pickup', location: 'Heathrow Cargo Terminal', appointment: '08:00 – 09:00', orders: 1 },
+      { type: 'delivery', location: 'Southampton Docks', appointment: '13:00 – 14:00', orders: 1 },
+    ],
+    date: 'Tomorrow',
+  },
 ];
 
 /* Read-only — completed trips aren't mutated in this prototype, so these don't
    need a state clone the way scheduledTrips (driver can add to it) does. */
 const MOCK_TRIP_HISTORY = [
-  { id: 'TRIP2026-000098', pickup: 'Dover Freight Village', dropoff: 'Meridian Distribution Centre, Coventry', status: 'Completed', badge: 'success', eta: 'Yesterday, 18:45' },
+  {
+    id: 'TRIP2026-000098',
+    stops: [
+      { type: 'pickup', location: 'Dover Freight Village', appointment: '08:00 – 09:00', orders: 2 },
+      { type: 'delivery', location: 'Meridian Distribution Centre, Coventry', appointment: '14:00 – 15:00', orders: 2 },
+    ],
+    date: 'Yesterday',
+    completed: true,
+  },
 ];
 
 const MOCK_CHAT_THREADS = {
@@ -182,7 +225,7 @@ const MOCK_GUEST_TRIP = {
   activeStopId: 'STOP-G1',
   stops: [
     {
-      id: 'STOP-G1', type: 'pickup', location: 'Heathrow Cargo Terminal', appointment: 'Today, 13:00',
+      id: 'STOP-G1', type: 'pickup', location: 'Heathrow Cargo Terminal', appointment: '13:00 – 14:00',
       orders: [{ id: 'ORD-9001', ref: 'GT-142' }],
       milestones: (() => {
         const s = pickupStages('12:55');
@@ -192,7 +235,7 @@ const MOCK_GUEST_TRIP = {
       exceptions: [],
     },
     {
-      id: 'STOP-G2', type: 'delivery', location: 'Southampton Docks', appointment: 'Today, 16:00',
+      id: 'STOP-G2', type: 'delivery', location: 'Southampton Docks', appointment: '16:00 – 17:00',
       orders: [{ id: 'ORD-9001', ref: 'GT-142', podStatus: 'pending', podRejectedReason: null }],
       milestones: deliveryStages('16:00'),
       exceptions: [],
@@ -350,6 +393,7 @@ function freshState() {
     // trip data itself, reset on every restart along with everything else.
     stopExpandOverride: {}, // stopId/tripId -> boolean, overrides the default (active stop open)
     instructionsExpanded: {}, // stopId -> boolean
+    tripsTab: 'active', // 'new' | 'active' | 'finished'
     editingMilestone: null, // { stopId, milestoneId } | null — which timestamp is mid-edit
     podSheet: null,         // { tripId, stopId, orderId } | null
     exceptionSheet: null,   // { tripId, stopId } | null
@@ -672,8 +716,12 @@ const App = {
     const ref = input && input.value.trim();
     if (ref) {
       state.scheduledTrips.push({
-        id: ref.toUpperCase(), pickup: 'Details pending', dropoff: '—',
-        status: 'Pending', badge: 'warning', eta: 'Awaiting confirmation from ops',
+        id: ref.toUpperCase(),
+        stops: [
+          { type: 'pickup', location: 'Awaiting assignment', appointment: 'TBC', orders: 0 },
+          { type: 'delivery', location: 'Awaiting assignment', appointment: 'TBC', orders: 0 },
+        ],
+        date: 'Pending',
       });
     }
     state.addTripSheet = false;
@@ -684,6 +732,11 @@ const App = {
      sibling top-level destinations rather than a back-stack of screens. */
   goTab(route) {
     setHash(route);
+  },
+
+  switchTripsTab(tab) {
+    state.tripsTab = tab;
+    render();
   },
 
   approveDashboard() {
@@ -771,19 +824,32 @@ function h(strings, ...values) {
   return strings.reduce((acc, str, i) => acc + str + (values[i] !== undefined ? values[i] : ''), '');
 }
 
-/* Compact row for a trip that isn't underway yet — Scheduled/Upcoming section
-   only. Nothing to act on until it becomes the active trip, so it isn't tappable. */
 function tripCard(trip) {
+  const done = trip.completed;
   return h`
-    <div class="card trip-card">
-      <div class="trip-card__top">
-        <div class="t-body-sm" style="color:var(--text-neutral-subtitle)">${trip.pickup} &#8594; ${trip.dropoff}</div>
-        <span class="badge badge--${trip.badge}">${trip.status}</span>
-      </div>
-      <div class="trip-card__bottom">
+    <div class="sched-card ${done ? 'sched-card--done' : ''}">
+      <div class="sched-card__header">
         <span class="t-body-sm t-caption">${trip.id}</span>
-        <span class="t-body-sm t-caption">${trip.status === 'Completed' ? '' : 'ETA '}${trip.eta}</span>
+        <span class="t-body-sm t-caption">${trip.date}</span>
       </div>
+      ${trip.stops.map((stop, i) => {
+        const isLast = i === trip.stops.length - 1;
+        const dotDone = done ? 'route-stop__dot--done' : '';
+        const typeClass = stop.type === 'pickup' ? 'route-stop__dot--pickup' : 'route-stop__dot--delivery';
+        return h`
+          <div class="sched-card__stop">
+            <div class="route-stop__rail">
+              <span class="route-stop__dot ${dotDone} ${typeClass}"></span>
+              ${!isLast ? h`<span class="route-stop__line ${done ? 'route-stop__line--done' : ''}"></span>` : ''}
+            </div>
+            <div class="sched-card__info">
+              <div class="sched-card__loc">Stop ${i + 1}: ${stop.type === 'pickup' ? 'Pickup' : 'Delivery'}</div>
+              <div class="sched-card__addr">${stop.location}</div>
+              <div class="sched-card__meta">Window: ${stop.appointment} · ${stop.orders} order${stop.orders === 1 ? '' : 's'}</div>
+            </div>
+          </div>
+        `;
+      }).join('')}
     </div>
   `;
 }
@@ -953,12 +1019,17 @@ function activeTripSection(trips) {
       </div>
     `;
   }
-  return trips.map(trip => h`
-    ${heroCard(trip)}
-    ${progressStepper(trip)}
-    ${compactRouteStrip(trip)}
-    ${unconfirmedProposals(trip)}
-  `).join('');
+  const multi = trips.length > 1;
+  return trips.map(trip => {
+    const inner = h`
+      ${heroCard(trip)}
+      ${compactRouteStrip(trip)}
+      ${unconfirmedProposals(trip)}
+    `;
+    return multi
+      ? h`<div class="trip-group">${inner}</div>`
+      : inner;
+  }).join('');
 }
 
 function stopTimelineList(trip) {
@@ -1327,6 +1398,14 @@ function getHeroState(trip) {
   return { type: 'info', current: { stop: activeStop, milestone: null }, unconfirmed: [], manualActions };
 }
 
+function heroTripContext(trip, stop) {
+  const stopIdx = stop ? trip.stops.indexOf(stop) : -1;
+  const stopLabel = stop
+    ? `${stop.type === 'pickup' ? 'Pickup' : 'Delivery'} · Stop ${stopIdx + 1} of ${trip.stops.length}`
+    : '';
+  return h`<div class="hero-card__context">${trip.id}${stopLabel ? h` · ${stopLabel}` : ''}</div>`;
+}
+
 function heroCard(trip) {
   const hero = getHeroState(trip);
   if (hero.type === 'proposal') {
@@ -1334,14 +1413,16 @@ function heroCard(trip) {
     const label = m.label.replace('Arrived at ', 'Arrival at ').replace('Departed ', 'Departure from ').replace('Cargo loaded', 'Cargo loaded').replace('Cargo unloaded', 'Cargo unloaded');
     return h`
       <div class="hero-card hero-card--action">
+        ${heroTripContext(trip, stop)}
         <div class="hero-card__eyebrow"><sl-icon name="broadcast" style="font-size:14px"></sl-icon> Tracking update</div>
         <div class="hero-card__title">${label} detected</div>
         <div class="hero-card__sub">${stop.location}</div>
         <div class="hero-card__meta"><span class="hero-card__chip">${m.timestamp}</span> <span class="hero-card__source">${stageSourceLabel(m) || 'Automated'}</span></div>
         <div class="hero-card__actions">
           <button type="button" class="hero-card__cta" onclick="App.confirmMilestone('${trip.id}','${hero.current.stop.id}','${m.id}')">Looks right</button>
-          <button type="button" class="hero-card__edit" onclick="App.startEditTimestamp('${hero.current.stop.id}','${m.id}')">Edit time</button>
+          <button type="button" class="hero-card__edit" onclick="App.openStopDetail('${trip.id}','${hero.current.stop.id}'); App.startEditTimestamp('${hero.current.stop.id}','${m.id}')">Edit time</button>
         </div>
+        ${progressBar(trip)}
       </div>
     `;
   }
@@ -1356,19 +1437,23 @@ function heroCard(trip) {
       : isPallet ? `${ordersLeft} order${ordersLeft === 1 ? '' : 's'} to confirm` : '';
     return h`
       <div class="hero-card hero-card--manual">
+        ${heroTripContext(trip, stop)}
         <div class="hero-card__eyebrow"><sl-icon name="${isPod ? 'file-earmark-arrow-up' : 'arrows-expand'}" style="font-size:14px"></sl-icon> Action needed</div>
         <div class="hero-card__title">${label}</div>
         <div class="hero-card__sub">${stop.location}</div>
         ${detail ? h`<div class="hero-card__meta">${detail}</div>` : ''}
         <button type="button" class="hero-card__cta" onclick="App.openStopDetail('${trip.id}','${stop.id}')">View details</button>
+        ${progressBar(trip)}
       </div>
     `;
   }
   if (hero.type === 'complete') {
     return h`
       <div class="hero-card hero-card--complete">
+        ${heroTripContext(trip, null)}
         <div class="hero-card__eyebrow"><sl-icon name="check-circle" style="font-size:14px"></sl-icon> Trip complete</div>
         <div class="hero-card__title">All milestones confirmed</div>
+        ${progressBar(trip)}
       </div>
     `;
   }
@@ -1376,10 +1461,12 @@ function heroCard(trip) {
   const eta = stop.milestones.find(m => m.kind === 'eta');
   return h`
     <div class="hero-card hero-card--info">
+      ${heroTripContext(trip, stop)}
       <div class="hero-card__eyebrow"><sl-icon name="truck" style="font-size:14px"></sl-icon> En route</div>
       <div class="hero-card__title">Heading to ${stop.type === 'pickup' ? 'pickup' : 'delivery'}</div>
       <div class="hero-card__sub">${stop.location}</div>
       ${eta ? h`<div class="hero-card__meta">ETA ${eta.timestamp} · Window ${stop.appointment}</div>` : ''}
+      ${progressBar(trip)}
     </div>
   `;
 }
@@ -1398,28 +1485,16 @@ function tripStepperPhase(trip) {
   return 0;
 }
 
-function progressStepper(trip) {
+function progressBar(trip) {
   const phase = tripStepperPhase(trip);
-  const steps = ['Assigned', 'At pickup', 'In transit', 'At delivery', 'Done'];
+  const segments = 5;
   return h`
-    <div class="trip-stepper">
-      <div class="trip-stepper__track">
-        ${steps.map((label, i) => {
-          const done = i < phase;
-          const current = i === phase;
-          const dotClass = done ? 'trip-stepper__dot--done' : current ? 'trip-stepper__dot--current' : '';
-          const lineClass = i < phase ? 'trip-stepper__line--done' : '';
-          return h`
-            <div class="trip-stepper__step">
-              <span class="trip-stepper__dot ${dotClass}">${done ? h`<sl-icon name="check" style="font-size:8px"></sl-icon>` : ''}</span>
-              ${i < steps.length - 1 ? h`<span class="trip-stepper__line ${lineClass}"></span>` : ''}
-            </div>
-          `;
-        }).join('')}
-      </div>
-      <div class="trip-stepper__labels">
-        ${steps.map(label => h`<span class="trip-stepper__label">${label}</span>`).join('')}
-      </div>
+    <div class="progress-bar">
+      ${Array.from({ length: segments }, (_, i) => {
+        const cls = i < phase ? 'progress-bar__seg--done'
+          : i === phase ? 'progress-bar__seg--current' : '';
+        return h`<span class="progress-bar__seg ${cls}"></span>`;
+      }).join('')}
     </div>
   `;
 }
@@ -1427,22 +1502,23 @@ function progressStepper(trip) {
 function compactRouteStrip(trip) {
   return h`
     <div class="route-strip">
-      <div class="route-strip__header">
-        <span class="t-body-sm t-muted">${trip.id}</span>
-        <span class="badge badge--info">In Transit</span>
-      </div>
-      ${trip.stops.map(stop => {
+      ${trip.stops.map((stop, i) => {
         const status = stopStatus(stop);
         const dotClass = status === 'completed' ? 'route-stop__dot--done'
           : status === 'active' ? 'route-stop__dot--active' : '';
         const typeClass = stop.type === 'pickup' ? 'route-stop__dot--pickup' : 'route-stop__dot--delivery';
         const orderCount = stop.orders.length;
+        const isLast = i === trip.stops.length - 1;
         return h`
           <button type="button" class="route-stop" onclick="App.openStopDetail('${trip.id}','${stop.id}')">
-            <span class="route-stop__dot ${dotClass} ${typeClass}"></span>
+            <div class="route-stop__rail">
+              <span class="route-stop__dot ${dotClass} ${typeClass}"></span>
+              ${!isLast ? h`<span class="route-stop__line ${status === 'completed' ? 'route-stop__line--done' : ''}"></span>` : ''}
+            </div>
             <div class="route-stop__info">
-              <div class="route-stop__loc">${stop.type === 'pickup' ? 'Pickup' : 'Delivery'} · ${stop.location}</div>
-              <div class="route-stop__meta">${stop.appointment} · ${orderCount} order${orderCount === 1 ? '' : 's'}</div>
+              <div class="route-stop__loc">Stop ${i + 1}: ${stop.type === 'pickup' ? 'Pickup' : 'Delivery'}</div>
+              <div class="route-stop__addr">${stop.location}</div>
+              <div class="route-stop__meta">Window: ${stop.appointment} · ${orderCount} order${orderCount === 1 ? '' : 's'}</div>
             </div>
             <sl-icon name="chevron-right" class="route-stop__chevron"></sl-icon>
           </button>
@@ -2051,6 +2127,7 @@ const SCREENS = {
           ${trackingStatusBanner()}
         </div>
         <div class="dash-section">
+          <div class="t-label-sm t-caption dash-section__label">ACTIVE</div>
           ${activeTripSection(state.activeTrips)}
         </div>
         <div class="dash-section">
@@ -2063,11 +2140,14 @@ const SCREENS = {
         ${exceptionSheetMarkup()}
         ${addTripSheetMarkup()}
       `,
-      reviewerNote: activeTrip && activeStop ? h`
-        <div class="reviewer-sticky__title">Geofence simulation</div>
-        <button type="button" class="reviewer-sticky__action" onclick="App.triggerGeofenceEntry('${activeTrip.id}','${activeStop.id}')">Entry at ${activeStop.location}</button>
-        <button type="button" class="reviewer-sticky__action" onclick="App.triggerGeofenceExit('${activeTrip.id}','${activeStop.id}')">Exit from ${activeStop.location}</button>
-      ` : '',
+      reviewerNote: state.activeTrips.length ? state.activeTrips.map(t => {
+        const s = t.stops.find(s2 => s2.id === t.activeStopId) || t.stops[0];
+        return h`
+          <div class="reviewer-sticky__title">${t.id}</div>
+          <button type="button" class="reviewer-sticky__action" onclick="App.triggerGeofenceEntry('${t.id}','${s.id}')">Entry at ${s.location}</button>
+          <button type="button" class="reviewer-sticky__action" onclick="App.triggerGeofenceExit('${t.id}','${s.id}')">Exit from ${s.location}</button>
+        `;
+      }).join('') : '',
     };
   },
 
@@ -2091,42 +2171,74 @@ const SCREENS = {
   /* ---------------- BOTTOM TAB SCREENS ---------------- */
 
   'nav-trips': () => {
+    const tab = state.tripsTab || 'active';
     const active = state.dashboardMode === 'guest' ? [state.guestTrip] : state.activeTrips;
+
+    function activeTripCard(trip) {
+      const stopCount = trip.stops.length;
+      return h`
+        <div class="sched-card tl-card--tappable" onclick="App.goTab('dashboard')">
+          <div class="sched-card__header">
+            <span class="t-body-sm t-caption">${trip.id} (${stopCount} Stop${stopCount === 1 ? '' : 's'})</span>
+          </div>
+          ${trip.stops.map((stop, i) => {
+            const status = stopStatus(stop);
+            const isLast = i === trip.stops.length - 1;
+            const dotDone = status === 'completed' ? 'route-stop__dot--done' : status === 'active' ? 'route-stop__dot--active' : '';
+            const typeClass = stop.type === 'pickup' ? 'route-stop__dot--pickup' : 'route-stop__dot--delivery';
+            return h`
+              <div class="sched-card__stop">
+                <div class="route-stop__rail">
+                  <span class="route-stop__dot ${dotDone} ${typeClass}"></span>
+                  ${!isLast ? h`<span class="route-stop__line ${status === 'completed' ? 'route-stop__line--done' : ''}"></span>` : ''}
+                </div>
+                <div class="sched-card__info">
+                  <div class="sched-card__loc">Stop ${i + 1}: ${stop.type === 'pickup' ? 'Pickup' : 'Delivery'}</div>
+                  <div class="sched-card__addr">${stop.location}</div>
+                  <div class="sched-card__meta">Window: ${stop.appointment} · ${stop.orders.length} order${stop.orders.length === 1 ? '' : 's'}</div>
+                </div>
+              </div>
+            `;
+          }).join('')}
+          <button type="button" class="tl-card__btn" onclick="App.goTab('dashboard')">View Trip</button>
+        </div>
+      `;
+    }
+
+    function emptyState(icon, text, sub) {
+      return h`
+        <div class="tl-empty">
+          <sl-icon name="${icon}" class="tl-empty__icon"></sl-icon>
+          <div class="tl-empty__text">${text}</div>
+          <div class="tl-empty__sub">${sub}</div>
+        </div>
+      `;
+    }
+
+    let tabContent = '';
+    if (tab === 'new') {
+      tabContent = state.scheduledTrips.length
+        ? state.scheduledTrips.map(t => tripCard(t)).join('')
+        : emptyState('clipboard', 'Nothing in your queue', 'Once a planner assigns a trip, it\'ll show up here.');
+    } else if (tab === 'active') {
+      tabContent = active.length
+        ? active.map(t => activeTripCard(t)).join('')
+        : emptyState('truck', 'No trips on the road', 'Once you start a trip, it\'ll show up here.');
+    } else {
+      tabContent = MOCK_TRIP_HISTORY.length
+        ? MOCK_TRIP_HISTORY.map(t => tripCard(t)).join('')
+        : emptyState('archive', 'No completed trips yet', 'Finished trips will appear here.');
+    }
+
     return {
       content: h`
-        <div class="dash-section">
-          <div class="t-label-sm t-caption dash-section__label">ACTIVE</div>
-          ${active.map(trip => {
-            const pickup = trip.stops.find(s => s.type === 'pickup');
-            const delivery = trip.stops.find(s => s.type === 'delivery');
-            const route = (pickup ? pickup.location : '') + (delivery ? ' → ' + delivery.location : '');
-            return h`
-            <div class="card trip-card trip-card--tappable" style="border-radius:10px;padding:12px;" onclick="App.goTab('dashboard')">
-              <div class="trip-card__top">
-                <div style="flex:1;min-width:0;">
-                  <div class="t-body-sm" style="color:var(--text-neutral-subtitle)">${route}</div>
-                  <div style="display:flex;align-items:center;gap:8px;margin-top:2px;">
-                    <span class="t-body-sm t-caption">${trip.id}</span>
-                    <span class="badge badge--info">In Transit</span>
-                  </div>
-                </div>
-                <sl-icon name="chevron-right" style="font-size:20px;color:var(--text-neutral-caption);"></sl-icon>
-              </div>
-            </div>
-          `}).join('')}
+        <div class="tl-tabs">
+          <button type="button" class="tl-tab ${tab === 'new' ? 'tl-tab--active' : ''}" onclick="App.switchTripsTab('new')">New</button>
+          <button type="button" class="tl-tab ${tab === 'active' ? 'tl-tab--active' : ''}" onclick="App.switchTripsTab('active')">Active</button>
+          <button type="button" class="tl-tab ${tab === 'finished' ? 'tl-tab--active' : ''}" onclick="App.switchTripsTab('finished')">Finished</button>
         </div>
-        <div class="dash-section">
-          <div class="dash-section__row">
-            <span class="t-label-sm t-caption dash-section__label">SCHEDULED</span>
-            <button type="button" class="btn-link" style="font-size:12px;" onclick="App.openAddTripSheet()">+ Add trip</button>
-          </div>
-          ${state.scheduledTrips.length
-            ? state.scheduledTrips.map(t => tripCard(t)).join('')
-            : h`<div class="t-body-sm t-caption dash-empty-note">Nothing scheduled.</div>`}
-        </div>
-        <div class="dash-section">
-          <div class="t-label-sm t-caption dash-section__label">HISTORY</div>
-          ${MOCK_TRIP_HISTORY.map(t => tripCard(t)).join('')}
+        <div class="tl-content">
+          ${tabContent}
         </div>
         ${addTripSheetMarkup()}
       `,
