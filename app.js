@@ -1396,6 +1396,11 @@ function getHeroState(trip) {
   );
   if (allDone) return { type: 'complete', current: null, unconfirmed: [], manualActions: [] };
   const activeStop = trip.stops.find(s => s.id === trip.activeStopId) || trip.stops[0];
+  const arrivedM = activeStop.milestones.find(m => m.id === 'arrived');
+  const departedM = activeStop.milestones.find(m => m.id === 'departed');
+  if (arrivedM && arrivedM.status === 'confirmed' && (!departedM || departedM.status === 'pending')) {
+    return { type: 'at-stop', current: { stop: activeStop, milestone: null }, unconfirmed: [], manualActions };
+  }
   return { type: 'info', current: { stop: activeStop, milestone: null }, unconfirmed: [], manualActions };
 }
 
@@ -1461,6 +1466,19 @@ function heroCard(trip) {
         ${heroTripContext(trip, null)}
         <div class="hero-card__eyebrow"><sl-icon name="check-circle" style="font-size:14px"></sl-icon> Trip complete</div>
         <div class="hero-card__title">All milestones confirmed</div>
+        ${progressBar(trip)}
+      </div>
+    `;
+  }
+  if (hero.type === 'at-stop') {
+    const stop = hero.current.stop;
+    return h`
+      <div class="hero-card hero-card--info">
+        ${heroTripContext(trip, stop)}
+        <div class="hero-card__eyebrow"><sl-icon name="geo-alt-fill" style="font-size:14px"></sl-icon> At stop</div>
+        <div class="hero-card__title">${stop.type === 'pickup' ? 'Loading cargo' : 'Unloading cargo'}</div>
+        <div class="hero-card__sub">${stop.location}</div>
+        <div class="hero-card__meta">Window ${stop.appointment}</div>
         ${progressBar(trip)}
       </div>
     `;
