@@ -111,15 +111,7 @@ const MOCK_ACTIVE_TRIPS = [
           { id: 'ORD-8841938', ref: 'PO-33211', stopRef: 'REF-556-DEF', expectedPallets: 5, actualPallets: null, palletConfirmed: false, palletMismatch: false,
             instructions: 'Use Gate B for trailers over 13.6m. Report to bay office on arrival. Max dwell time 2 hours.' },
         ],
-        milestones: (() => {
-          // Pallet exchange required at this shipper — exchange dock is a
-          // per-warehouse constant per uat-findings.md, not per-trip.
-          const s = pickupStages('07:55', 'Dock 018');
-          // Geofence fired 2 minutes early against the calculated ETA — a real
-          // case for the timestamp-edit feature, not just a round number.
-          s[1].status = 'proposed'; s[1].source = 'automated'; s[1].timestamp = '08:02';
-          return s;
-        })(),
+        milestones: pickupStages('07:55', 'Dock 018'),
         exceptions: [],
       },
       {
@@ -139,20 +131,14 @@ const MOCK_ACTIVE_TRIPS = [
   },
   {
     id: 'TRIP2026-000125',
-    activeStopId: 'STOP-4',
+    activeStopId: 'STOP-3',
     stops: [
       {
         id: 'STOP-3', type: 'pickup', location: 'Rotterdam Europoort Terminal', appointment: '10:00 – 11:00',
         orders: [
           { id: 'ORD-9920001', ref: 'PO-44010', stopRef: 'REF-ROT-010' },
         ],
-        milestones: (() => {
-          const s = pickupStages('09:50');
-          s[1].status = 'confirmed'; s[1].source = 'automated'; s[1].timestamp = '09:58';
-          s[s.length - 2].status = 'confirmed'; s[s.length - 2].source = 'automated'; s[s.length - 2].timestamp = '10:35';
-          s[s.length - 1].status = 'confirmed'; s[s.length - 1].source = 'automated'; s[s.length - 1].timestamp = '10:36';
-          return s;
-        })(),
+        milestones: pickupStages('09:50'),
         exceptions: [],
       },
       {
