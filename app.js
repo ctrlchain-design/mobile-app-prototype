@@ -1496,6 +1496,11 @@ function getHeroState(trip) {
   );
   if (allDone) return { type: 'complete', current: null, unconfirmed: [], manualActions: [] };
   const activeStop = trip.stops.find(s => s.id === trip.activeStopId) || trip.stops[0];
+  const arrivedM = activeStop.milestones.find(m => m.id === 'arrived');
+  const loadedM = activeStop.milestones.find(m => m.id === 'loaded' || m.id === 'unloaded');
+  if (arrivedM && arrivedM.status === 'confirmed' && (!loadedM || loadedM.status === 'pending')) {
+    return { type: 'arrived', current: { stop: activeStop, milestone: arrivedM }, unconfirmed: [], manualActions };
+  }
   return { type: 'info', current: { stop: activeStop, milestone: null }, unconfirmed: [], manualActions };
 }
 
@@ -1590,6 +1595,31 @@ function heroCard(trip) {
         ${progressBar(trip)}
         <div class="hero-card__update">
           <div class="hero-card__title hero-card__title--bold">All milestones confirmed</div>
+        </div>
+      </div>
+    `;
+  }
+  if (hero.type === 'arrived') {
+    const { milestone: m, stop } = hero.current;
+    const stopIdx = trip.stops.indexOf(stop) + 1;
+    const totalStops = trip.stops.length;
+    const eventLabel = stop.type === 'pickup' ? 'Arrival at pickup' : 'Arrival at delivery';
+    const source = stageSourceLabel(m) || 'Geofence';
+    return h`
+      <div class="hero-card hero-card--action">
+        <div class="hero-card__top">
+          <div class="hero-card__eyebrow"><sl-icon name="broadcast" style="font-size:14px"></sl-icon> Tracking update</div>
+        </div>
+        ${progressBar(trip)}
+        <div class="hero-card__update">
+          <div class="hero-card__content-block">
+            <div class="hero-card__title"><strong>Stop ${stopIdx} of ${totalStops}:</strong> ${eventLabel} detected</div>
+            <div class="hero-card__sub">${stop.location}</div>
+            <div class="hero-card__timestamp-row">
+              <span class="hero-card__chip">At: <strong>${m.timestamp}</strong></span>
+              <span class="hero-card__source">• ${source}</span>
+            </div>
+          </div>
         </div>
       </div>
     `;
