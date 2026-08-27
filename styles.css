@@ -2005,28 +2005,23 @@ button { font-family: inherit; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: none;
-  border: none;
-  padding: 0;
-  margin: 0;
-  cursor: pointer;
+  gap: 10px;
   width: 100%;
-  font-family: var(--font-family);
-  text-align: left;
 }
-.trip-header:active { opacity: 0.7; }
+.trip-header__left {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  flex: 1;
+  min-width: 0;
+}
 .trip-header__id {
   font-size: 12px;
   line-height: 16px;
   font-weight: 500;
-  color: #717171;
+  color: #3e3e3e;
 }
-.dark .trip-header__id { color: #a0a0a0; }
-.trip-header__right {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
+.dark .trip-header__id { color: #e0e0e0; }
 .trip-header__link {
   font-size: 12px;
   line-height: 16px;
@@ -2035,8 +2030,21 @@ button { font-family: inherit; }
   text-decoration: underline;
 }
 .dark .trip-header__link { color: #a0a0a0; }
+.trip-header__toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+.trip-header__toggle:active { opacity: 0.6; }
 .trip-header__chevron {
-  font-size: 16px;
+  font-size: 20px;
   color: #717171;
 }
 .dark .trip-header__chevron { color: #a0a0a0; }
@@ -2088,30 +2096,15 @@ button { font-family: inherit; }
 .route-stop-card {
   display: flex;
   flex-direction: column;
+  gap: 8px;
+  padding: 6px;
   border-radius: 8px;
-  background: transparent;
-  border: none;
+  background: #fafafa;
   text-align: left;
   font-family: var(--font-family);
   width: 100%;
-  overflow: hidden;
 }
-.route-stop-card--bordered {
-  border: 1px solid var(--border-neutral-subtle, #ebebeb);
-  background: var(--surface-container-lowest, #fff);
-}
-.dark .route-stop-card--bordered {
-  border-color: var(--border-neutral-subtle, #33363d);
-  background: var(--surface-container-lowest, #1c1e22);
-}
-.route-stop-card--sched {
-  background: #fafafa;
-  border: none;
-}
-.dark .route-stop-card--sched { background: #262830; }
-.route-stop-card__body {
-  padding: 6px 8px;
-}
+.dark .route-stop-card { background: #262830; }
 .route-stop-card__content { flex: 1; min-width: 0; }
 .route-stop-card__title-row {
   display: flex;
@@ -2159,55 +2152,41 @@ button { font-family: inherit; }
 }
 .dark .route-stop-card__chevron { color: #a0a0a0; }
 
-/* ---------- Stop action bar ---------- */
-.stop-actions {
+/* ---------- Stop button row ---------- */
+.stop-btn-row {
+  display: flex;
+  gap: 8px;
+}
+.stop-btn {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
   display: flex;
   align-items: center;
-  justify-content: space-around;
-  border-top: 1px solid var(--border-neutral-subtle, #ebebeb);
-  background: #fafafa;
-  padding: 6px 10px;
-}
-.dark .stop-actions {
-  border-top-color: var(--border-neutral-subtle, #33363d);
-  background: #262830;
-}
-.stop-action {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
+  justify-content: center;
+  padding: 0 8px;
+  border: 1px solid var(--border-neutral-subtle, #ebebeb);
+  border-radius: 8px;
   background: none;
-  border: none;
-  padding: 4px 8px;
-  cursor: pointer;
   font-family: var(--font-family);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  color: #3e3e3e;
+  cursor: pointer;
+  white-space: nowrap;
 }
-.stop-action:active { opacity: 0.6; }
-.stop-action__icon {
-  font-size: 16px;
-  color: #717171;
+.dark .stop-btn {
+  border-color: var(--border-neutral-subtle, #33363d);
+  color: #e0e0e0;
 }
-.dark .stop-action__icon { color: #a0a0a0; }
-.stop-action__icon-wrap {
-  position: relative;
-  display: inline-flex;
+.stop-btn:active { background: #f0f2f5; }
+.dark .stop-btn:active { background: #33363d; }
+.stop-btn--disabled {
+  opacity: 0.4;
+  cursor: default;
 }
-.stop-action__badge {
-  position: absolute;
-  top: -2px;
-  right: -4px;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--critical-text, #d32f2f);
-}
-.stop-action__label {
-  font-size: 10px;
-  line-height: 12px;
-  color: #717171;
-}
-.dark .stop-action__label { color: #a0a0a0; }
+.stop-btn--disabled:active { background: none; }
 
 /* ---------- Instructions sheet items ---------- */
 .instructions-item {

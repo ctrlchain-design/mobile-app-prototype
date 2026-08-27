@@ -863,13 +863,15 @@ function tripCard(trip) {
   const expanded = state.tripExpanded[trip.id] !== false;
   return h`
     <div class="sched-card ${done ? 'sched-card--done' : ''}">
-      <button type="button" class="trip-header" onclick="App.toggleTripExpand('${trip.id}')">
-        <span class="trip-header__id">${trip.id} • ${totalStops} Stop${totalStops === 1 ? '' : 's'}</span>
-        <span class="trip-header__right">
-          <span class="trip-header__link">See trip details</span>
+      <div class="trip-header">
+        <div class="trip-header__left">
+          <span class="trip-header__id">${trip.id} • ${totalStops} Stop${totalStops === 1 ? '' : 's'}</span>
+          <a class="trip-header__link" href="javascript:void(0)" onclick="event.stopPropagation()">See trip details</a>
+        </div>
+        <button type="button" class="trip-header__toggle" onclick="App.toggleTripExpand('${trip.id}')">
           <sl-icon name="${expanded ? 'chevron-up' : 'chevron-down'}" class="trip-header__chevron"></sl-icon>
-        </span>
-      </button>
+        </button>
+      </div>
       ${expanded ? h`
         <div class="route-strip route-strip--sched">
           ${trip.stops.map((stop, i) => {
@@ -880,35 +882,26 @@ function tripCard(trip) {
                 <span class="route-stop__dot route-stop__dot--faded"></span>
                 ${!isLast ? h`<span class="route-stop__line route-stop__line--faded"></span>` : ''}
               </div>
-              <div class="route-stop-card route-stop-card--sched">
-                <div class="route-stop-card__body">
-                  <div class="route-stop-card__content">
-                    <div class="route-stop-card__title-row">
-                      <span class="route-stop-card__loc">Stop ${i + 1}: ${stop.type === 'pickup' ? 'Pickup' : 'Delivery'}</span>
-                      <span class="route-stop-card__badge">${orderCount} Order${orderCount === 1 ? '' : 's'}</span>
-                    </div>
-                    <div class="route-stop-card__addr">${stop.location}</div>
-                    <div class="route-stop-card__meta">Window: ${trip.date || 'Today'}, ${stop.appointment}</div>
+              <div class="route-stop-card">
+                <div class="route-stop-card__content">
+                  <div class="route-stop-card__title-row">
+                    <span class="route-stop-card__loc">Stop ${i + 1}: ${stop.type === 'pickup' ? 'Pickup' : 'Delivery'}</span>
+                    <span class="route-stop-card__badge">${orderCount} Order${orderCount === 1 ? '' : 's'}</span>
                   </div>
+                  <div class="route-stop-card__addr">${stop.location}</div>
+                  <div class="route-stop-card__meta">Window: ${trip.date || 'Today'}, ${stop.appointment}</div>
                 </div>
-                <div class="stop-actions">
-                  <button type="button" class="stop-action" onclick="event.stopPropagation()">
-                    <sl-icon name="flag" class="stop-action__icon"></sl-icon>
-                    <span class="stop-action__label">Report</span>
-                  </button>
-                  <button type="button" class="stop-action" onclick="event.stopPropagation()">
-                    <sl-icon name="journal-text" class="stop-action__icon"></sl-icon>
-                    <span class="stop-action__label">Instructions</span>
-                  </button>
-                  <button type="button" class="stop-action" onclick="event.stopPropagation()">
-                    <sl-icon name="info-circle" class="stop-action__icon"></sl-icon>
-                    <span class="stop-action__label">More details</span>
-                  </button>
+                <div class="stop-btn-row">
+                  <button type="button" class="stop-btn" onclick="event.stopPropagation()">Stop details</button>
+                  <button type="button" class="stop-btn stop-btn--disabled" disabled>Read Instructions</button>
                 </div>
               </div>
             `;
           }).join('')}
         </div>
+        <button type="button" class="report-issue-link" onclick="event.stopPropagation()">
+          <sl-icon name="flag" aria-hidden="true"></sl-icon> Report an issue
+        </button>
       ` : ''}
     </div>
   `;
@@ -1081,22 +1074,28 @@ function activeTripSection(trips) {
     `;
   }
   return trips.map(trip => {
+    const activeStop = trip.stops.find(s => s.id === trip.activeStopId) || trip.stops[0];
     const totalStops = trip.stops.length;
     const expanded = state.tripExpanded[trip.id] !== false;
     return h`
       <div class="trip-group">
-        <button type="button" class="trip-header" onclick="App.toggleTripExpand('${trip.id}')">
-          <span class="trip-header__id">${trip.id} • ${totalStops} Stop${totalStops === 1 ? '' : 's'}</span>
-          <span class="trip-header__right">
-            <span class="trip-header__link">See trip details</span>
+        <div class="trip-header">
+          <div class="trip-header__left">
+            <span class="trip-header__id">${trip.id} • ${totalStops} Stop${totalStops === 1 ? '' : 's'}</span>
+            <a class="trip-header__link" href="javascript:void(0)" onclick="event.stopPropagation()">See trip details</a>
+          </div>
+          <button type="button" class="trip-header__toggle" onclick="App.toggleTripExpand('${trip.id}')">
             <sl-icon name="${expanded ? 'chevron-up' : 'chevron-down'}" class="trip-header__chevron"></sl-icon>
-          </span>
-        </button>
+          </button>
+        </div>
         ${heroCard(trip)}
         ${expanded ? h`
           <div class="all-stops-label">All Stops</div>
           ${compactRouteStrip(trip)}
           ${unconfirmedProposals(trip)}
+          <button type="button" class="report-issue-link" onclick="App.openExceptionSheet('${trip.id}','${activeStop.id}')">
+            <sl-icon name="flag" aria-hidden="true"></sl-icon> Report an issue
+          </button>
         ` : ''}
       </div>
     `;
@@ -1765,33 +1764,18 @@ function compactRouteStrip(trip) {
             <span class="route-stop__dot"></span>
             ${!isLast ? h`<span class="route-stop__line"></span>` : ''}
           </div>
-          <div class="route-stop-card route-stop-card--bordered">
-            <div class="route-stop-card__body">
-              <div class="route-stop-card__content">
-                <div class="route-stop-card__title-row">
-                  <span class="route-stop-card__loc">Stop ${i + 1}: ${stop.type === 'pickup' ? 'Pickup' : 'Delivery'}</span>
-                  <span class="route-stop-card__badge">${orderCount} Order${orderCount === 1 ? '' : 's'}</span>
-                </div>
-                <div class="route-stop-card__addr">${stop.location}</div>
-                <div class="route-stop-card__meta">Window: Today, ${stop.appointment}</div>
+          <div class="route-stop-card">
+            <div class="route-stop-card__content">
+              <div class="route-stop-card__title-row">
+                <span class="route-stop-card__loc">Stop ${i + 1}: ${stop.type === 'pickup' ? 'Pickup' : 'Delivery'}</span>
+                <span class="route-stop-card__badge">${orderCount} Order${orderCount === 1 ? '' : 's'}</span>
               </div>
+              <div class="route-stop-card__addr">${stop.location}</div>
+              <div class="route-stop-card__meta">Window: Today, ${stop.appointment}</div>
             </div>
-            <div class="stop-actions">
-              <button type="button" class="stop-action" onclick="App.openExceptionSheet('${trip.id}','${stop.id}')">
-                <sl-icon name="flag" class="stop-action__icon"></sl-icon>
-                <span class="stop-action__label">Report</span>
-              </button>
-              <button type="button" class="stop-action" onclick="App.openInstructionsSheet('${trip.id}','${stop.id}')">
-                <span class="stop-action__icon-wrap">
-                  <sl-icon name="journal-text" class="stop-action__icon"></sl-icon>
-                  ${hasInstructions ? '<span class="stop-action__badge"></span>' : ''}
-                </span>
-                <span class="stop-action__label">Instructions</span>
-              </button>
-              <button type="button" class="stop-action" onclick="App.openStopDetail('${trip.id}','${stop.id}')">
-                <sl-icon name="info-circle" class="stop-action__icon"></sl-icon>
-                <span class="stop-action__label">More details</span>
-              </button>
+            <div class="stop-btn-row">
+              <button type="button" class="stop-btn" onclick="App.openStopDetail('${trip.id}','${stop.id}')">Stop details</button>
+              <button type="button" class="stop-btn ${hasInstructions ? '' : 'stop-btn--disabled'}" onclick="${hasInstructions ? `App.openInstructionsSheet('${trip.id}','${stop.id}')` : 'void(0)'}" ${hasInstructions ? '' : 'disabled'}>Read Instructions</button>
             </div>
           </div>
         `;
@@ -2480,47 +2464,38 @@ const SCREENS = {
       const expanded = state.tripExpanded['nav-' + trip.id] !== false;
       return h`
         <div class="sched-card">
-          <button type="button" class="trip-header" onclick="App.toggleTripExpand('nav-${trip.id}')">
-            <span class="trip-header__id">${trip.id} • ${totalStops} Stop${totalStops === 1 ? '' : 's'}</span>
-            <span class="trip-header__right">
-              <span class="trip-header__link">See trip details</span>
+          <div class="trip-header">
+            <div class="trip-header__left">
+              <span class="trip-header__id">${trip.id} • ${totalStops} Stop${totalStops === 1 ? '' : 's'}</span>
+              <a class="trip-header__link" href="javascript:void(0)" onclick="event.stopPropagation()">See trip details</a>
+            </div>
+            <button type="button" class="trip-header__toggle" onclick="App.toggleTripExpand('nav-${trip.id}')">
               <sl-icon name="${expanded ? 'chevron-up' : 'chevron-down'}" class="trip-header__chevron"></sl-icon>
-            </span>
-          </button>
+            </button>
+          </div>
           ${expanded ? h`
             <div class="route-strip">
               ${trip.stops.map((stop, i) => {
                 const isLast = i === trip.stops.length - 1;
                 const orderCount = stop.orders.length;
+                const hasInstructions = stop.orders.some(o => o.instructions);
                 return h`
                   <div class="route-strip__dot-cell">
                     <span class="route-stop__dot"></span>
                     ${!isLast ? h`<span class="route-stop__line"></span>` : ''}
                   </div>
-                  <div class="route-stop-card route-stop-card--bordered">
-                    <div class="route-stop-card__body">
-                      <div class="route-stop-card__content">
-                        <div class="route-stop-card__title-row">
-                          <span class="route-stop-card__loc">Stop ${i + 1}: ${stop.type === 'pickup' ? 'Pickup' : 'Delivery'}</span>
-                          <span class="route-stop-card__badge">${orderCount} Order${orderCount === 1 ? '' : 's'}</span>
-                        </div>
-                        <div class="route-stop-card__addr">${stop.location}</div>
-                        <div class="route-stop-card__meta">Window: Today, ${stop.appointment}</div>
+                  <div class="route-stop-card">
+                    <div class="route-stop-card__content">
+                      <div class="route-stop-card__title-row">
+                        <span class="route-stop-card__loc">Stop ${i + 1}: ${stop.type === 'pickup' ? 'Pickup' : 'Delivery'}</span>
+                        <span class="route-stop-card__badge">${orderCount} Order${orderCount === 1 ? '' : 's'}</span>
                       </div>
+                      <div class="route-stop-card__addr">${stop.location}</div>
+                      <div class="route-stop-card__meta">Window: Today, ${stop.appointment}</div>
                     </div>
-                    <div class="stop-actions">
-                      <button type="button" class="stop-action" onclick="event.stopPropagation()">
-                        <sl-icon name="flag" class="stop-action__icon"></sl-icon>
-                        <span class="stop-action__label">Report</span>
-                      </button>
-                      <button type="button" class="stop-action" onclick="event.stopPropagation()">
-                        <sl-icon name="journal-text" class="stop-action__icon"></sl-icon>
-                        <span class="stop-action__label">Instructions</span>
-                      </button>
-                      <button type="button" class="stop-action" onclick="event.stopPropagation()">
-                        <sl-icon name="info-circle" class="stop-action__icon"></sl-icon>
-                        <span class="stop-action__label">More details</span>
-                      </button>
+                    <div class="stop-btn-row">
+                      <button type="button" class="stop-btn" onclick="event.stopPropagation()">Stop details</button>
+                      <button type="button" class="stop-btn ${hasInstructions ? '' : 'stop-btn--disabled'}" ${hasInstructions ? '' : 'disabled'}>Read Instructions</button>
                     </div>
                   </div>
                 `;
