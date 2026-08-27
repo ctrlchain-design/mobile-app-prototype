@@ -2196,6 +2196,105 @@ button { font-family: inherit; }
 .dark .instructions-item { border-bottom-color: var(--border-neutral-subtle, #33363d); }
 .instructions-item:last-child { border-bottom: none; }
 
+/* ---------- Full-page instructions ---------- */
+.instructions-page { padding: 16px; }
+.instructions-page__header {
+  padding: 12px 0 16px; border-bottom: 1px solid var(--border-neutral-subtle, #ebebeb);
+}
+.dark .instructions-page__header { border-bottom-color: var(--border-neutral-subtle, #33363d); }
+.instructions-page__location {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; line-height: 16px; color: var(--text-secondary, #717171); font-weight: 500;
+}
+.instructions-page__addr {
+  margin-top: 4px; font-size: 15px; line-height: 20px; font-weight: 600;
+  color: var(--text-neutral-body, #3e3e3e);
+}
+.dark .instructions-page__addr { color: #e0e0e0; }
+
+.instructions-tts-btn {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  margin: 12px 0; padding: 10px 14px; border-radius: 10px;
+  border: 1px solid var(--border-neutral-subtle, #ebebeb);
+  background: var(--surface-neutral-subtle, #f7f7f7);
+  font-size: 13px; line-height: 18px; font-weight: 500; font-family: var(--font-family);
+  color: var(--text-neutral-body, #3e3e3e); cursor: pointer;
+}
+.instructions-tts-btn:active { opacity: 0.7; }
+.instructions-tts-btn--active {
+  background: var(--cca-green, #6b8f3c); color: #fff;
+  border-color: var(--cca-green, #6b8f3c);
+}
+.dark .instructions-tts-btn { background: #262830; border-color: #33363d; color: #e0e0e0; }
+.dark .instructions-tts-btn--active { background: var(--cca-green, #6b8f3c); color: #fff; border-color: var(--cca-green, #6b8f3c); }
+
+.instructions-page__list { margin-top: 4px; }
+.instructions-page__item {
+  padding: 14px 0; border-bottom: 1px solid var(--border-neutral-subtle, #ebebeb);
+}
+.dark .instructions-page__item { border-bottom-color: var(--border-neutral-subtle, #33363d); }
+.instructions-page__item:last-child { border-bottom: none; }
+.instructions-page__customer {
+  font-size: 13px; line-height: 18px; font-weight: 600;
+  color: var(--text-neutral-body, #3e3e3e); margin-bottom: 6px;
+}
+.dark .instructions-page__customer { color: #e0e0e0; }
+.instructions-page__text {
+  font-size: 13px; line-height: 20px; color: var(--text-secondary, #717171);
+  white-space: pre-line;
+}
+.dark .instructions-page__text { color: #a0a4ae; }
+
+/* ---------- Push notification banner ---------- */
+.push-notif {
+  position: absolute; top: 28px; left: 8px; right: 8px; z-index: 1000;
+  background: rgba(255, 255, 255, 0.97); border-radius: 14px;
+  padding: 10px 12px; box-shadow: 0 4px 24px rgba(0,0,0,0.18);
+  font-family: var(--font-family); cursor: pointer;
+  animation: push-notif-slide 0.35s ease-out;
+}
+.dark .push-notif { background: rgba(40, 42, 50, 0.97); }
+@keyframes push-notif-slide {
+  from { transform: translateY(-100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.push-notif__header {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;
+}
+.push-notif__app {
+  display: flex; align-items: center; gap: 6px; font-size: 11px; color: #999;
+}
+.push-notif__icon { width: 16px; height: 16px; border-radius: 4px; }
+.push-notif__app-name { font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
+.push-notif__time { color: #bbb; }
+.push-notif__dismiss {
+  background: none; border: none; font-size: 18px; line-height: 1; color: #999;
+  cursor: pointer; padding: 0 2px;
+}
+.push-notif__dismiss:active { opacity: 0.5; }
+.push-notif__title {
+  font-size: 13px; font-weight: 600; color: var(--text-neutral-body, #1a1a1a);
+  line-height: 18px;
+}
+.dark .push-notif__title { color: #e0e0e0; }
+.push-notif__body {
+  font-size: 12px; line-height: 16px; color: var(--text-secondary, #555);
+  margin-top: 2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.dark .push-notif__body { color: #a0a4ae; }
+.push-notif__actions {
+  display: flex; gap: 8px; margin-top: 8px;
+}
+.push-notif__action {
+  display: flex; align-items: center; gap: 4px; padding: 5px 12px;
+  border-radius: 16px; border: 1px solid var(--border-neutral-subtle, #ddd);
+  background: none; font-size: 12px; font-weight: 500; font-family: var(--font-family);
+  color: var(--text-neutral-body, #3e3e3e); cursor: pointer;
+}
+.push-notif__action:active { opacity: 0.6; }
+.dark .push-notif__action { border-color: #444; color: #e0e0e0; }
+
 /* ---------- Unconfirmed proposals list ---------- */
 .unconfirmed-list {
   border-radius: var(--radius-md, 12px);

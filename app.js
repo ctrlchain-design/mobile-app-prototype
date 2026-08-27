@@ -308,6 +308,7 @@ const ROUTE_META = {
   'nav-chats': null,
   'chat-conversation': null,
   'stop-detail': null,
+  'stop-instructions': null,
   'nav-profile': null,
 };
 
@@ -341,6 +342,7 @@ const TITLES = {
   'nav-chats': 'Chats',
   'chat-conversation': '',
   'stop-detail': '',
+  'stop-instructions': 'Stop instructions',
   'nav-profile': 'Profile',
 };
 
@@ -386,6 +388,8 @@ function freshState() {
     podSheet: null,         // { tripId, stopId, orderId } | null
     exceptionSheet: null,   // { tripId, stopId } | null
     instructionsSheet: null, // { tripId, stopId } | null
+    pushNotification: null,  // { tripId, stopId, text, speaking } | null
+    instructionsTts: false,  // true while TTS is playing on the instructions page
     addTripSheet: false,
     activeDetailTripId: null,  // which trip's stop we're viewing in stop-detail
     activeDetailStopId: null,  // which stop we're viewing in stop-detail
@@ -706,12 +710,78 @@ const App = {
 
   openInstructionsSheet(tripId, stopId) {
     state.instructionsSheet = { tripId, stopId };
-    render();
+    state.instructionsTts = false;
+    window.speechSynthesis && window.speechSynthesis.cancel();
+    this.nav('stop-instructions');
   },
 
   closeInstructionsSheet() {
     state.instructionsSheet = null;
+    state.instructionsTts = false;
+    window.speechSynthesis && window.speechSynthesis.cancel();
+    this.back();
+  },
+
+  toggleInstructionsTts() {
+    if (!state.instructionsSheet) return;
+    if (state.instructionsTts) {
+      state.instructionsTts = false;
+      window.speechSynthesis && window.speechSynthesis.cancel();
+      render();
+      return;
+    }
+    const trip = findActiveTrip(state.instructionsSheet.tripId);
+    const stop = trip && findStop(trip, state.instructionsSheet.stopId);
+    if (!stop) return;
+    const text = stop.orders.filter(o => o.instructions).map(o =>
+      (o.customer || o.ref) + '. ' + o.instructions.replace(/\n/g, '. ')
+    ).join('. Next order. ');
+    if (!text) return;
+    state.instructionsTts = true;
     render();
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.rate = 0.95;
+      utter.onend = () => { state.instructionsTts = false; render(); };
+      utter.onerror = () => { state.instructionsTts = false; render(); };
+      window.speechSynthesis.speak(utter);
+    }
+  },
+
+  dismissPushNotification() {
+    state.pushNotification = null;
+    window.speechSynthesis && window.speechSynthesis.cancel();
+    render();
+  },
+
+  openPushNotification() {
+    const notif = state.pushNotification;
+    if (!notif) return;
+    state.pushNotification = null;
+    window.speechSynthesis && window.speechSynthesis.cancel();
+    this.openInstructionsSheet(notif.tripId, notif.stopId);
+  },
+
+  toggleNotificationTts() {
+    const notif = state.pushNotification;
+    if (!notif) return;
+    if (notif.speaking) {
+      notif.speaking = false;
+      window.speechSynthesis && window.speechSynthesis.cancel();
+      render();
+      return;
+    }
+    notif.speaking = true;
+    render();
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+      const utter = new SpeechSynthesisUtterance(notif.text);
+      utter.rate = 0.95;
+      utter.onend = () => { if (state.pushNotification) { state.pushNotification.speaking = false; render(); } };
+      utter.onerror = () => { if (state.pushNotification) { state.pushNotification.speaking = false; render(); } };
+      window.speechSynthesis.speak(utter);
+    }
   },
 
   submitException() {
@@ -999,6 +1069,25 @@ function simulateGeofenceEntry(trip, stop) {
   arrived.timestamp = formatNowTime();
   const pe = stop.milestones.find(m => m.kind === 'pallet-exchange');
   if (pe && pe.status === 'pending') pe.status = 'ready';
+
+  const hasInstructions = stop.orders.some(o => o.instructions);
+  if (hasInstructions) {
+    const preview = stop.orders.filter(o => o.instructions)
+      .map(o => o.instructions.split('\n')[0]).join(' | ');
+    const fullText = stop.orders.filter(o => o.instructions).map(o =>
+      (o.customer || o.ref) + '. ' + o.instructions.replace(/\n/g, '. ')
+    ).join('. Next order. ');
+    state.pushNotification = {
+      tripId: trip.id, stopId: stop.id,
+      text: fullText, preview: preview,
+      location: stop.location, speaking: false,
+    };
+    setTimeout(() => {
+      if (state.pushNotification && state.pushNotification.stopId === stop.id) {
+        App.toggleNotificationTts();
+      }
+    }, 600);
+  }
 }
 
 function simulateGeofenceExit(trip, stop) {
@@ -1407,33 +1496,67 @@ function exceptionSheetMarkup() {
   `;
 }
 
-function instructionsSheetMarkup() {
-  const open = !!state.instructionsSheet;
-  let stop = null;
-  if (open) {
-    const trip = findActiveTrip(state.instructionsSheet.tripId);
-    stop = trip && findStop(trip, state.instructionsSheet.stopId);
-  }
-  const orders = stop ? stop.orders.filter(o => o.instructions) : [];
+function instructionsPageContent() {
+  if (!state.instructionsSheet) return h`<div class="empty-state"><sl-icon name="info-circle" style="font-size:32px"></sl-icon><p>No instructions selected.</p></div>`;
+  const trip = findActiveTrip(state.instructionsSheet.tripId);
+  const stop = trip && findStop(trip, state.instructionsSheet.stopId);
+  if (!stop) return h`<div class="empty-state"><p>Stop not found.</p></div>`;
+  const orders = stop.orders.filter(o => o.instructions);
+  const stopIdx = trip.stops.indexOf(stop);
+  const speaking = state.instructionsTts;
   return h`
-    <sl-drawer id="instructions-drawer" label="Stop instructions" placement="bottom" ${open ? 'open' : ''}>
-      ${open && stop ? h`
-        <div class="sheet-body">
-          <div class="t-body-sm t-muted" style="margin-bottom:12px;">${stop.location}</div>
-          ${orders.length ? orders.map(o => h`
-            <div class="instructions-item">
-              <div class="t-label-sm" style="margin-bottom:4px;">${o.customer || o.ref}</div>
-              <div class="t-body-sm">${o.instructions.replace(/\n/g, '<br/>')}</div>
-            </div>
-          `).join('') : h`
-            <div class="t-body-sm t-muted">No special instructions for this stop.</div>
-          `}
+    <div class="instructions-page">
+      <div class="instructions-page__header">
+        <div class="instructions-page__location">
+          <sl-icon name="geo-alt" style="font-size:16px; color:var(--text-secondary)"></sl-icon>
+          <span>Stop ${stopIdx + 1}: ${stop.type === 'pickup' ? 'Pickup' : 'Delivery'}</span>
         </div>
-        <div slot="footer" style="display:flex; gap:8px;">
-          <sl-button style="flex:1;" variant="primary" onclick="App.closeInstructionsSheet()">Close</sl-button>
+        <div class="instructions-page__addr">${stop.location}</div>
+      </div>
+      <button type="button" class="instructions-tts-btn ${speaking ? 'instructions-tts-btn--active' : ''}" onclick="App.toggleInstructionsTts()">
+        <sl-icon name="${speaking ? 'pause-circle' : 'play-circle'}" style="font-size:20px"></sl-icon>
+        <span>${speaking ? 'Stop listening' : 'Listen to instructions'}</span>
+      </button>
+      <div class="instructions-page__list">
+        ${orders.length ? orders.map(o => h`
+          <div class="instructions-page__item">
+            <div class="instructions-page__customer">${o.customer || o.ref}</div>
+            <div class="instructions-page__text">${o.instructions.replace(/\n/g, '<br/>')}</div>
+          </div>
+        `).join('') : h`
+          <div class="t-body-sm t-muted" style="padding:24px 0; text-align:center;">No special instructions for this stop.</div>
+        `}
+      </div>
+    </div>
+  `;
+}
+
+function pushNotificationBanner() {
+  const notif = state.pushNotification;
+  if (!notif) return '';
+  return h`
+    <div class="push-notif" onclick="App.openPushNotification()">
+      <div class="push-notif__header">
+        <div class="push-notif__app">
+          <img src="assets/logo-icon.svg" class="push-notif__icon" alt="" />
+          <span class="push-notif__app-name">CCA Driver</span>
+          <span class="push-notif__time">now</span>
         </div>
-      ` : ''}
-    </sl-drawer>
+        <button type="button" class="push-notif__dismiss" onclick="event.stopPropagation(); App.dismissPushNotification()" aria-label="Dismiss">&times;</button>
+      </div>
+      <div class="push-notif__title">Stop instructions available</div>
+      <div class="push-notif__body">${notif.location} — Tap to view full instructions</div>
+      <div class="push-notif__actions">
+        <button type="button" class="push-notif__action" onclick="event.stopPropagation(); App.toggleNotificationTts()">
+          <sl-icon name="${notif.speaking ? 'pause-fill' : 'volume-up-fill'}" style="font-size:14px"></sl-icon>
+          ${notif.speaking ? 'Stop' : 'Listen'}
+        </button>
+        <button type="button" class="push-notif__action" onclick="event.stopPropagation(); App.openPushNotification()">
+          <sl-icon name="box-arrow-up-right" style="font-size:14px"></sl-icon>
+          Open
+        </button>
+      </div>
+    </div>
   `;
 }
 
@@ -2375,7 +2498,6 @@ const SCREENS = {
           </div>
           ${podSheetMarkup()}
           ${exceptionSheetMarkup()}
-          ${instructionsSheetMarkup()}
           ${palletExchangeSheetMarkup()}
         `,
       };
@@ -2409,7 +2531,6 @@ const SCREENS = {
         </div>
         ${podSheetMarkup()}
         ${exceptionSheetMarkup()}
-        ${instructionsSheetMarkup()}
         ${palletExchangeSheetMarkup()}
         ${addTripSheetMarkup()}
       `,
@@ -2450,6 +2571,12 @@ const SCREENS = {
         <button type="button" class="reviewer-sticky__action" onclick="App.triggerGeofenceExit('${trip.id}','${stop.id}')">Simulate exit (loaded + departed)</button>
       `;
     })(),
+  }),
+
+  /* ---------------- STOP INSTRUCTIONS (full page) ---------------- */
+
+  'stop-instructions': () => ({
+    content: instructionsPageContent(),
   }),
 
   /* ---------------- BOTTOM TAB SCREENS ---------------- */
@@ -2942,6 +3069,7 @@ function render() {
   if (statusBar) statusBar.classList.toggle('status-bar--overlay', !!screen.transparentStatusBar);
 
   document.getElementById('app').innerHTML = h`
+    ${pushNotificationBanner()}
     ${headerHtml}
     <div class="app-content">${screen.content}</div>
     ${footerHtml}
@@ -2960,7 +3088,6 @@ function render() {
   const drawerClosers = {
     'pod-drawer': () => App.closePodSheet(),
     'exception-drawer': () => App.closeExceptionSheet(),
-    'instructions-drawer': () => App.closeInstructionsSheet(),
     'pallet-exchange-drawer': () => App.closePalletExchangeSheet(),
     'add-trip-drawer': () => App.closeAddTripSheet(),
   };
