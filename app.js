@@ -733,7 +733,8 @@ const App = {
     const trip = findActiveTrip(state.instructionsSheet.tripId);
     const stop = trip && findStop(trip, state.instructionsSheet.stopId);
     if (!stop) return;
-    const text = stop.orders.filter(o => o.instructions).map(o =>
+    const stopType = stop.type === 'pickup' ? 'pickup' : stop.type === 'delivery' ? 'delivery' : stop.type;
+    const text = 'You have a ' + stopType + ' instruction. ' + stop.orders.filter(o => o.instructions).map(o =>
       (o.customer || o.ref) + '. ' + o.instructions.replace(/\n/g, '. ')
     ).join('. Next order. ');
     if (!text) return;
@@ -1074,7 +1075,9 @@ function simulateGeofenceEntry(trip, stop) {
   if (hasInstructions) {
     const preview = stop.orders.filter(o => o.instructions)
       .map(o => o.instructions.split('\n')[0]).join(' | ');
-    const fullText = stop.orders.filter(o => o.instructions).map(o =>
+    const stopType = stop.type === 'pickup' ? 'pickup' : stop.type === 'delivery' ? 'delivery' : stop.type;
+    const intro = 'You have a ' + stopType + ' instruction. ';
+    const fullText = intro + stop.orders.filter(o => o.instructions).map(o =>
       (o.customer || o.ref) + '. ' + o.instructions.replace(/\n/g, '. ')
     ).join('. Next order. ');
     state.pushNotification = {
