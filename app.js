@@ -2101,7 +2101,7 @@ function tripDetailContent() {
         <div class="td__stop-card" onclick="App.openStopDetail('${trip.id}','${stop.id}')">
           <div class="td__stop-header">
             <span class="td__stop-title">Stop #${i + 1}: ${typeLabel}</span>
-            <span class="td__stop-status td__stop-status--${statusCls}">&bull; ${stopStatus}</span>
+            <span class="td__stop-status td__stop-status--${statusCls}">${stopStatus}</span>
           </div>
           <div class="td__stop-summary">${summaryParts.join(' &middot; ')}</div>
           <div class="td__stop-meta"><sl-icon name="geo-alt" class="td__stop-meta-icon"></sl-icon> ${stop.location}</div>
