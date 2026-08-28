@@ -2515,20 +2515,22 @@ button { font-family: inherit; }
 .sd__milestones { display: flex; flex-direction: column; }
 .sd-ms { display: flex; gap: 12px; min-height: 48px; }
 .sd-ms__track {
-  display: flex; flex-direction: column; align-items: center;
   width: 8px; flex-shrink: 0; position: relative;
-  padding: 0;
 }
 .sd-ms__dot {
-  width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0;
-  position: relative; z-index: 1;
+  width: 8px; height: 8px; border-radius: 2px;
+  position: absolute; left: 0; top: 6px; z-index: 1;
 }
 .sd-ms__dot--active { background: var(--text-neutral-primary, #10152e); }
 .dark .sd-ms__dot--active { background: var(--text-neutral-primary, #e2e5ea); }
 .sd-ms__dot--pending { background: var(--text-neutral-primary, #10152e); opacity: .3; }
 .dark .sd-ms__dot--pending { background: var(--text-neutral-primary, #e2e5ea); opacity: .3; }
-.sd-ms__line-top, .sd-ms__line-bot {
-  width: 0; flex: 1;
+.sd-ms__line-top {
+  position: absolute; top: 0; left: 3.5px; bottom: calc(100% - 6px);
+  border-left: 1px dashed var(--border-neutral-subtle, #c0c0c0);
+}
+.sd-ms__line-bot {
+  position: absolute; top: 14px; left: 3.5px; bottom: 0;
   border-left: 1px dashed var(--border-neutral-subtle, #c0c0c0);
 }
 .dark .sd-ms__line-top, .dark .sd-ms__line-bot { border-left-color: var(--border-neutral-subtle, #4a4d55); }
