@@ -2061,9 +2061,6 @@ function stopDetailScreen() {
         ${stop.orders.map((o, idx) => sdOrderCard(trip, stop, o, hasPalletEx)).join('')}
       </div>
 
-      <button type="button" class="report-issue-link" onclick="App.openExceptionSheet('${trip.id}','${stop.id}')">
-        <sl-icon name="flag" aria-hidden="true"></sl-icon> Report an issue with this stop
-      </button>
     </div>
     ${podSheetMarkup()}
     ${exceptionSheetMarkup()}
