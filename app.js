@@ -192,6 +192,9 @@ const MOCK_UPCOMING_TRIPS = [
       { type: 'delivery', location: 'Southampton Docks', appointment: '14:00 – 14:30', orders: 2 },
     ],
     date: 'Tomorrow',
+    vehicle: 'VX72 YYM',
+    trailer: '570859',
+    contact: { name: 'Sarah Chen', company: 'CtrlChain B.V.' },
   },
 ];
 
@@ -206,33 +209,44 @@ const MOCK_TRIP_HISTORY = [
     ],
     date: 'Yesterday',
     completed: true,
+    vehicle: 'NL-82-BKZ',
+    trailer: '441290',
+    contact: { name: 'Sarah Chen', company: 'CtrlChain B.V.' },
   },
 ];
 
-const MOCK_CHAT_THREADS = {
-  'TRIP2026-000123': {
-    plannerName: 'Sarah Chen',
-    plannerRole: 'Planner',
+/* A trip can carry more than one conversation (e.g. a general chat plus a
+   one-off route-change thread) — this mirrors the web platform's Centralised
+   Conversation model, where each conversation is its own record scoped to an
+   entity (here, always a trip) rather than one fixed thread per trip. */
+const MOCK_CONVERSATIONS = [
+  {
+    id: 'CONV-1',
+    tripId: 'TRIP2026-000123',
+    title: 'Pickup at Meridian DC',
+    contact: { name: 'Sarah Chen', company: 'CtrlChain B.V.' },
     messages: [
-      { id: 'm1', from: 'system', text: 'Chat started for trip TRIP2026-000123', time: '07:30' },
-      { id: 'm2', from: 'planner', text: 'Hi Jordan, your pickup at Meridian Distribution Centre is confirmed for 08:00. Head to Dock 018 for pallet exchange.', time: '07:32' },
+      { id: 'm1', from: 'system', text: 'Conversation started for TRIP2026-000123', time: '07:30' },
+      { id: 'm2', from: 'contact', text: 'Hi Jordan, your pickup at Meridian Distribution Centre is confirmed for 08:00. Head to Dock 018 for pallet exchange.', time: '07:32' },
       { id: 'm3', from: 'driver', text: 'Thanks, on my way. Should arrive around 07:55.', time: '07:35' },
-      { id: 'm4', from: 'planner', text: 'The warehouse requires PPE and safety shoes — just a heads up.', time: '07:36' },
+      { id: 'm4', from: 'contact', text: 'The warehouse requires PPE and safety shoes — just a heads up.', time: '07:36' },
       { id: 'm5', from: 'driver', text: 'Noted, I have my gear ready.', time: '07:38' },
-      { id: 'm6', from: 'planner', text: 'Quick update — Bay 3 is occupied, please use Bay 5 instead when you arrive.', time: '07:52', unread: true },
+      { id: 'm6', from: 'contact', text: 'Quick update — Bay 3 is occupied, please use Bay 5 instead when you arrive.', time: '07:52', unread: true },
     ],
   },
-  'TRIP2026-000098': {
-    plannerName: 'Sarah Chen',
-    plannerRole: 'Planner',
+  {
+    id: 'CONV-2',
+    tripId: 'TRIP2026-000098',
+    title: 'Dover pickup coordination',
+    contact: { name: 'Sarah Chen', company: 'CtrlChain B.V.' },
     messages: [
-      { id: 'h1', from: 'system', text: 'Chat started for trip TRIP2026-000098', time: 'Yesterday, 08:00' },
-      { id: 'h2', from: 'planner', text: 'Hi Jordan, pickup at Dover Freight Village is confirmed. Gate 2 for your trailer size.', time: 'Yesterday, 08:05' },
+      { id: 'h1', from: 'system', text: 'Conversation started for TRIP2026-000098', time: 'Yesterday, 08:00' },
+      { id: 'h2', from: 'contact', text: 'Hi Jordan, pickup at Dover Freight Village is confirmed. Gate 2 for your trailer size.', time: 'Yesterday, 08:05' },
       { id: 'h3', from: 'driver', text: 'Arrived at Dover. Slight queue at the gate.', time: 'Yesterday, 09:12' },
-      { id: 'h4', from: 'planner', text: 'Thanks for the update. Safe drive to Coventry.', time: 'Yesterday, 09:15' },
+      { id: 'h4', from: 'contact', text: 'Thanks for the update. Safe drive to Coventry.', time: 'Yesterday, 09:15' },
     ],
   },
-};
+];
 
 const MOCK_GUEST_TRIP = {
   id: 'TRIP2026-000142',
@@ -369,7 +383,7 @@ const TITLES = {
   'dashboard': 'Dashboard',
   'nav-trips': 'My Trips',
   'nav-notifications': 'Notifications',
-  'nav-chats': 'Chats',
+  'nav-chats': 'Conversations',
   'chat-conversation': '',
   'trip-detail': '',
   'stop-detail': '',
@@ -429,11 +443,13 @@ function freshState() {
     orderOverview: null,       // { tripId, stopId, orderId } | null
     orderOverviewItemExpanded: {}, // itemIdx -> boolean for cargo item cards
 
-    chatThreads: deepClone(MOCK_CHAT_THREADS),
-    activeChatTripId: null,
+    conversations: deepClone(MOCK_CONVERSATIONS),
+    activeConversationId: null,
     chatInput: '',
     chatSearchQuery: '',
     chatFilter: 'all', // 'all' | 'unread'
+    tripConversationsSheet: null, // tripId | null
+    newConversationSheet: null, // { tripId } | null
   };
 }
 
@@ -959,11 +975,11 @@ const App = {
     render();
   },
 
-  openChat(tripId) {
-    state.activeChatTripId = tripId;
+  openConversation(conversationId) {
+    state.activeConversationId = conversationId;
     state.chatInput = '';
-    const thread = state.chatThreads[tripId];
-    if (thread) thread.messages.forEach(m => { m.unread = false; });
+    const conv = state.conversations.find(c => c.id === conversationId);
+    if (conv) conv.messages.forEach(m => { m.unread = false; });
     this.nav('chat-conversation');
   },
 
@@ -973,10 +989,10 @@ const App = {
 
   sendChatMessage() {
     const text = state.chatInput.trim();
-    if (!text || !state.activeChatTripId) return;
-    const thread = state.chatThreads[state.activeChatTripId];
-    if (!thread) return;
-    thread.messages.push({
+    if (!text || !state.activeConversationId) return;
+    const conv = state.conversations.find(c => c.id === state.activeConversationId);
+    if (!conv) return;
+    conv.messages.push({
       id: 'msg-' + Date.now(),
       from: 'driver',
       text: text,
@@ -988,6 +1004,52 @@ const App = {
       const container = document.querySelector('.chat-messages');
       if (container) container.scrollTop = container.scrollHeight;
     });
+  },
+
+  openTripConversationsSheet(tripId) {
+    state.tripConversationsSheet = tripId;
+    render();
+  },
+
+  closeTripConversationsSheet() {
+    state.tripConversationsSheet = null;
+    render();
+  },
+
+  openNewConversationSheet(tripId) {
+    state.tripConversationsSheet = null;
+    state.newConversationSheet = { tripId };
+    render();
+  },
+
+  closeNewConversationSheet() {
+    state.newConversationSheet = null;
+    render();
+  },
+
+  submitNewConversation() {
+    const { tripId } = state.newConversationSheet;
+    const trip = findActiveTrip(tripId);
+    const titleEl = document.getElementById('new-convo-title');
+    const messageEl = document.getElementById('new-convo-message');
+    const title = titleEl && titleEl.value.trim();
+    const message = messageEl && messageEl.value.trim();
+    if (!title || !trip) { state.newConversationSheet = null; render(); return; }
+    const conv = {
+      id: 'conv-' + Date.now(),
+      tripId: trip.id,
+      title,
+      contact: trip.contact || { name: 'CtrlChain', company: 'CtrlChain B.V.' },
+      messages: [
+        { id: 'msg-' + Date.now() + '-sys', from: 'system', text: `Conversation started for ${trip.id}`, time: formatNowTime() },
+      ],
+    };
+    if (message) {
+      conv.messages.push({ id: 'msg-' + Date.now() + '-first', from: 'driver', text: message, time: formatNowTime() });
+    }
+    state.conversations.unshift(conv);
+    state.newConversationSheet = null;
+    this.openConversation(conv.id);
   },
 };
 
@@ -1008,49 +1070,37 @@ function h(strings, ...values) {
 function tripCard(trip) {
   const done = trip.completed;
   const totalStops = trip.stops.length;
-  const expanded = state.tripExpanded[trip.id] !== false;
+  const totalOrders = trip.stops.reduce((sum, s) => sum + (typeof s.orders === 'number' ? s.orders : (s.orders ? s.orders.length : 0)), 0);
+
   return h`
-    <div class="sched-card ${done ? 'sched-card--done' : ''}">
-      <div class="trip-header">
-        <div class="trip-header__left">
-          <span class="trip-header__id">${trip.id} • ${totalStops} Stop${totalStops === 1 ? '' : 's'}</span>
-          <a class="trip-header__link" href="javascript:void(0)" onclick="event.stopPropagation(); App.openTripDetail('${trip.id}')">See trip details</a>
-        </div>
-        <button type="button" class="trip-header__toggle" onclick="App.toggleTripExpand('${trip.id}')">
-          <sl-icon name="${expanded ? 'chevron-up' : 'chevron-down'}" class="trip-header__chevron"></sl-icon>
-        </button>
+    <div class="sched-card ${done ? 'sched-card--done' : ''} tl-card--tappable" onclick="App.openTripDetail('${trip.id}')">
+      <div class="sched-card__header-line">
+        <span class="sched-card__id">${trip.id}</span> • ${totalStops} Stop${totalStops === 1 ? '' : 's'} • ${totalOrders} Order${totalOrders === 1 ? '' : 's'}
       </div>
-      ${expanded ? h`
-        <div class="route-strip route-strip--sched">
+      <div class="sched-card__body">
+        <div class="route-strip route-strip--compact">
           ${trip.stops.map((stop, i) => {
+            const isFirst = i === 0;
             const isLast = i === trip.stops.length - 1;
-            const orderCount = stop.orders;
+            const label = isFirst ? 'Start' : isLast ? 'End' : 'Stop';
             return h`
               <div class="route-strip__dot-cell">
                 <span class="route-stop__dot route-stop__dot--faded"></span>
                 ${!isLast ? h`<span class="route-stop__line route-stop__line--faded"></span>` : ''}
               </div>
-              <div class="route-stop-card">
-                <div class="route-stop-card__content">
-                  <div class="route-stop-card__title-row">
-                    <span class="route-stop-card__loc">Stop ${i + 1}: ${stop.type === 'pickup' ? 'Pickup' : 'Delivery'}</span>
-                    <span class="route-stop-card__badge">${orderCount} Order${orderCount === 1 ? '' : 's'}</span>
-                  </div>
-                  <div class="route-stop-card__addr">${stop.location}</div>
-                  <div class="route-stop-card__meta">Window: ${trip.date || 'Today'}, ${stop.appointment}</div>
-                </div>
-                <div class="stop-btn-row">
-                  <button type="button" class="stop-btn" onclick="event.stopPropagation()">Stop details</button>
-                  <button type="button" class="stop-btn stop-btn--disabled" disabled>Read Instructions</button>
-                </div>
-              </div>
-            `;
+              <div class="sched-card__stop">
+                <div class="sched-card__stop-loc">${stop.location}</div>
+                <div class="sched-card__stop-time">${label} (${trip.date || 'Today'}, ${stop.appointment})</div>
+              </div>`;
           }).join('')}
         </div>
-        <button type="button" class="report-issue-link" onclick="event.stopPropagation()">
-          <sl-icon name="flag" aria-hidden="true"></sl-icon> Report an issue
-        </button>
-      ` : ''}
+        <sl-icon name="chevron-right" class="sched-card__chevron"></sl-icon>
+      </div>
+      <div class="sched-card__divider"></div>
+      <div class="sched-card__resources">
+        <span class="sched-card__res-item"><span class="sched-card__res-label">Vehicle:</span> ${trip.vehicle || '—'}</span>
+        <span class="sched-card__res-item"><span class="sched-card__res-label">Trailer:</span> ${trip.trailer || '—'}</span>
+      </div>
     </div>
   `;
 }
@@ -1088,7 +1138,10 @@ function isExpanded(id, defaultOpen) {
 }
 
 function findActiveTrip(tripId) {
-  return state.activeTrips.find(t => t.id === tripId) || (state.guestTrip.id === tripId ? state.guestTrip : null);
+  return state.activeTrips.find(t => t.id === tripId)
+    || state.scheduledTrips.find(t => t.id === tripId)
+    || MOCK_TRIP_HISTORY.find(t => t.id === tripId)
+    || (state.guestTrip.id === tripId ? state.guestTrip : null);
 }
 
 function findStop(trip, stopId) {
@@ -1741,6 +1794,83 @@ function addTripSheetMarkup() {
   `;
 }
 
+function tripConversationsSheetMarkup() {
+  const tripId = state.tripConversationsSheet;
+  if (!tripId) return '';
+  const convos = conversationsForTrip(tripId);
+  const totalUnread = convos.reduce((n, c) => n + conversationUnreadCount(c), 0);
+  return h`
+    <sl-drawer id="trip-conversations-drawer" label="Conversations" placement="bottom" open>
+      <div class="sheet-body" style="padding-bottom:8px;">
+        ${convos.length ? convos.map(conv => {
+          const msgs = conv.messages.filter(m => m.from !== 'system');
+          const last = msgs[msgs.length - 1];
+          const unread = conversationUnreadCount(conv);
+          return h`
+            <button type="button" class="td__convo-row" onclick="App.closeTripConversationsSheet(); App.openConversation('${conv.id}')">
+              <div class="td__convo-row__body">
+                <div class="td__convo-row__title t-label-sm">${conv.title}</div>
+                <div class="td__convo-row__preview t-body-sm t-muted">${last ? (last.from === 'driver' ? 'You: ' : '') + last.text : ''}</div>
+              </div>
+              ${unread ? h`<span class="chat-row__unread">${unread}</span>` : ''}
+              <sl-icon name="chevron-right" class="td__convo-row__chevron"></sl-icon>
+            </button>`;
+        }).join('') : h`
+          <div class="t-body-sm t-muted" style="text-align:center; padding:16px 0;">No conversations yet for this trip.</div>
+        `}
+      </div>
+      <div slot="footer">
+        <button type="button" class="btn btn-primary" style="width:100%;" onclick="App.openNewConversationSheet('${tripId}')">
+          <sl-icon name="plus-lg" style="font-size:14px;margin-right:6px;"></sl-icon> New conversation
+        </button>
+      </div>
+    </sl-drawer>
+  `;
+}
+
+/* Scoped-down version of the web platform's "New Conversation" modal — a
+   driver only ever starts a conversation about one of their own trips, so
+   Type/Reference/Chat With are fixed rather than the web's free-form
+   selects (Type=Trip, Reference=this trip, Chat With=the trip's CtrlChain
+   contact) and only Title + first message need input. */
+function newConversationSheetMarkup() {
+  const open = !!state.newConversationSheet;
+  const trip = open ? findActiveTrip(state.newConversationSheet.tripId) : null;
+  const contact = (trip && trip.contact) || { name: 'CtrlChain', company: 'CtrlChain B.V.' };
+  return h`
+    <sl-drawer id="new-conversation-drawer" label="New Conversation" placement="bottom" ${open ? 'open' : ''}>
+      ${open && trip ? h`
+        <div class="sheet-body">
+          <div class="sheet-field">
+            <label class="t-label-sm">Type</label>
+            <sl-input value="Trips" disabled></sl-input>
+          </div>
+          <div class="sheet-field">
+            <label class="t-label-sm">Reference Number</label>
+            <sl-input value="${trip.id}" disabled></sl-input>
+          </div>
+          <div class="sheet-field">
+            <label class="t-label-sm">Chat With</label>
+            <sl-input value="${contact.company}" disabled></sl-input>
+          </div>
+          <div class="sheet-field">
+            <label class="t-label-sm">Title</label>
+            <sl-input id="new-convo-title" placeholder="e.g. Pickup change at Meridian"></sl-input>
+          </div>
+          <div class="sheet-field">
+            <label class="t-label-sm">Message</label>
+            <sl-textarea id="new-convo-message" rows="3" placeholder="Type your message here"></sl-textarea>
+          </div>
+        </div>
+        <div slot="footer" style="display:flex; gap:8px;">
+          <sl-button style="flex:1;" onclick="App.closeNewConversationSheet()">Cancel</sl-button>
+          <sl-button style="flex:1;" variant="primary" onclick="App.submitNewConversation()">Send</sl-button>
+        </div>
+      ` : ''}
+    </sl-drawer>
+  `;
+}
+
 /* ---------- Hero card, stepper, route strip (V1 dashboard redesign) ----------
    The dashboard no longer inlines the full milestone timeline. Instead:
    1. Hero card — most recent automation proposal (or manual action needed)
@@ -2031,29 +2161,149 @@ function unconfirmedProposals(trip) {
 /* ── TRIP DETAIL ─────────────────────────────────────────────────────── */
 
 function tripStopStatus(trip, stop) {
+  if (trip.completed) return 'Finished';
   const idx = trip.stops.indexOf(stop);
   const activeIdx = trip.stops.findIndex(s => s.id === trip.activeStopId);
+  if (activeIdx === -1) return 'Not Started';
   if (idx < activeIdx) return 'Finished';
   if (idx === activeIdx) return 'In Transit';
   return 'Not Started';
+}
+
+function buildRouteMapSvg(trip) {
+  const W = 360, H = 170, pad = 30;
+  const stops = trip.stops || [];
+  const n = stops.length;
+  if (n === 0) return '';
+
+  const MAP_COORDS = {
+    'Meridian Distribution Centre, Coventry': { x: 0.55, y: 0.35 },
+    'Aldi RDC, Bristol':                      { x: 0.30, y: 0.55 },
+    'Rotterdam Europoort Terminal':            { x: 0.75, y: 0.25 },
+    'Lidl DC, Bridgend':                      { x: 0.22, y: 0.60 },
+    'Heathrow Cargo Terminal':                 { x: 0.58, y: 0.50 },
+    'Southampton Docks':                       { x: 0.50, y: 0.65 },
+    'Dover Freight Village':                   { x: 0.72, y: 0.55 },
+  };
+
+  const pts = stops.map((s, i) => {
+    const c = MAP_COORDS[s.location];
+    if (c) return { x: pad + c.x * (W - pad * 2), y: pad + c.y * (H - pad * 2) };
+    const t = n > 1 ? i / (n - 1) : 0.5;
+    return { x: pad + t * (W - pad * 2), y: H * 0.45 + Math.sin(t * Math.PI) * 20 };
+  });
+
+  const isDark = document.documentElement.classList.contains('dark');
+  const landFill   = isDark ? '#2a3040' : '#e8ecf0';
+  const landStroke = isDark ? '#3a4258' : '#c8cdd5';
+  const waterFill  = isDark ? '#1a2030' : '#dae3f0';
+  const routeColor = isDark ? '#7a9a5a' : '#4a6e3a';
+  const markerBg   = isDark ? '#3a4050' : '#f5f5f5';
+  const markerBorder = isDark ? '#606878' : '#b0b4bc';
+  const markerText = isDark ? '#e0e2e8' : '#333';
+  const roadColor  = isDark ? '#404858' : '#d0d4da';
+  const cityDot    = isDark ? '#505868' : '#bcc0c8';
+  const cityText   = isDark ? '#606878' : '#a0a4ac';
+  const cursorFill = isDark ? '#5599ee' : '#2266cc';
+
+  let pathD = `M ${pts[0].x} ${pts[0].y}`;
+  for (let i = 1; i < pts.length; i++) {
+    const prev = pts[i - 1], curr = pts[i];
+    const cpx1 = prev.x + (curr.x - prev.x) * 0.4;
+    const cpy1 = prev.y - 10;
+    const cpx2 = prev.x + (curr.x - prev.x) * 0.6;
+    const cpy2 = curr.y + 10;
+    pathD += ` C ${cpx1} ${cpy1}, ${cpx2} ${cpy2}, ${curr.x} ${curr.y}`;
+  }
+
+  const cities = [
+    { name: 'London',     x: 0.56, y: 0.46 },
+    { name: 'Birmingham', x: 0.48, y: 0.28 },
+    { name: 'Cardiff',    x: 0.26, y: 0.52 },
+    { name: 'Manchester', x: 0.44, y: 0.12 },
+    { name: 'Leeds',      x: 0.52, y: 0.10 },
+  ];
+  const citiesSvg = cities.map(c => {
+    const cx = pad + c.x * (W - pad * 2);
+    const cy = pad + c.y * (H - pad * 2);
+    return `<circle cx="${cx}" cy="${cy}" r="1.5" fill="${cityDot}"/>
+            <text x="${cx + 4}" y="${cy + 1}" fill="${cityText}" font-size="6" font-family="Roboto,sans-serif">${c.name}</text>`;
+  }).join('');
+
+  const roads = [
+    'M 30,80 Q 100,70 170,65 Q 240,60 320,55',
+    'M 170,30 Q 175,60 180,95 Q 185,120 190,145',
+    'M 80,40 Q 130,50 180,65 Q 230,75 280,60',
+  ];
+  const roadsSvg = roads.map(d =>
+    `<path d="${d}" fill="none" stroke="${roadColor}" stroke-width="0.8" stroke-dasharray="3,3" opacity="0.5"/>`
+  ).join('');
+
+  const activeIdx = stops.findIndex(s => s.id === trip.activeStopId);
+  const cursorPt = activeIdx >= 0 ? pts[activeIdx] : null;
+  const cursorSvg = cursorPt ? `
+    <circle cx="${cursorPt.x}" cy="${cursorPt.y - 2}" r="8" fill="${cursorFill}" opacity="0.15"/>
+    <circle cx="${cursorPt.x}" cy="${cursorPt.y - 2}" r="5" fill="none" stroke="${cursorFill}" stroke-width="1.2"/>
+    <circle cx="${cursorPt.x}" cy="${cursorPt.y - 2}" r="2" fill="${cursorFill}"/>` : '';
+
+  const markersSvg = pts.map((p, i) => `
+    <circle cx="${p.x}" cy="${p.y}" r="11" fill="${markerBg}" stroke="${markerBorder}" stroke-width="1"/>
+    <text x="${p.x}" y="${p.y + 3.5}" text-anchor="middle" fill="${markerText}" font-size="9" font-weight="600" font-family="Roboto,sans-serif">${i + 1}</text>
+  `).join('');
+
+  const zoomBtnX = W - 36, zoomBtnY = H - 40;
+  const btnFill = isDark ? '#2a3040' : '#ffffff';
+  const btnStroke = isDark ? '#4a5060' : '#d0d4da';
+  const btnIcon = isDark ? '#a0a8b8' : '#555';
+  const zoomSvg = `
+    <rect x="${zoomBtnX}" y="${zoomBtnY}" width="24" height="18" rx="4" fill="${btnFill}" stroke="${btnStroke}" stroke-width="0.8"/>
+    <line x1="${zoomBtnX + 8}" y1="${zoomBtnY + 5}" x2="${zoomBtnX + 16}" y2="${zoomBtnY + 5}" stroke="${btnIcon}" stroke-width="1.2"/>
+    <line x1="${zoomBtnX + 12}" y1="${zoomBtnY + 3}" x2="${zoomBtnX + 12}" y2="${zoomBtnY + 7}" stroke="${btnIcon}" stroke-width="1.2"/>
+    <line x1="${zoomBtnX + 8}" y1="${zoomBtnY + 13}" x2="${zoomBtnX + 16}" y2="${zoomBtnY + 13}" stroke="${btnIcon}" stroke-width="1.2"/>`;
+
+  const ukLand = `
+    <path d="M 110,20 Q 125,15 145,18 Q 165,22 178,35 Q 195,52 200,70
+             Q 205,88 195,100 Q 185,112 175,120 Q 168,125 162,132
+             Q 155,140 148,148 Q 140,152 130,148 Q 118,142 108,135
+             Q 95,125 85,115 Q 75,105 70,90 Q 65,75 70,60
+             Q 75,45 85,35 Q 95,25 110,20 Z"
+          fill="${landFill}" stroke="${landStroke}" stroke-width="0.8"/>
+    <path d="M 80,25 Q 88,18 98,20 Q 105,22 108,30 Q 106,38 98,40
+             Q 88,38 82,32 Z"
+          fill="${landFill}" stroke="${landStroke}" stroke-width="0.6" opacity="0.7"/>
+    <ellipse cx="60" cy="65" rx="15" ry="22" fill="${landFill}" stroke="${landStroke}" stroke-width="0.6" opacity="0.5"/>
+    <path d="M 220,25 Q 260,18 300,22 Q 330,28 340,50 Q 345,70 330,85
+             Q 315,95 290,92 Q 260,88 240,78 Q 220,65 215,45 Q 215,32 220,25 Z"
+          fill="${landFill}" stroke="${landStroke}" stroke-width="0.6" opacity="0.4"/>`;
+
+  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg"
+    style="width:100%;height:100%;display:block;background:${waterFill};border-radius:10px">
+    ${ukLand}
+    ${roadsSvg}
+    ${citiesSvg}
+    <path d="${pathD}" fill="none" stroke="${routeColor}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="${pathD}" fill="none" stroke="${routeColor}" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.2"/>
+    ${cursorSvg}
+    ${markersSvg}
+    ${zoomSvg}
+  </svg>`;
 }
 
 function tripDetailContent() {
   const trip = findActiveTrip(state.activeDetailTripId);
   if (!trip) return h`<div class="t-body-md t-muted" style="padding:24px;">Trip not found.</div>`;
 
-  const statusClass = (trip.status || 'In Transit').toLowerCase().replace(/\s/g, '-');
+  const tripStatus = trip.status || (trip.completed ? 'Completed' : (trip.activeStopId ? 'In Transit' : 'Scheduled'));
+  const statusClass = tripStatus.toLowerCase().replace(/\s/g, '-');
 
-  const totalOrders = trip.stops.reduce((sum, s) => sum + (s.orders ? s.orders.length : 0), 0);
-  const totalItems = trip.stops.reduce((sum, s) => sum + (s.orders ? s.orders.reduce((a, o) => a + (o.cargo ? o.cargo.totalItems : 0), 0) : 0), 0);
-  const totalWeight = trip.stops.reduce((sum, s) => sum + (s.orders ? s.orders.reduce((a, o) => a + (o.weight || 0), 0) : 0), 0);
+  const stopOrderCount = s => typeof s.orders === 'number' ? s.orders : (Array.isArray(s.orders) ? s.orders.length : 0);
+  const totalOrders = trip.stops.reduce((sum, s) => sum + stopOrderCount(s), 0);
+  const totalItems = trip.stops.reduce((sum, s) => sum + (Array.isArray(s.orders) ? s.orders.reduce((a, o) => a + (o.cargo ? o.cargo.totalItems : 0), 0) : 0), 0);
+  const totalWeight = trip.stops.reduce((sum, s) => sum + (Array.isArray(s.orders) ? s.orders.reduce((a, o) => a + (o.weight || 0), 0) : 0), 0);
 
   const mapHtml = h`
     <div class="td__map">
-      <div class="td__map-placeholder">
-        <sl-icon name="map" style="font-size:32px;opacity:0.4"></sl-icon>
-        <span style="opacity:0.5;font-size:13px;margin-top:4px">Route map</span>
-      </div>
+      ${buildRouteMapSvg(trip)}
     </div>`;
 
   const contactHtml = trip.contact ? h`
@@ -2062,6 +2312,8 @@ function tripDetailContent() {
       <div class="td__contact-row"><sl-icon name="person" class="td__contact-icon"></sl-icon> ${trip.contact.name}</div>
       <div class="td__contact-row"><sl-icon name="building" class="td__contact-icon"></sl-icon> ${trip.contact.company}</div>
     </div>` : '';
+
+  const tripConvos = conversationsForTrip(trip.id);
 
   const refRows = trip.stops.map((s, i) => {
     const typeLabel = s.type === 'pickup' ? 'Pickup' : s.type === 'delivery' ? 'Delivery' : s.type.charAt(0).toUpperCase() + s.type.slice(1);
@@ -2079,55 +2331,51 @@ function tripDetailContent() {
       ${refRows}
     </div>`;
 
-  const stopsHtml = trip.stops.map((stop, i) => {
-    const isLast = i === trip.stops.length - 1;
-    const stopStatus = tripStopStatus(trip, stop);
-    const statusCls = stopStatus.toLowerCase().replace(/\s/g, '-');
-    const typeLabel = stop.type === 'pickup' ? 'Pickup' : stop.type === 'delivery' ? 'Delivery' : stop.type.charAt(0).toUpperCase() + stop.type.slice(1);
-    const orderCount = stop.orders ? stop.orders.length : 0;
-    const itemCount = stop.orders ? stop.orders.reduce((a, o) => a + (o.cargo ? o.cargo.totalItems : 0), 0) : 0;
-    const weight = stop.orders ? stop.orders.reduce((a, o) => a + (o.weight || 0), 0) : 0;
-    const summaryParts = [];
-    summaryParts.push(orderCount + ' Order' + (orderCount === 1 ? '' : 's'));
-    if (itemCount) summaryParts.push(itemCount + ' Items');
-    if (weight) summaryParts.push(weight + ' kg');
-
-    return h`
-      <div class="td__stop-row">
-        <div class="td__stop-track">
-          <span class="td__stop-dot td__stop-dot--${statusCls}"></span>
-          ${!isLast ? h`<span class="td__stop-line"></span>` : ''}
-        </div>
-        <div class="td__stop-card" onclick="App.openStopDetail('${trip.id}','${stop.id}')">
-          <div class="td__stop-header">
-            <span class="td__stop-title">Stop #${i + 1}: ${typeLabel}</span>
-            <span class="td__stop-status td__stop-status--${statusCls}">${stopStatus}</span>
+  const stopsHtml = h`
+    <div class="route-strip">
+      ${trip.stops.map((stop, i) => {
+        const isLast = i === trip.stops.length - 1;
+        const stopStatus = tripStopStatus(trip, stop);
+        const statusCls = stopStatus.toLowerCase().replace(/\s/g, '-');
+        const typeLabel = stop.type === 'pickup' ? 'Pickup' : stop.type === 'delivery' ? 'Delivery' : stop.type.charAt(0).toUpperCase() + stop.type.slice(1);
+        const orderCount = stopOrderCount(stop);
+        const hasInstructions = Array.isArray(stop.orders) ? stop.orders.some(o => o.instructions) : false;
+        return h`
+          <div class="route-strip__dot-cell">
+            <span class="route-stop__dot ${statusCls === 'not-started' ? 'route-stop__dot--faded' : ''}"></span>
+            ${!isLast ? h`<span class="route-stop__line"></span>` : ''}
           </div>
-          <div class="td__stop-summary">${summaryParts.join(' &middot; ')}</div>
-          <div class="td__stop-meta"><sl-icon name="geo-alt" class="td__stop-meta-icon"></sl-icon> ${stop.location}</div>
-          <div class="td__stop-meta"><sl-icon name="clock" class="td__stop-meta-icon"></sl-icon> Between Today, ${stop.appointment}</div>
-          <div class="td__stop-divider"></div>
-          <div class="td__stop-resources">
-            <span class="td__resources-label">Assigned Resources</span>
-            <span class="td__resources-value">Vehicle: ${trip.vehicle || '—'}    Trailer: ${trip.trailer || '—'}</span>
-          </div>
-        </div>
-      </div>`;
-  }).join('');
+          <div class="route-stop-card">
+            <div class="route-stop-card__content">
+              <div class="route-stop-card__title-row">
+                <span class="route-stop-card__loc">Stop ${i + 1}: ${typeLabel}</span>
+                <span class="route-stop-card__badge">${orderCount} Order${orderCount === 1 ? '' : 's'}</span>
+              </div>
+              <div class="route-stop-card__addr">${stop.location}</div>
+              <div class="route-stop-card__meta">Window: Tomorrow, ${stop.appointment}</div>
+              <div class="route-stop-card__resources">Vehicle: ${trip.vehicle || '—'} &middot; Trailer: ${trip.trailer || '—'}</div>
+            </div>
+            ${stop.id ? h`<div class="stop-btn-row">
+              <button type="button" class="stop-btn" onclick="App.openStopDetail('${trip.id}','${stop.id}')">Stop details</button>
+              <button type="button" class="stop-btn ${hasInstructions ? '' : 'stop-btn--disabled'}" onclick="${hasInstructions ? `App.openInstructionsSheet('${trip.id}','${stop.id}')` : 'void(0)'}" ${hasInstructions ? '' : 'disabled'}>Read Instructions</button>
+            </div>` : ''}
+          </div>`;
+      }).join('')}
+    </div>`;
 
   return h`
     <div class="td">
       <div class="td__overview-header">
         <span class="sd__section-title" style="margin:0">Trip Overview</span>
-        <span class="td__trip-badge td__trip-badge--${statusClass}">${trip.status || 'In Transit'}</span>
+        <span class="td__trip-badge td__trip-badge--${statusClass}">${tripStatus}</span>
       </div>
       ${mapHtml}
       ${contactHtml}
       ${refsHtml}
-      <div class="td__stops-timeline">
-        ${stopsHtml}
-      </div>
-    </div>`;
+      ${stopsHtml}
+    </div>
+    ${tripConversationsSheetMarkup()}
+    ${newConversationSheetMarkup()}`;
 }
 
 function stopDetailScreen() {
@@ -2411,7 +2659,7 @@ const ICON_TRIP = '<svg class="app-tabbar__icon-img" width="24" height="24" view
 const TAB_ITEMS = [
   { route: 'dashboard', svg: ICON_DASHBOARD, label: 'Dashboard' },
   { route: 'nav-trips', svg: ICON_TRIP, label: 'My Trips' },
-  { route: 'nav-chats', icon: 'chat-dots', label: 'Chats' },
+  { route: 'nav-chats', icon: 'chat-dots', label: 'Conversations' },
   { route: 'nav-profile', icon: 'person', label: 'Profile' },
 ];
 const TAB_ROUTES = TAB_ITEMS.map(t => t.route);
@@ -2982,54 +3230,6 @@ const SCREENS = {
     const active = state.dashboardMode === 'guest' ? [state.guestTrip]
       : (state.hideSecondActiveTrip ? state.activeTrips.slice(0, 1) : state.activeTrips);
 
-    function activeTripCard(trip) {
-      const totalStops = trip.stops.length;
-      const expanded = state.tripExpanded['nav-' + trip.id] !== false;
-      return h`
-        <div class="sched-card">
-          <div class="trip-header">
-            <div class="trip-header__left">
-              <span class="trip-header__id">${trip.id} • ${totalStops} Stop${totalStops === 1 ? '' : 's'}</span>
-              <a class="trip-header__link" href="javascript:void(0)" onclick="event.stopPropagation(); App.openTripDetail('${trip.id}')">See trip details</a>
-            </div>
-            <button type="button" class="trip-header__toggle" onclick="App.toggleTripExpand('nav-${trip.id}')">
-              <sl-icon name="${expanded ? 'chevron-up' : 'chevron-down'}" class="trip-header__chevron"></sl-icon>
-            </button>
-          </div>
-          ${expanded ? h`
-            <div class="route-strip">
-              ${trip.stops.map((stop, i) => {
-                const isLast = i === trip.stops.length - 1;
-                const orderCount = stop.orders.length;
-                const hasInstructions = stop.orders.some(o => o.instructions);
-                return h`
-                  <div class="route-strip__dot-cell">
-                    <span class="route-stop__dot"></span>
-                    ${!isLast ? h`<span class="route-stop__line"></span>` : ''}
-                  </div>
-                  <div class="route-stop-card">
-                    <div class="route-stop-card__content">
-                      <div class="route-stop-card__title-row">
-                        <span class="route-stop-card__loc">Stop ${i + 1}: ${stop.type === 'pickup' ? 'Pickup' : 'Delivery'}</span>
-                        <span class="route-stop-card__badge">${orderCount} Order${orderCount === 1 ? '' : 's'}</span>
-                      </div>
-                      <div class="route-stop-card__addr">${stop.location}</div>
-                      <div class="route-stop-card__meta">Window: Today, ${stop.appointment}</div>
-                    </div>
-                    <div class="stop-btn-row">
-                      <button type="button" class="stop-btn" onclick="event.stopPropagation()">Stop details</button>
-                      <button type="button" class="stop-btn ${hasInstructions ? '' : 'stop-btn--disabled'}" ${hasInstructions ? '' : 'disabled'}>Read Instructions</button>
-                    </div>
-                  </div>
-                `;
-              }).join('')}
-            </div>
-            <button type="button" class="tl-card__btn" onclick="App.goTab('dashboard')">View Trip</button>
-          ` : ''}
-        </div>
-      `;
-    }
-
     function emptyState(icon, text, sub) {
       return h`
         <div class="tl-empty">
@@ -3047,7 +3247,7 @@ const SCREENS = {
         : emptyState('clipboard', 'Nothing in your queue', 'Once a planner assigns a trip, it\'ll show up here.');
     } else if (tab === 'active') {
       tabContent = active.length
-        ? active.map(t => activeTripCard(t)).join('')
+        ? activeTripSection(active)
         : emptyState('truck', 'No trips on the road', 'Once you start a trip, it\'ll show up here.');
     } else {
       tabContent = MOCK_TRIP_HISTORY.length
@@ -3058,7 +3258,7 @@ const SCREENS = {
     return {
       content: h`
         <div class="tl-tabs">
-          <button type="button" class="tl-tab ${tab === 'new' ? 'tl-tab--active' : ''}" onclick="App.switchTripsTab('new')">New</button>
+          <button type="button" class="tl-tab ${tab === 'new' ? 'tl-tab--active' : ''}" onclick="App.switchTripsTab('new')">Scheduled</button>
           <button type="button" class="tl-tab ${tab === 'active' ? 'tl-tab--active' : ''}" onclick="App.switchTripsTab('active')">Active</button>
           <button type="button" class="tl-tab ${tab === 'finished' ? 'tl-tab--active' : ''}" onclick="App.switchTripsTab('finished')">Finished</button>
         </div>
@@ -3246,45 +3446,47 @@ function trackingStatusBanner() {
 /* Chat screens                                                      */
 /* ---------------------------------------------------------------- */
 
-function chatUnreadCount(thread) {
-  return thread ? thread.messages.filter(m => m.unread).length : 0;
+function conversationsForTrip(tripId) {
+  return state.conversations.filter(c => c.tripId === tripId);
+}
+
+function conversationUnreadCount(conv) {
+  return conv ? conv.messages.filter(m => m.unread).length : 0;
 }
 
 function totalUnreadChats() {
-  return Object.values(state.chatThreads).reduce((n, t) => n + chatUnreadCount(t), 0);
+  return state.conversations.reduce((n, c) => n + conversationUnreadCount(c), 0);
 }
 
-/* Search matches on trip id, planner name, and message text — the three
+/* Search matches on trip id, conversation title, and message text — the
    things a driver would actually remember about a conversation they're
-   trying to find again ("that one about Bay 5", "Sarah", "the Bristol trip"). */
-function chatMatchesSearch(tripId, thread, query) {
+   trying to find again ("that one about Bay 5", "the pickup thread", "the Bristol trip"). */
+function chatMatchesSearch(conv, query) {
   if (!query) return true;
   const q = query.toLowerCase();
-  if (tripId.toLowerCase().includes(q)) return true;
-  if (thread.plannerName.toLowerCase().includes(q)) return true;
-  return thread.messages.some(m => m.text.toLowerCase().includes(q));
+  if (conv.tripId.toLowerCase().includes(q)) return true;
+  if (conv.title.toLowerCase().includes(q)) return true;
+  return conv.messages.some(m => m.text.toLowerCase().includes(q));
 }
 
 function chatListScreen() {
-  const tripIds = Object.keys(state.chatThreads);
-  if (!tripIds.length) {
+  if (!state.conversations.length) {
     return h`
       <div class="center-state">
         <sl-icon class="center-state__icon" name="chat-dots"></sl-icon>
         <div class="t-headline-md">No conversations yet</div>
-        <div class="t-body-md t-muted">Chats with your carrier's back office will appear here once a trip is assigned.</div>
+        <div class="t-body-md t-muted">Conversations with CtrlChain will appear here once a trip is assigned.</div>
       </div>
     `;
   }
 
   const query = state.chatSearchQuery.trim();
   const filter = state.chatFilter;
-  const visibleTripIds = tripIds.filter(tripId => {
-    const thread = state.chatThreads[tripId];
-    if (filter === 'unread' && chatUnreadCount(thread) === 0) return false;
-    return chatMatchesSearch(tripId, thread, query);
+  const visibleConvos = state.conversations.filter(conv => {
+    if (filter === 'unread' && conversationUnreadCount(conv) === 0) return false;
+    return chatMatchesSearch(conv, query);
   });
-  const totalUnread = tripIds.filter(id => chatUnreadCount(state.chatThreads[id]) > 0).length;
+  const totalUnread = state.conversations.filter(c => conversationUnreadCount(c) > 0).length;
 
   return h`
     <div class="chat-list-screen">
@@ -3293,7 +3495,7 @@ function chatListScreen() {
         <input
           class="chat-search-input"
           type="text"
-          placeholder="Search chats"
+          placeholder="Search conversations"
           value="${state.chatSearchQuery}"
           oninput="App.setChatSearch(this.value)"
         />
@@ -3309,26 +3511,25 @@ function chatListScreen() {
           Unread${totalUnread ? h` <span class="chat-filter-pill__count">${totalUnread}</span>` : ''}
         </button>
       </div>
-      ${visibleTripIds.length ? h`
+      ${visibleConvos.length ? h`
         <div class="chat-list">
-          ${visibleTripIds.map(tripId => {
-            const thread = state.chatThreads[tripId];
-            const msgs = thread.messages.filter(m => m.from !== 'system');
+          ${visibleConvos.map(conv => {
+            const msgs = conv.messages.filter(m => m.from !== 'system');
             const last = msgs[msgs.length - 1];
-            const unread = chatUnreadCount(thread);
-            const isActive = state.activeTrips.some(t => t.id === tripId);
+            const unread = conversationUnreadCount(conv);
+            const isActive = state.activeTrips.some(t => t.id === conv.tripId);
             return h`
-              <button type="button" class="chat-row" onclick="App.openChat('${tripId}')">
+              <button type="button" class="chat-row" onclick="App.openConversation('${conv.id}')">
                 <div class="chat-row__avatar">
                   <sl-icon name="person-circle"></sl-icon>
                 </div>
                 <div class="chat-row__body">
                   <div class="chat-row__top">
-                    <span class="chat-row__name t-label-md">${thread.plannerName}</span>
+                    <span class="chat-row__name t-label-md">${conv.title}</span>
                     <span class="chat-row__time t-body-sm t-caption">${last ? last.time : ''}</span>
                   </div>
                   <div class="chat-row__trip t-body-sm t-caption">
-                    ${tripId}${isActive ? h` <span class="badge badge--info" style="font-size:10px;padding:1px 5px;">Active</span>` : ''}
+                    ${conv.contact.company} · ${conv.tripId}${isActive ? h` <span class="badge badge--info" style="font-size:10px;padding:1px 5px;">Active</span>` : ''}
                   </div>
                   <div class="chat-row__bottom">
                     <span class="chat-row__preview t-body-sm t-muted">${last ? (last.from === 'driver' ? 'You: ' : '') + last.text : ''}</span>
@@ -3342,7 +3543,7 @@ function chatListScreen() {
       ` : h`
         <div class="center-state">
           <sl-icon class="center-state__icon" name="chat-dots"></sl-icon>
-          <div class="t-headline-md">${filter === 'unread' ? 'No unread chats' : 'No matches'}</div>
+          <div class="t-headline-md">${filter === 'unread' ? 'No unread conversations' : 'No matches'}</div>
           <div class="t-body-md t-muted">${query ? `Nothing matches "${query}".` : 'Nothing to show here right now.'}</div>
         </div>
       `}
@@ -3351,10 +3552,10 @@ function chatListScreen() {
 }
 
 function chatConversationScreen() {
-  const tripId = state.activeChatTripId;
-  const thread = tripId && state.chatThreads[tripId];
-  if (!thread) return h`<div class="center-state"><div class="t-body-md t-muted">Chat not found.</div></div>`;
+  const conv = state.conversations.find(c => c.id === state.activeConversationId);
+  if (!conv) return h`<div class="center-state"><div class="t-body-md t-muted">Conversation not found.</div></div>`;
 
+  const tripId = conv.tripId;
   const isActive = state.activeTrips.some(t => t.id === tripId);
 
   return h`
@@ -3364,25 +3565,24 @@ function chatConversationScreen() {
           <sl-icon name="arrow-left"></sl-icon>
         </button>
         <div class="chat-header__info">
-          <div class="chat-header__name t-label-md">${thread.plannerName}</div>
-          <div class="chat-header__meta t-body-sm t-caption">${thread.plannerRole} · ${tripId}</div>
+          <div class="chat-header__name t-label-md">${conv.title}</div>
+          <div class="chat-header__meta t-body-sm t-caption">${conv.contact.company} · ${tripId}</div>
         </div>
       </div>
       <div class="chat-messages">
-        ${isActive ? h`
-          <div class="chat-trip-pill">
-            <sl-icon name="truck" style="font-size:13px"></sl-icon>
-            <span class="t-body-sm">${tripId}</span>
-            <span class="badge badge--info" style="font-size:10px;padding:1px 5px;">In Transit</span>
-          </div>
-        ` : ''}
-        ${thread.messages.map(m => {
+        <div class="chat-trip-pill">
+          <sl-icon name="truck" style="font-size:13px"></sl-icon>
+          <span class="t-body-sm">${tripId}</span>
+          ${isActive ? h`<span class="badge badge--info" style="font-size:10px;padding:1px 5px;">In Transit</span>` : ''}
+        </div>
+        ${conv.messages.map(m => {
           if (m.from === 'system') {
             return h`<div class="chat-msg chat-msg--system"><span class="t-body-sm t-caption">${m.text}</span></div>`;
           }
           const isDriver = m.from === 'driver';
           return h`
             <div class="chat-msg ${isDriver ? 'chat-msg--driver' : 'chat-msg--planner'}">
+              ${!isDriver ? h`<div class="chat-msg__sender t-body-sm t-caption">${conv.contact.name}</div>` : ''}
               <div class="chat-bubble ${isDriver ? 'chat-bubble--driver' : 'chat-bubble--planner'}">
                 <div class="t-body-sm">${m.text}</div>
               </div>
@@ -3444,8 +3644,14 @@ function render() {
             <sl-icon name="bell"></sl-icon>
             ${unreadCount ? h`<span class="app-header__bell-dot"></span>` : ''}
           </button>`
-      : route === 'trip-detail' || route === 'stop-detail'
-        ? h`<button type="button" class="app-header__bell" onclick="App.goTab('nav-chats')" aria-label="Chat"><sl-icon name="chat-square-text"></sl-icon></button>`
+      : (route === 'trip-detail' || route === 'stop-detail') && state.activeDetailTripId
+        ? (() => {
+            const tripUnread = conversationsForTrip(state.activeDetailTripId).reduce((n, c) => n + conversationUnreadCount(c), 0);
+            return h`<button type="button" class="app-header__bell" onclick="App.openTripConversationsSheet('${state.activeDetailTripId}')" aria-label="Conversations">
+              <sl-icon name="chat-square-text"></sl-icon>
+              ${tripUnread ? h`<span class="app-header__bell-dot"></span>` : ''}
+            </button>`;
+          })()
         : meta ? h`<div class="app-header__step t-body-sm">${meta.step} / ${meta.total}</div>` : h`<div class="app-header__spacer"></div>`;
     headerHtml = h`
       <div class="app-header">
@@ -3488,6 +3694,8 @@ function render() {
     'exception-drawer': () => App.closeExceptionSheet(),
     'pallet-exchange-drawer': () => App.closePalletExchangeSheet(),
     'add-trip-drawer': () => App.closeAddTripSheet(),
+    'trip-conversations-drawer': () => App.closeTripConversationsSheet(),
+    'new-conversation-drawer': () => App.closeNewConversationSheet(),
   };
   Object.keys(drawerClosers).forEach(id => {
     const el = document.getElementById(id);
