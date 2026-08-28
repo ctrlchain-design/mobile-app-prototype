@@ -3390,4 +3390,13 @@ function render() {
 }
 
 window.addEventListener('hashchange', render);
-window.addEventListener('DOMContentLoaded', render);
+window.addEventListener('DOMContentLoaded', () => {
+  const route = currentRoute();
+  const needsStopState = ['stop-detail', 'order-overview', 'stop-instructions'].includes(route);
+  if (needsStopState && !state.activeDetailTripId) {
+    const fallback = FLOW_FIRST_ROUTE[state.activeFlow] || 'self-reg-welcome';
+    window.location.hash = fallback;
+    return;
+  }
+  render();
+});
