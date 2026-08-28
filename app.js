@@ -393,6 +393,7 @@ function freshState() {
     addTripSheet: false,
     activeDetailTripId: null,  // which trip's stop we're viewing in stop-detail
     activeDetailStopId: null,  // which stop we're viewing in stop-detail
+    orderCardExpanded: {},     // orderId -> boolean for stop-detail order cards
 
     chatThreads: deepClone(MOCK_CHAT_THREADS),
     activeChatTripId: null,
@@ -545,7 +546,20 @@ const App = {
   openStopDetail(tripId, stopId) {
     state.activeDetailTripId = tripId;
     state.activeDetailStopId = stopId;
+    state.orderCardExpanded = {};
+    const trip = findActiveTrip(tripId);
+    const stop = trip && findStop(trip, stopId);
+    if (trip && stop) {
+      stop.orders.forEach((o, i) => { state.orderCardExpanded[o.id] = i === 0; });
+      const idx = trip.stops.indexOf(stop) + 1;
+      TITLES['stop-detail'] = 'Stop ' + idx + ' of ' + trip.stops.length + ': ' + (stop.type === 'pickup' ? 'Pickup' : 'Delivery');
+    }
     this.nav('stop-detail');
+  },
+
+  toggleOrderCard(orderId) {
+    state.orderCardExpanded[orderId] = !state.orderCardExpanded[orderId];
+    render();
   },
 
   triggerGeofenceEntry(tripId, stopId) {
@@ -1955,24 +1969,50 @@ function stopDetailScreen() {
   const trip = findActiveTrip(state.activeDetailTripId);
   const stop = trip && findStop(trip, state.activeDetailStopId);
   if (!trip || !stop) return h`<div class="t-body-md t-muted" style="padding:24px;">Stop not found.</div>`;
-  const status = stopStatus(stop);
+
+  const hasInstructions = stop.orders.some(o => o.instructions);
+  const hasPalletEx = stop.milestones.some(m => m.kind === 'pallet-exchange');
+
   return h`
-    <div class="stop-detail-screen">
-      <div class="stop-detail__header">
-        <button type="button" class="stop-detail__back" onclick="App.back()"><sl-icon name="arrow-left"></sl-icon></button>
-        <div class="stop-detail__title-block">
-          <div class="stop-detail__title">${stop.type === 'pickup' ? 'Pickup' : 'Delivery'} <span class="badge badge--category">${stop.orders.length} Order${stop.orders.length === 1 ? '' : 's'}</span>
-            ${hasPendingPallets(stop) ? h`<span class="badge badge--attention"><sl-icon name="exclamation-circle"></sl-icon> Pallets</span>` : ''}
-          </div>
-          <div class="t-body-sm" style="color:var(--text-neutral-subtitle)">${stop.location}</div>
-          <div class="stop-detail__window">
-            <span class="t-label-sm">Window:</span>
-            <span class="t-label-sm">${stop.appointment}</span>
+    <div class="sd">
+      <div class="sd__section-title">Address &amp; Appointment</div>
+      <div class="sd__addr-block">
+        <div class="sd__addr-row">
+          <sl-icon name="geo-alt" class="sd__icon-24"></sl-icon>
+          <span class="sd__addr-text">${stop.location}</span>
+        </div>
+        <div class="sd__addr-row">
+          <sl-icon name="clock" class="sd__icon-24"></sl-icon>
+          <div class="sd__time-block">
+            <div class="sd__time-label"><span class="sd__time-muted">Time window</span> <span class="sd__time-agreed">(Agreed)</span></div>
+            <div class="sd__time-value">${stop.appointment}</div>
           </div>
         </div>
+        <button type="button" class="sd__subtle-btn" onclick="void 0">Open in Map</button>
       </div>
-      ${stopInstructionsBlock(stop)}
-      <div class="stage-list">${stop.milestones.map(m => stageItem(trip, stop, m)).join('')}</div>
+
+      <div class="sd__divider"></div>
+
+      <div class="sd__section-title">Stop Instructions</div>
+      <button type="button" class="sd__subtle-btn${hasInstructions ? '' : ' sd__subtle-btn--disabled'}"
+        ${hasInstructions ? 'onclick="App.openInstructionsSheet(\'' + trip.id + '\',\'' + stop.id + '\')"' : 'disabled'}>
+        Read Instructions
+      </button>
+
+      <div class="sd__divider"></div>
+
+      <div class="sd__section-title">Orders at this Stop</div>
+      <div class="sd__orders">
+        ${stop.orders.map((o, idx) => sdOrderCard(trip, stop, o, hasPalletEx)).join('')}
+      </div>
+
+      <div class="sd__divider"></div>
+
+      <div class="sd__section-title">Milestone Checklist</div>
+      <div class="sd__milestones">
+        ${stop.milestones.map((m, idx) => sdMilestoneItem(trip, stop, m, idx === 0, idx === stop.milestones.length - 1)).join('')}
+      </div>
+
       <button type="button" class="report-issue-link" onclick="App.openExceptionSheet('${trip.id}','${stop.id}')">
         <sl-icon name="flag" aria-hidden="true"></sl-icon> Report an issue with this stop
       </button>
@@ -1981,6 +2021,120 @@ function stopDetailScreen() {
     ${exceptionSheetMarkup()}
     ${palletExchangeSheetMarkup()}
   `;
+}
+
+function sdOrderCard(trip, stop, order, hasPalletEx) {
+  const expanded = !!state.orderCardExpanded[order.id];
+  const pallets = order.expectedPallets ? order.expectedPallets + ' Pallets' : '';
+  const needsExchange = hasPalletEx && order.expectedPallets;
+  const exchangeLabel = needsExchange ? order.expectedPallets + '/' + order.expectedPallets + ' exchange needed' : '';
+
+  const headerHtml = h`
+    <button type="button" class="sd-order__header" onclick="App.toggleOrderCard('${order.id}')">
+      <div class="sd-order__info">
+        <div class="sd-order__customer">${order.customer || order.ref}</div>
+        <div class="sd-order__pallets-row">
+          ${pallets ? h`<span class="sd-order__pallets">${pallets}</span>` : ''}
+          ${exchangeLabel ? h`<span class="sd-order__exchange-badge">${exchangeLabel}</span>` : ''}
+        </div>
+      </div>
+      <span class="sd-order__chevron"><sl-icon name="${expanded ? 'chevron-up' : 'chevron-down'}"></sl-icon></span>
+    </button>
+  `;
+
+  if (!expanded) {
+    return h`<div class="sd-order sd-order--collapsed">${headerHtml}</div>`;
+  }
+
+  return h`
+    <div class="sd-order sd-order--expanded">
+      ${headerHtml}
+      <div class="sd-order__divider"></div>
+      <div class="sd-order__details">
+        <div class="sd-order__ref-row">
+          <span class="sd-order__ref-label">Order Reference</span>
+          <span class="sd-order__ref-value">${order.ref}</span>
+        </div>
+        <div class="sd-order__ref-row">
+          <span class="sd-order__ref-label">Stop Reference</span>
+          <span class="sd-order__ref-value">${stop.id}</span>
+        </div>
+      </div>
+      <button type="button" class="sd__secondary-btn" onclick="void 0">More Info</button>
+    </div>
+  `;
+}
+
+function sdMilestoneItem(trip, stop, m, isFirst, isLast) {
+  const isEta = m.kind === 'eta';
+  const isPending = m.status === 'pending';
+  const isProposed = m.status === 'proposed';
+  const isConfirmed = m.status === 'confirmed';
+  const isReady = m.status === 'ready';
+  const isActive = isEta || isConfirmed || isProposed || isReady;
+  const editing = state.editingMilestone && state.editingMilestone.milestoneId === m.id;
+
+  let statusHtml;
+  if (editing) {
+    statusHtml = h`
+      <div class="timestamp-edit">
+        <sl-input id="ts-input-${m.id}" type="time" size="small" value="${m.timestamp || ''}"></sl-input>
+        <sl-button size="small" variant="primary" onclick="App.saveTimestamp('${trip.id}','${stop.id}','${m.id}')">Save</sl-button>
+        <sl-button size="small" onclick="App.cancelEditTimestamp()">Cancel</sl-button>
+      </div>`;
+  } else if (isEta && m.timestamp) {
+    statusHtml = h`
+      <div class="sd-ms__eta-box">
+        <span class="sd-ms__eta-label">System calculated:</span>
+        <div class="sd-ms__eta-right">
+          <span class="sd-ms__eta-time">${m.timestamp}</span>
+          <button type="button" class="sd-ms__edit-btn" onclick="App.startEditTimestamp('${stop.id}','${m.id}')">
+            <img class="sd-ms__edit-icon" src="assets/icon-edit.svg" alt="edit" />
+          </button>
+        </div>
+      </div>`;
+  } else if (isPending || (isEta && !m.timestamp)) {
+    statusHtml = h`<span class="sd-ms__not-reached">Not yet reached</span>`;
+  } else if (m.timestamp) {
+    const src = stageSourceLabel(m);
+    statusHtml = h`
+      <div class="sd-ms__time-confirmed">
+        <span class="sd-ms__time-chip">
+          <button type="button" class="timestamp-btn timestamp-btn--bold" onclick="App.startEditTimestamp('${stop.id}','${m.id}')">${m.timestamp}</button>
+          <img class="sd-ms__edit-icon" src="assets/icon-edit.svg" alt="edit" />
+        </span>
+        ${src ? h`<span class="sd-ms__source">${src}</span>` : ''}
+      </div>`;
+  } else {
+    statusHtml = h`<span class="sd-ms__not-reached">Awaiting driver</span>`;
+  }
+
+  let actionHtml = '';
+  if (!editing && isProposed) {
+    actionHtml = h`<button type="button" class="stage-confirm-btn" style="margin-top:4px" onclick="App.confirmMilestone('${trip.id}','${stop.id}','${m.id}')">Confirm</button>`;
+  }
+
+  const hasOrderRows = m.kind === 'pod' || m.kind === 'pallet-exchange';
+  const anyPalletMismatch = m.kind === 'pallet-exchange' && isConfirmed && stop.orders.some(o => o.palletMismatch);
+  let subRowsHtml = '';
+  if (hasOrderRows && !isPending && !(m.kind === 'pallet-exchange' && isConfirmed && !anyPalletMismatch)) {
+    subRowsHtml = h`<div class="sd-ms__sub">${stop.orders.map(o => m.kind === 'pod' ? orderRow(trip, stop, o) : palletExchangeOrderRow(trip, stop, o)).join('')}</div>`;
+  }
+
+  return h`
+    <div class="sd-ms${isFirst ? ' sd-ms--first' : ''}${isLast ? ' sd-ms--last' : ''}">
+      <div class="sd-ms__track">
+        ${!isFirst ? '<div class="sd-ms__line-top"></div>' : ''}
+        <div class="sd-ms__dot ${isActive ? 'sd-ms__dot--active' : 'sd-ms__dot--pending'}"></div>
+        ${!isLast ? '<div class="sd-ms__line-bot"></div>' : ''}
+      </div>
+      <div class="sd-ms__body">
+        <div class="sd-ms__label${isPending ? ' sd-ms__label--pending' : ''}">${m.label}${anyPalletMismatch ? h` <span class="badge badge--warning">Mismatch</span>` : ''}</div>
+        ${statusHtml}
+        ${actionHtml}
+        ${subRowsHtml}
+      </div>
+    </div>`;
 }
 
 /* Notifications feed — mostly derived live from actual trip state (a proposed
@@ -2562,7 +2716,6 @@ const SCREENS = {
   /* ---------------- STOP DETAIL ---------------- */
 
   'stop-detail': () => ({
-    hideBack: true,
     content: stopDetailScreen(),
     reviewerNote: (() => {
       const trip = findActiveTrip(state.activeDetailTripId);
@@ -3051,7 +3204,9 @@ function render() {
             <sl-icon name="bell"></sl-icon>
             ${unreadCount ? h`<span class="app-header__bell-dot"></span>` : ''}
           </button>`
-      : meta ? h`<div class="app-header__step t-body-sm">${meta.step} / ${meta.total}</div>` : h`<div class="app-header__spacer"></div>`;
+      : route === 'stop-detail'
+        ? h`<button type="button" class="app-header__bell" onclick="App.goTab('nav-chats')" aria-label="Chat"><sl-icon name="chat-square-text"></sl-icon></button>`
+        : meta ? h`<div class="app-header__step t-body-sm">${meta.step} / ${meta.total}</div>` : h`<div class="app-header__spacer"></div>`;
     headerHtml = h`
       <div class="app-header">
         <div class="app-header__row">
