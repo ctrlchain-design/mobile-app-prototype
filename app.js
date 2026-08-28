@@ -2209,7 +2209,6 @@ function orderOverviewContent() {
 
   return h`
     <div class="oo">
-      <div class="sd__divider"></div>
       <div class="sd__section-title">Cargo Summary</div>
       ${summaryGrid}
 
