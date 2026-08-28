@@ -2607,6 +2607,118 @@ button { font-family: inherit; }
 .oo__detail-value { font-size: 12px; line-height: 16px; color: var(--text-neutral-primary, #3e3e3e); }
 .dark .oo__detail-value { color: var(--text-neutral-primary, #d0d3da); }
 
+/* ── TRIP DETAIL ────────────────────────────────────────────────────── */
+.td { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.td__overview-header { display: flex; justify-content: space-between; align-items: center; }
+.td__trip-badge {
+  font-size: 12px; font-weight: 600; line-height: 20px;
+  padding: 2px 10px; border-radius: 4px;
+}
+.td__trip-badge--in-transit { background: #fff3e0; color: #e65100; }
+.dark .td__trip-badge--in-transit { background: #4e2a00; color: #ffb74d; }
+.td__trip-badge--finished { background: #e8f5e9; color: #2e7d32; }
+.dark .td__trip-badge--finished { background: #1b3a1f; color: #81c784; }
+.td__trip-badge--not-started { background: var(--bg-neutral-subtle, #f0f0f0); color: var(--text-neutral-subtitle, #717171); }
+.dark .td__trip-badge--not-started { background: var(--bg-neutral-subtle, #2a2d33); color: var(--text-neutral-subtitle, #a0a4ad); }
+
+.td__map {
+  border-radius: 10px; overflow: hidden;
+  background: linear-gradient(135deg, #e8eaf6 0%, #c5cae9 50%, #e0e0e0 100%);
+  height: 160px; position: relative;
+}
+.dark .td__map { background: linear-gradient(135deg, #263238 0%, #37474f 50%, #455a64 100%); }
+.td__map-placeholder {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  color: var(--text-neutral-subtitle, #717171);
+}
+.dark .td__map-placeholder { color: var(--text-neutral-subtitle, #a0a4ad); }
+
+.td__card {
+  border: 1px solid var(--border-neutral-subtle, #e0e0e0);
+  border-radius: 10px; padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.dark .td__card { border-color: var(--border-neutral-subtle, #3a3d44); }
+.td__card-title { font-size: 14px; font-weight: 600; color: var(--text-neutral-primary, #3e3e3e); }
+.dark .td__card-title { color: var(--text-neutral-primary, #d0d3da); }
+
+.td__contact-row {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; color: var(--text-neutral-primary, #3e3e3e);
+}
+.dark .td__contact-row { color: var(--text-neutral-primary, #d0d3da); }
+.td__contact-icon { font-size: 16px; color: var(--text-neutral-subtitle, #717171); }
+.dark .td__contact-icon { color: var(--text-neutral-subtitle, #a0a4ad); }
+
+.td__ref-row {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-size: 13px;
+}
+.td__ref-label { color: var(--text-neutral-subtitle, #717171); }
+.dark .td__ref-label { color: var(--text-neutral-subtitle, #a0a4ad); }
+.td__ref-value { color: var(--text-neutral-primary, #3e3e3e); font-weight: 500; }
+.dark .td__ref-value { color: var(--text-neutral-primary, #d0d3da); }
+
+.td__stops-timeline { display: flex; flex-direction: column; }
+.td__stop-row { display: flex; gap: 12px; }
+.td__stop-track { width: 12px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; padding-top: 18px; }
+.td__stop-dot {
+  width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; z-index: 1;
+  border: 2px solid transparent;
+}
+.td__stop-dot--finished { background: #2e7d32; border-color: #2e7d32; }
+.td__stop-dot--in-transit { background: #e65100; border-color: #e65100; }
+.td__stop-dot--not-started { background: transparent; border-color: var(--border-neutral-subtle, #c0c0c0); }
+.dark .td__stop-dot--not-started { border-color: var(--border-neutral-subtle, #555); }
+.td__stop-line {
+  flex: 1; width: 2px; min-height: 20px;
+  background: var(--border-neutral-subtle, #c0c0c0);
+}
+.dark .td__stop-line { background: var(--border-neutral-subtle, #555); }
+
+.td__stop-card {
+  flex: 1; min-width: 0;
+  border: 1px solid var(--border-neutral-subtle, #e0e0e0);
+  border-radius: 10px; padding: 14px 16px; margin-bottom: 12px;
+  cursor: pointer;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.td__stop-card:active { background: var(--bg-neutral-subtle, #f5f5f5); }
+.dark .td__stop-card { border-color: var(--border-neutral-subtle, #3a3d44); }
+.dark .td__stop-card:active { background: var(--bg-neutral-subtle, #2a2d33); }
+
+.td__stop-header { display: flex; justify-content: space-between; align-items: center; }
+.td__stop-title { font-size: 14px; font-weight: 600; color: var(--text-neutral-primary, #3e3e3e); }
+.dark .td__stop-title { color: var(--text-neutral-primary, #d0d3da); }
+.td__stop-status { font-size: 12px; font-weight: 600; }
+.td__stop-status--finished { color: #2e7d32; }
+.dark .td__stop-status--finished { color: #81c784; }
+.td__stop-status--in-transit { color: #e65100; }
+.dark .td__stop-status--in-transit { color: #ffb74d; }
+.td__stop-status--not-started { color: var(--text-neutral-subtitle, #717171); }
+.dark .td__stop-status--not-started { color: var(--text-neutral-subtitle, #a0a4ad); }
+
+.td__stop-summary { font-size: 12px; color: var(--text-neutral-subtitle, #717171); }
+.dark .td__stop-summary { color: var(--text-neutral-subtitle, #a0a4ad); }
+
+.td__stop-meta {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 13px; color: var(--text-neutral-primary, #3e3e3e);
+}
+.dark .td__stop-meta { color: var(--text-neutral-primary, #d0d3da); }
+.td__stop-meta-icon { font-size: 14px; color: var(--text-neutral-subtitle, #717171); flex-shrink: 0; }
+.dark .td__stop-meta-icon { color: var(--text-neutral-subtitle, #a0a4ad); }
+
+.td__stop-divider { border-top: 1px solid var(--border-neutral-subtle, #e0e0e0); margin: 4px 0; }
+.dark .td__stop-divider { border-color: var(--border-neutral-subtle, #3a3d44); }
+
+.td__stop-resources { display: flex; flex-direction: column; gap: 2px; }
+.td__resources-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; color: var(--text-neutral-subtitle, #717171); }
+.dark .td__resources-label { color: var(--text-neutral-subtitle, #a0a4ad); }
+.td__resources-value { font-size: 12px; color: var(--text-neutral-primary, #3e3e3e); }
+.dark .td__resources-value { color: var(--text-neutral-primary, #d0d3da); }
+
 /* ---------- Trip card bottom row ---------- */
 .trip-card__bottom {
   display: flex;

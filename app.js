@@ -98,6 +98,11 @@ const MOCK_ACTIVE_TRIPS = [
   {
     id: 'TRIP2026-000123',
     activeStopId: 'STOP-1',
+    status: 'In Transit',
+    contact: { name: 'John Doe', company: 'CtrlChain B.V.' },
+    vehicle: 'VX72 YYM',
+    trailer: '570859',
+    references: { 'STOP-1': '570859', 'STOP-2': 'Not Added yet' },
     // Consolidated, 2 orders — both are loaded at the one pickup and both are
     // delivered at the one delivery, so the same two orders appear at both
     // stops (previously PO-33211 only appeared at delivery, as if it had never
@@ -150,6 +155,11 @@ const MOCK_ACTIVE_TRIPS = [
   {
     id: 'TRIP2026-000125',
     activeStopId: 'STOP-3',
+    status: 'In Transit',
+    contact: { name: 'Sarah Chen', company: 'CtrlChain B.V.' },
+    vehicle: 'NL-82-BKZ',
+    trailer: '441290',
+    references: { 'STOP-3': '441290', 'STOP-4': 'Not Added yet' },
     stops: [
       {
         id: 'STOP-3', type: 'pickup', location: 'Rotterdam Europoort Terminal', appointment: '10:00 – 11:00',
@@ -325,6 +335,7 @@ const ROUTE_META = {
   'nav-notifications': null,
   'nav-chats': null,
   'chat-conversation': null,
+  'trip-detail': null,
   'stop-detail': null,
   'stop-instructions': null,
   'order-overview': null,
@@ -360,6 +371,7 @@ const TITLES = {
   'nav-notifications': 'Notifications',
   'nav-chats': 'Chats',
   'chat-conversation': '',
+  'trip-detail': '',
   'stop-detail': '',
   'stop-instructions': 'Stop instructions',
   'order-overview': '',
@@ -564,6 +576,12 @@ const App = {
     const stop = trip && findStop(trip, stopId);
     if (stop) confirmProposal(trip, stop, milestoneId);
     render();
+  },
+
+  openTripDetail(tripId) {
+    state.activeDetailTripId = tripId;
+    TITLES['trip-detail'] = tripId;
+    this.nav('trip-detail');
   },
 
   openStopDetail(tripId, stopId) {
@@ -996,7 +1014,7 @@ function tripCard(trip) {
       <div class="trip-header">
         <div class="trip-header__left">
           <span class="trip-header__id">${trip.id} • ${totalStops} Stop${totalStops === 1 ? '' : 's'}</span>
-          <a class="trip-header__link" href="javascript:void(0)" onclick="event.stopPropagation()">See trip details</a>
+          <a class="trip-header__link" href="javascript:void(0)" onclick="event.stopPropagation(); App.openTripDetail('${trip.id}')">See trip details</a>
         </div>
         <button type="button" class="trip-header__toggle" onclick="App.toggleTripExpand('${trip.id}')">
           <sl-icon name="${expanded ? 'chevron-up' : 'chevron-down'}" class="trip-header__chevron"></sl-icon>
@@ -1233,7 +1251,7 @@ function activeTripSection(trips) {
         <div class="trip-header">
           <div class="trip-header__left">
             <span class="trip-header__id">${trip.id} • ${totalStops} Stop${totalStops === 1 ? '' : 's'}</span>
-            <a class="trip-header__link" href="javascript:void(0)" onclick="event.stopPropagation()">See trip details</a>
+            <a class="trip-header__link" href="javascript:void(0)" onclick="event.stopPropagation(); App.openTripDetail('${trip.id}')">See trip details</a>
           </div>
           <button type="button" class="trip-header__toggle" onclick="App.toggleTripExpand('${trip.id}')">
             <sl-icon name="${expanded ? 'chevron-up' : 'chevron-down'}" class="trip-header__chevron"></sl-icon>
@@ -2008,6 +2026,108 @@ function unconfirmedProposals(trip) {
       `).join('')}
     </div>
   `;
+}
+
+/* ── TRIP DETAIL ─────────────────────────────────────────────────────── */
+
+function tripStopStatus(trip, stop) {
+  const idx = trip.stops.indexOf(stop);
+  const activeIdx = trip.stops.findIndex(s => s.id === trip.activeStopId);
+  if (idx < activeIdx) return 'Finished';
+  if (idx === activeIdx) return 'In Transit';
+  return 'Not Started';
+}
+
+function tripDetailContent() {
+  const trip = findActiveTrip(state.activeDetailTripId);
+  if (!trip) return h`<div class="t-body-md t-muted" style="padding:24px;">Trip not found.</div>`;
+
+  const statusClass = (trip.status || 'In Transit').toLowerCase().replace(/\s/g, '-');
+
+  const totalOrders = trip.stops.reduce((sum, s) => sum + (s.orders ? s.orders.length : 0), 0);
+  const totalItems = trip.stops.reduce((sum, s) => sum + (s.orders ? s.orders.reduce((a, o) => a + (o.cargo ? o.cargo.totalItems : 0), 0) : 0), 0);
+  const totalWeight = trip.stops.reduce((sum, s) => sum + (s.orders ? s.orders.reduce((a, o) => a + (o.weight || 0), 0) : 0), 0);
+
+  const mapHtml = h`
+    <div class="td__map">
+      <div class="td__map-placeholder">
+        <sl-icon name="map" style="font-size:32px;opacity:0.4"></sl-icon>
+        <span style="opacity:0.5;font-size:13px;margin-top:4px">Route map</span>
+      </div>
+    </div>`;
+
+  const contactHtml = trip.contact ? h`
+    <div class="td__card">
+      <div class="td__card-title">CtrlChain Contact</div>
+      <div class="td__contact-row"><sl-icon name="person" class="td__contact-icon"></sl-icon> ${trip.contact.name}</div>
+      <div class="td__contact-row"><sl-icon name="building" class="td__contact-icon"></sl-icon> ${trip.contact.company}</div>
+    </div>` : '';
+
+  const refRows = trip.stops.map((s, i) => {
+    const typeLabel = s.type === 'pickup' ? 'Pickup' : s.type === 'delivery' ? 'Delivery' : s.type.charAt(0).toUpperCase() + s.type.slice(1);
+    const refVal = (trip.references && trip.references[s.id]) || '—';
+    return h`
+      <div class="td__ref-row">
+        <span class="td__ref-label">Stop ${i + 1} (${typeLabel}):</span>
+        <span class="td__ref-value">${refVal}</span>
+      </div>`;
+  }).join('');
+
+  const refsHtml = h`
+    <div class="td__card">
+      <div class="td__card-title">References</div>
+      ${refRows}
+    </div>`;
+
+  const stopsHtml = trip.stops.map((stop, i) => {
+    const isLast = i === trip.stops.length - 1;
+    const stopStatus = tripStopStatus(trip, stop);
+    const statusCls = stopStatus.toLowerCase().replace(/\s/g, '-');
+    const typeLabel = stop.type === 'pickup' ? 'Pickup' : stop.type === 'delivery' ? 'Delivery' : stop.type.charAt(0).toUpperCase() + stop.type.slice(1);
+    const orderCount = stop.orders ? stop.orders.length : 0;
+    const itemCount = stop.orders ? stop.orders.reduce((a, o) => a + (o.cargo ? o.cargo.totalItems : 0), 0) : 0;
+    const weight = stop.orders ? stop.orders.reduce((a, o) => a + (o.weight || 0), 0) : 0;
+    const summaryParts = [];
+    summaryParts.push(orderCount + ' Order' + (orderCount === 1 ? '' : 's'));
+    if (itemCount) summaryParts.push(itemCount + ' Items');
+    if (weight) summaryParts.push(weight + ' kg');
+
+    return h`
+      <div class="td__stop-row">
+        <div class="td__stop-track">
+          <span class="td__stop-dot td__stop-dot--${statusCls}"></span>
+          ${!isLast ? h`<span class="td__stop-line"></span>` : ''}
+        </div>
+        <div class="td__stop-card" onclick="App.openStopDetail('${trip.id}','${stop.id}')">
+          <div class="td__stop-header">
+            <span class="td__stop-title">Stop #${i + 1}: ${typeLabel}</span>
+            <span class="td__stop-status td__stop-status--${statusCls}">&bull; ${stopStatus}</span>
+          </div>
+          <div class="td__stop-summary">${summaryParts.join(' &middot; ')}</div>
+          <div class="td__stop-meta"><sl-icon name="geo-alt" class="td__stop-meta-icon"></sl-icon> ${stop.location}</div>
+          <div class="td__stop-meta"><sl-icon name="clock" class="td__stop-meta-icon"></sl-icon> Between Today, ${stop.appointment}</div>
+          <div class="td__stop-divider"></div>
+          <div class="td__stop-resources">
+            <span class="td__resources-label">Assigned Resources</span>
+            <span class="td__resources-value">Vehicle: ${trip.vehicle || '—'}    Trailer: ${trip.trailer || '—'}</span>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+
+  return h`
+    <div class="td">
+      <div class="td__overview-header">
+        <span class="sd__section-title" style="margin:0">Trip Overview</span>
+        <span class="td__trip-badge td__trip-badge--${statusClass}">${trip.status || 'In Transit'}</span>
+      </div>
+      ${mapHtml}
+      ${contactHtml}
+      ${refsHtml}
+      <div class="td__stops-timeline">
+        ${stopsHtml}
+      </div>
+    </div>`;
 }
 
 function stopDetailScreen() {
@@ -2823,6 +2943,12 @@ const SCREENS = {
     };
   },
 
+  /* ---------------- TRIP DETAIL ---------------- */
+
+  'trip-detail': () => ({
+    content: tripDetailContent(),
+  }),
+
   /* ---------------- STOP DETAIL ---------------- */
 
   'stop-detail': () => ({
@@ -2864,7 +2990,7 @@ const SCREENS = {
           <div class="trip-header">
             <div class="trip-header__left">
               <span class="trip-header__id">${trip.id} • ${totalStops} Stop${totalStops === 1 ? '' : 's'}</span>
-              <a class="trip-header__link" href="javascript:void(0)" onclick="event.stopPropagation()">See trip details</a>
+              <a class="trip-header__link" href="javascript:void(0)" onclick="event.stopPropagation(); App.openTripDetail('${trip.id}')">See trip details</a>
             </div>
             <button type="button" class="trip-header__toggle" onclick="App.toggleTripExpand('nav-${trip.id}')">
               <sl-icon name="${expanded ? 'chevron-up' : 'chevron-down'}" class="trip-header__chevron"></sl-icon>
@@ -3318,7 +3444,7 @@ function render() {
             <sl-icon name="bell"></sl-icon>
             ${unreadCount ? h`<span class="app-header__bell-dot"></span>` : ''}
           </button>`
-      : route === 'stop-detail'
+      : route === 'trip-detail' || route === 'stop-detail'
         ? h`<button type="button" class="app-header__bell" onclick="App.goTab('nav-chats')" aria-label="Chat"><sl-icon name="chat-square-text"></sl-icon></button>`
         : meta ? h`<div class="app-header__step t-body-sm">${meta.step} / ${meta.total}</div>` : h`<div class="app-header__spacer"></div>`;
     headerHtml = h`
@@ -3392,7 +3518,7 @@ function render() {
 window.addEventListener('hashchange', render);
 window.addEventListener('DOMContentLoaded', () => {
   const route = currentRoute();
-  const needsStopState = ['stop-detail', 'order-overview', 'stop-instructions'].includes(route);
+  const needsStopState = ['trip-detail', 'stop-detail', 'order-overview', 'stop-instructions'].includes(route);
   if (needsStopState && !state.activeDetailTripId) {
     const fallback = FLOW_FIRST_ROUTE[state.activeFlow] || 'self-reg-welcome';
     window.location.hash = fallback;
