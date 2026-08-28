@@ -2363,6 +2363,15 @@ button { font-family: inherit; }
 /* ---------- Stop detail screen (sd-*) ---------- */
 .sd { padding: 0 0 24px; }
 
+.sd__stop-heading {
+  font-family: var(--font-family);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 24px;
+  color: var(--text-neutral-primary, #10152e);
+  margin: 0 0 12px;
+}
+
 .sd__section-title {
   font-family: var(--font-family);
   font-size: 16px;

@@ -106,9 +106,9 @@ const MOCK_ACTIVE_TRIPS = [
       {
         id: 'STOP-1', type: 'pickup', location: 'Meridian Distribution Centre, Coventry', appointment: '08:00 – 09:00',
         orders: [
-          { id: 'ORD-8841937', ref: '#CCA2025-001030.1', customer: 'Freiberger UK Ltd', expectedPallets: 7, actualPallets: null, palletConfirmed: false, palletMismatch: false,
+          { id: 'ORD-8841937', ref: '#CCA2025-001030.1', customer: 'Freiberger UK Ltd', expectedPallets: 7, weight: 270, actualPallets: null, palletConfirmed: false, palletMismatch: false,
             instructions: 'IMPORTANT: include in Assign Driver this information:\nFirst Name: First and Last Name\nLast Name: Driver\'s ID\n\n1- The driver must present himself at the access control and register.\n2- Once registered, he/she will check if he/she can enter the pier or must wait until called by phone.\n3- Once assigned the pier will be directed towards him/her, if it is busy you must wait for another vehicle.\n\nThe use of PPE, reflective waistcoat and safety shoes is mandatory.' },
-          { id: 'ORD-8841938', ref: '#CCA2025-001020.1', customer: 'R&R Ice Cream UK Ltd', expectedPallets: 5, actualPallets: null, palletConfirmed: false, palletMismatch: false,
+          { id: 'ORD-8841938', ref: '#CCA2025-001020.1', customer: 'R&R Ice Cream UK Ltd', expectedPallets: 5, weight: 100, actualPallets: null, palletConfirmed: false, palletMismatch: false,
             instructions: 'Use Gate B for trailers over 13.6m. Report to bay office on arrival. Max dwell time 2 hours.' },
         ],
         milestones: pickupStages('07:55', 'Dock 018'),
@@ -117,10 +117,10 @@ const MOCK_ACTIVE_TRIPS = [
       {
         id: 'STOP-2', type: 'delivery', location: 'Aldi RDC, Bristol', appointment: '14:30 – 15:30',
         orders: [
-          { id: 'ORD-8841937', ref: '#CCA2025-001030.1', customer: 'Freiberger UK Ltd',
+          { id: 'ORD-8841937', ref: '#CCA2025-001030.1', customer: 'Freiberger UK Ltd', weight: 270,
             podStatus: 'rejected', podRejectedReason: 'Wrong document — the file doesn\'t relate to this shipment.',
             instructions: 'No double-stack trailers. Max height 4.2m. Use bay 12–18 for chilled goods.' },
-          { id: 'ORD-8841938', ref: '#CCA2025-001020.1', customer: 'R&R Ice Cream UK Ltd',
+          { id: 'ORD-8841938', ref: '#CCA2025-001020.1', customer: 'R&R Ice Cream UK Ltd', weight: 100,
             podStatus: 'approved', podRejectedReason: null,
             instructions: 'No double-stack trailers. Max height 4.2m. Use bay 12–18 for chilled goods.' },
         ],
@@ -551,8 +551,7 @@ const App = {
     const stop = trip && findStop(trip, stopId);
     if (trip && stop) {
       stop.orders.forEach((o, i) => { state.orderCardExpanded[o.id] = i === 0; });
-      const idx = trip.stops.indexOf(stop) + 1;
-      TITLES['stop-detail'] = 'Stop ' + idx + ' of ' + trip.stops.length + ': ' + (stop.type === 'pickup' ? 'Pickup' : 'Delivery');
+      TITLES['stop-detail'] = trip.id;
     }
     this.nav('stop-detail');
   },
@@ -1972,9 +1971,19 @@ function stopDetailScreen() {
 
   const hasInstructions = stop.orders.some(o => o.instructions);
   const hasPalletEx = stop.milestones.some(m => m.kind === 'pallet-exchange');
+  const stopIdx = trip.stops.indexOf(stop) + 1;
+  const stopHeading = 'Stop ' + stopIdx + ' of ' + trip.stops.length + ': ' + (stop.type === 'pickup' ? 'Pickup' : 'Delivery');
 
   return h`
     <div class="sd">
+      <div class="sd__stop-heading">${stopHeading}</div>
+
+      <div class="sd__milestones">
+        ${stop.milestones.map((m, idx) => sdMilestoneItem(trip, stop, m, idx === 0, idx === stop.milestones.length - 1)).join('')}
+      </div>
+
+      <div class="sd__divider"></div>
+
       <div class="sd__section-title">Address &amp; Appointment</div>
       <div class="sd__addr-block">
         <div class="sd__addr-row">
@@ -2006,13 +2015,6 @@ function stopDetailScreen() {
         ${stop.orders.map((o, idx) => sdOrderCard(trip, stop, o, hasPalletEx)).join('')}
       </div>
 
-      <div class="sd__divider"></div>
-
-      <div class="sd__section-title">Milestone Checklist</div>
-      <div class="sd__milestones">
-        ${stop.milestones.map((m, idx) => sdMilestoneItem(trip, stop, m, idx === 0, idx === stop.milestones.length - 1)).join('')}
-      </div>
-
       <button type="button" class="report-issue-link" onclick="App.openExceptionSheet('${trip.id}','${stop.id}')">
         <sl-icon name="flag" aria-hidden="true"></sl-icon> Report an issue with this stop
       </button>
@@ -2025,7 +2027,10 @@ function stopDetailScreen() {
 
 function sdOrderCard(trip, stop, order, hasPalletEx) {
   const expanded = !!state.orderCardExpanded[order.id];
-  const pallets = order.expectedPallets ? order.expectedPallets + ' Pallets' : '';
+  const palletParts = [];
+  if (order.expectedPallets) palletParts.push(order.expectedPallets + ' Pallets');
+  if (order.weight) palletParts.push(order.weight + ' kg');
+  const pallets = palletParts.join(' · ');
   const needsExchange = hasPalletEx && order.expectedPallets;
   const exchangeLabel = needsExchange ? order.expectedPallets + '/' + order.expectedPallets + ' exchange needed' : '';
 
