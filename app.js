@@ -484,7 +484,8 @@ const App = {
   },
 
   back() {
-    setHash(navHistory.pop() || 'self-reg-welcome');
+    const fallback = FLOW_FIRST_ROUTE[state.activeFlow] || 'self-reg-welcome';
+    setHash(navHistory.pop() || fallback);
   },
 
   set(key, value) {
@@ -888,9 +889,11 @@ const App = {
     render();
   },
 
-  /* Bottom tab bar — a direct hash switch, not this.nav(), since tabs are
-     sibling top-level destinations rather than a back-stack of screens. */
+  /* Bottom tab bar — tabs are sibling top-level destinations. We push the
+     current route so that screens opened FROM a tab can "back" into it. */
   goTab(route) {
+    const current = currentRoute();
+    if (current !== route) navHistory.push(current);
     setHash(route);
   },
 
