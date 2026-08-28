@@ -2103,12 +2103,14 @@ function sdMilestoneItem(trip, stop, m, isFirst, isLast) {
   } else if (m.timestamp) {
     const src = stageSourceLabel(m);
     statusHtml = h`
-      <div class="sd-ms__time-confirmed">
-        <span class="sd-ms__time-chip">
-          <button type="button" class="timestamp-btn timestamp-btn--bold" onclick="App.startEditTimestamp('${stop.id}','${m.id}')">${m.timestamp}</button>
-          <img class="sd-ms__edit-icon" src="assets/icon-edit.svg" alt="edit" />
-        </span>
-        ${src ? h`<span class="sd-ms__source">${src}</span>` : ''}
+      <div class="sd-ms__eta-box">
+        <span class="sd-ms__eta-label">${src || 'Confirmed'}</span>
+        <div class="sd-ms__eta-right">
+          <span class="sd-ms__eta-time">${m.timestamp}</span>
+          <button type="button" class="sd-ms__edit-btn" onclick="App.startEditTimestamp('${stop.id}','${m.id}')">
+            <img class="sd-ms__edit-icon" src="assets/icon-edit.svg" alt="edit" />
+          </button>
+        </div>
       </div>`;
   } else {
     statusHtml = h`<span class="sd-ms__not-reached">Awaiting driver</span>`;
