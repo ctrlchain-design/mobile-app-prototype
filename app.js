@@ -111,7 +111,7 @@ const MOCK_ACTIVE_TRIPS = [
             cargo: { totalItems: 9, perishable: 'Non Perishable', tempSensitive: false, loadingMethod: 'Side Loading', hazardous: false,
               items: [
                 { label: '5 Euro Pallet (120x80x180)', weight: 150, loadAt: 'WF3 4 BY, WAKEFIELD GB', unloadAt: 'DL10 7 JQ, RICHMOND, GB', reqExchange: '5/5', actualExchange: '5', description: 'No description added yet.' },
-                { label: '4 Boxes (40x40x40)', weight: 120, loadAt: 'WF3 4 BY, WAKEFIELD GB', unloadAt: 'DL10 7 JQ, RICHMOND, GB', reqExchange: '0/0', actualExchange: '0', description: 'Promotional display units — handle upright, do not stack.' },
+                { label: '4 Boxes (40x40x40)', weight: 120, loadAt: 'WF3 4 BY, WAKEFIELD GB', unloadAt: 'DL10 7 JQ, RICHMOND, GB', description: 'Promotional display units — handle upright, do not stack.' },
               ] } },
           { id: 'ORD-8841938', ref: '#CCA2025-001020.1', customer: 'R&R Ice Cream UK Ltd', expectedPallets: 5, weight: 100, actualPallets: null, palletConfirmed: false, palletMismatch: false,
             instructions: 'Use Gate B for trailers over 13.6m. Report to bay office on arrival. Max dwell time 2 hours.',
@@ -132,7 +132,7 @@ const MOCK_ACTIVE_TRIPS = [
             cargo: { totalItems: 9, perishable: 'Non Perishable', tempSensitive: false, loadingMethod: 'Side Loading', hazardous: false,
               items: [
                 { label: '5 Euro Pallet (120x80x180)', weight: 150, loadAt: 'WF3 4 BY, WAKEFIELD GB', unloadAt: 'DL10 7 JQ, RICHMOND, GB', reqExchange: '5/5', actualExchange: '5', description: 'No description added yet.' },
-                { label: '4 Boxes (40x40x40)', weight: 120, loadAt: 'WF3 4 BY, WAKEFIELD GB', unloadAt: 'DL10 7 JQ, RICHMOND, GB', reqExchange: '0/0', actualExchange: '0', description: 'Promotional display units — handle upright, do not stack.' },
+                { label: '4 Boxes (40x40x40)', weight: 120, loadAt: 'WF3 4 BY, WAKEFIELD GB', unloadAt: 'DL10 7 JQ, RICHMOND, GB', description: 'Promotional display units — handle upright, do not stack.' },
               ] } },
           { id: 'ORD-8841938', ref: '#CCA2025-001020.1', customer: 'R&R Ice Cream UK Ltd', weight: 100,
             podStatus: 'approved', podRejectedReason: null,
