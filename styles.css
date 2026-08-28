@@ -2578,6 +2578,35 @@ button { font-family: inherit; }
 /* Sub-rows (POD / pallet exchange) inside milestone */
 .sd-ms__sub { margin-top: 8px; }
 
+/* ---------- Order overview modal (oo-*) ---------- */
+.oo { padding: 0; }
+.oo__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 16px;
+}
+.oo__datum { display: flex; flex-direction: column; gap: 2px; }
+.oo__datum-label {
+  font-size: 10px; line-height: 12px; font-weight: 400;
+  color: var(--text-neutral-subtitle, #717171);
+}
+.dark .oo__datum-label { color: var(--text-neutral-subtitle, #a0a4ad); }
+.oo__datum-value {
+  font-size: 12px; line-height: 16px; font-weight: 400;
+  color: var(--text-neutral-primary, #3e3e3e);
+}
+.dark .oo__datum-value { color: var(--text-neutral-primary, #d0d3da); }
+.oo__items { display: flex; flex-direction: column; gap: 8px; }
+.oo__detail-rows { display: flex; flex-direction: column; gap: 8px; }
+.oo__detail-row { display: flex; gap: 8px; align-items: flex-start; }
+.oo__detail-icon { font-size: 20px; flex-shrink: 0; color: var(--text-neutral-subtitle, #717171); margin-top: 1px; }
+.dark .oo__detail-icon { color: var(--text-neutral-subtitle, #a0a4ad); }
+.oo__detail-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.oo__detail-label { font-size: 12px; line-height: 16px; color: var(--text-neutral-subtitle, #717171); }
+.dark .oo__detail-label { color: var(--text-neutral-subtitle, #a0a4ad); }
+.oo__detail-value { font-size: 12px; line-height: 16px; color: var(--text-neutral-primary, #3e3e3e); }
+.dark .oo__detail-value { color: var(--text-neutral-primary, #d0d3da); }
+
 /* ---------- Trip card bottom row ---------- */
 .trip-card__bottom {
   display: flex;

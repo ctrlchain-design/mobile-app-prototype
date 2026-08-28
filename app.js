@@ -107,9 +107,18 @@ const MOCK_ACTIVE_TRIPS = [
         id: 'STOP-1', type: 'pickup', location: 'Meridian Distribution Centre, Coventry', appointment: '08:00 – 09:00',
         orders: [
           { id: 'ORD-8841937', ref: '#CCA2025-001030.1', customer: 'Freiberger UK Ltd', expectedPallets: 7, weight: 270, actualPallets: null, palletConfirmed: false, palletMismatch: false,
-            instructions: 'IMPORTANT: include in Assign Driver this information:\nFirst Name: First and Last Name\nLast Name: Driver\'s ID\n\n1- The driver must present himself at the access control and register.\n2- Once registered, he/she will check if he/she can enter the pier or must wait until called by phone.\n3- Once assigned the pier will be directed towards him/her, if it is busy you must wait for another vehicle.\n\nThe use of PPE, reflective waistcoat and safety shoes is mandatory.' },
+            instructions: 'IMPORTANT: include in Assign Driver this information:\nFirst Name: First and Last Name\nLast Name: Driver\'s ID\n\n1- The driver must present himself at the access control and register.\n2- Once registered, he/she will check if he/she can enter the pier or must wait until called by phone.\n3- Once assigned the pier will be directed towards him/her, if it is busy you must wait for another vehicle.\n\nThe use of PPE, reflective waistcoat and safety shoes is mandatory.',
+            cargo: { totalItems: 9, perishable: 'Non Perishable', tempSensitive: false, loadingMethod: 'Side Loading', hazardous: false,
+              items: [
+                { label: '5 Euro Pallet (120x80x180)', weight: 150, loadAt: 'WF3 4 BY, WAKEFIELD GB', unloadAt: 'DL10 7 JQ, RICHMOND, GB', reqExchange: '5/5', actualExchange: '5', description: 'No description added yet.' },
+                { label: '4 Boxes (40x40x40)', weight: 120 },
+              ] } },
           { id: 'ORD-8841938', ref: '#CCA2025-001020.1', customer: 'R&R Ice Cream UK Ltd', expectedPallets: 5, weight: 100, actualPallets: null, palletConfirmed: false, palletMismatch: false,
-            instructions: 'Use Gate B for trailers over 13.6m. Report to bay office on arrival. Max dwell time 2 hours.' },
+            instructions: 'Use Gate B for trailers over 13.6m. Report to bay office on arrival. Max dwell time 2 hours.',
+            cargo: { totalItems: 4, perishable: 'Perishable', tempSensitive: true, loadingMethod: 'Rear Loading', hazardous: false,
+              items: [
+                { label: '4 Euro Pallet (120x80x180)', weight: 100, loadAt: 'WF3 4 BY, WAKEFIELD GB', unloadAt: 'BS11 8AZ, BRISTOL, GB', reqExchange: '5/5', actualExchange: '5', description: 'Frozen goods — maintain -18C.' },
+              ] } },
         ],
         milestones: pickupStages('07:55', 'Dock 018'),
         exceptions: [],
@@ -119,10 +128,19 @@ const MOCK_ACTIVE_TRIPS = [
         orders: [
           { id: 'ORD-8841937', ref: '#CCA2025-001030.1', customer: 'Freiberger UK Ltd', weight: 270,
             podStatus: 'rejected', podRejectedReason: 'Wrong document — the file doesn\'t relate to this shipment.',
-            instructions: 'No double-stack trailers. Max height 4.2m. Use bay 12–18 for chilled goods.' },
+            instructions: 'No double-stack trailers. Max height 4.2m. Use bay 12–18 for chilled goods.',
+            cargo: { totalItems: 9, perishable: 'Non Perishable', tempSensitive: false, loadingMethod: 'Side Loading', hazardous: false,
+              items: [
+                { label: '5 Euro Pallet (120x80x180)', weight: 150, loadAt: 'WF3 4 BY, WAKEFIELD GB', unloadAt: 'DL10 7 JQ, RICHMOND, GB', reqExchange: '5/5', actualExchange: '5', description: 'No description added yet.' },
+                { label: '4 Boxes (40x40x40)', weight: 120 },
+              ] } },
           { id: 'ORD-8841938', ref: '#CCA2025-001020.1', customer: 'R&R Ice Cream UK Ltd', weight: 100,
             podStatus: 'approved', podRejectedReason: null,
-            instructions: 'No double-stack trailers. Max height 4.2m. Use bay 12–18 for chilled goods.' },
+            instructions: 'No double-stack trailers. Max height 4.2m. Use bay 12–18 for chilled goods.',
+            cargo: { totalItems: 4, perishable: 'Perishable', tempSensitive: true, loadingMethod: 'Rear Loading', hazardous: false,
+              items: [
+                { label: '4 Euro Pallet (120x80x180)', weight: 100, loadAt: 'WF3 4 BY, WAKEFIELD GB', unloadAt: 'BS11 8AZ, BRISTOL, GB', reqExchange: '5/5', actualExchange: '5', description: 'Frozen goods — maintain -18C.' },
+              ] } },
         ],
         milestones: deliveryStages('14:30'),
         exceptions: [],
@@ -309,6 +327,7 @@ const ROUTE_META = {
   'chat-conversation': null,
   'stop-detail': null,
   'stop-instructions': null,
+  'order-overview': null,
   'nav-profile': null,
 };
 
@@ -343,6 +362,7 @@ const TITLES = {
   'chat-conversation': '',
   'stop-detail': '',
   'stop-instructions': 'Stop instructions',
+  'order-overview': '',
   'nav-profile': 'Profile',
 };
 
@@ -394,6 +414,8 @@ function freshState() {
     activeDetailTripId: null,  // which trip's stop we're viewing in stop-detail
     activeDetailStopId: null,  // which stop we're viewing in stop-detail
     orderCardExpanded: {},     // orderId -> boolean for stop-detail order cards
+    orderOverview: null,       // { tripId, stopId, orderId } | null
+    orderOverviewItemExpanded: {}, // itemIdx -> boolean for cargo item cards
 
     chatThreads: deepClone(MOCK_CHAT_THREADS),
     activeChatTripId: null,
@@ -558,6 +580,27 @@ const App = {
 
   toggleOrderCard(orderId) {
     state.orderCardExpanded[orderId] = !state.orderCardExpanded[orderId];
+    render();
+  },
+
+  openOrderOverview(tripId, stopId, orderId) {
+    state.orderOverview = { tripId, stopId, orderId };
+    state.orderOverviewItemExpanded = { 0: true };
+    const trip = findActiveTrip(tripId);
+    const stop = trip && findStop(trip, stopId);
+    const order = stop && stop.orders.find(o => o.id === orderId);
+    TITLES['order-overview'] = order ? 'Order ' + order.ref : 'Order Overview';
+    this.nav('order-overview');
+  },
+
+  closeOrderOverview() {
+    state.orderOverview = null;
+    state.orderOverviewItemExpanded = {};
+    this.back();
+  },
+
+  toggleOrderOverviewItem(idx) {
+    state.orderOverviewItemExpanded[idx] = !state.orderOverviewItemExpanded[idx];
     render();
   },
 
@@ -2065,7 +2108,7 @@ function sdOrderCard(trip, stop, order, hasPalletEx) {
           <span class="sd-order__ref-value">${stop.id}</span>
         </div>
       </div>
-      <button type="button" class="sd__secondary-btn" onclick="void 0">More Info</button>
+      <button type="button" class="sd__secondary-btn" onclick="App.openOrderOverview('${trip.id}','${stop.id}','${order.id}')">More Info</button>
     </div>
   `;
 }
@@ -2140,6 +2183,67 @@ function sdMilestoneItem(trip, stop, m, isFirst, isLast) {
         ${statusHtml}
         ${actionHtml}
         ${subRowsHtml}
+      </div>
+    </div>`;
+}
+
+function orderOverviewContent() {
+  if (!state.orderOverview) return h`<div class="empty-state"><sl-icon name="info-circle" style="font-size:32px"></sl-icon><p>No order selected.</p></div>`;
+  const trip = findActiveTrip(state.orderOverview.tripId);
+  const stop = trip && findStop(trip, state.orderOverview.stopId);
+  const order = stop && stop.orders.find(o => o.id === state.orderOverview.orderId);
+  if (!order) return h`<div class="empty-state"><p>Order not found.</p></div>`;
+
+  const cargo = order.cargo || {};
+  const items = cargo.items || [];
+
+  const summaryGrid = h`
+    <div class="oo__grid">
+      <div class="oo__datum"><span class="oo__datum-label">Total Items</span><span class="oo__datum-value">${cargo.totalItems || '—'}</span></div>
+      <div class="oo__datum"><span class="oo__datum-label">Total Weight</span><span class="oo__datum-value">${order.weight ? order.weight + ' kg' : '—'}</span></div>
+      <div class="oo__datum"><span class="oo__datum-label">Food or Perishable</span><span class="oo__datum-value">${cargo.perishable || '—'}</span></div>
+      <div class="oo__datum"><span class="oo__datum-label">Temperature sensitive</span><span class="oo__datum-value">${cargo.tempSensitive ? 'Yes' : 'No'}</span></div>
+      <div class="oo__datum"><span class="oo__datum-label">Loading Method</span><span class="oo__datum-value">${cargo.loadingMethod || '—'}</span></div>
+      <div class="oo__datum"><span class="oo__datum-label">Shipment Hazardous</span><span class="oo__datum-value">${cargo.hazardous ? 'Yes' : 'No'}</span></div>
+    </div>`;
+
+  return h`
+    <div class="oo">
+      <div class="sd__divider"></div>
+      <div class="sd__section-title">Cargo Summary</div>
+      ${summaryGrid}
+
+      <div class="sd__section-title" style="margin-top:16px">Item Info</div>
+      <div class="oo__items">
+        ${items.map((item, idx) => ooItemCard(item, idx)).join('')}
+      </div>
+    </div>`;
+}
+
+function ooItemCard(item, idx) {
+  const expanded = !!state.orderOverviewItemExpanded[idx];
+  const headerHtml = h`
+    <button type="button" class="sd-order__header" onclick="App.toggleOrderOverviewItem(${idx})">
+      <div class="sd-order__info">
+        <div class="sd-order__customer" style="font-size:12px;font-weight:700">${item.label} &bull; ${item.weight} kg</div>
+      </div>
+      <span class="sd-order__chevron"><sl-icon name="${expanded ? 'chevron-up' : 'chevron-down'}"></sl-icon></span>
+    </button>`;
+
+  if (!expanded) {
+    return h`<div class="sd-order sd-order--collapsed">${headerHtml}</div>`;
+  }
+
+  return h`
+    <div class="sd-order sd-order--expanded">
+      ${headerHtml}
+      <div class="sd-order__divider"></div>
+      <div class="oo__detail-rows">
+        ${item.loadAt ? h`<div class="oo__detail-row"><sl-icon name="person-arms-up" class="oo__detail-icon"></sl-icon><div class="oo__detail-text"><span class="oo__detail-label">Loading at:</span><span class="oo__detail-value">${item.loadAt}</span></div></div>` : ''}
+        ${item.unloadAt ? h`<div class="oo__detail-row"><sl-icon name="truck" class="oo__detail-icon"></sl-icon><div class="oo__detail-text"><span class="oo__detail-label">Unloading at:</span><span class="oo__detail-value">${item.unloadAt}</span></div></div>` : ''}
+        ${item.reqExchange ? h`<div class="oo__detail-row"><sl-icon name="arrow-left-right" class="oo__detail-icon"></sl-icon><div class="oo__detail-text"><span class="oo__detail-label">Requested Exchange</span><span class="oo__detail-value">${item.reqExchange}</span></div></div>` : ''}
+        ${item.actualExchange ? h`<div class="oo__detail-row"><sl-icon name="arrow-repeat" class="oo__detail-icon"></sl-icon><div class="oo__detail-text"><span class="oo__detail-label">Actual Exchanged</span><span class="oo__detail-value">${item.actualExchange}</span></div></div>` : ''}
+        <div class="oo__detail-row"><sl-icon name="card-text" class="oo__detail-icon"></sl-icon><div class="oo__detail-text"><span class="oo__detail-label">Description</span><span class="oo__detail-value">${item.description || 'No description added yet.'}</span></div></div>
       </div>
     </div>`;
 }
@@ -2740,6 +2844,10 @@ const SCREENS = {
 
   'stop-instructions': () => ({
     content: instructionsPageContent(),
+  }),
+
+  'order-overview': () => ({
+    content: orderOverviewContent(),
   }),
 
   /* ---------------- BOTTOM TAB SCREENS ---------------- */
