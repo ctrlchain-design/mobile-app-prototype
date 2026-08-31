@@ -974,7 +974,8 @@ const App = {
     render();
     if (window.speechSynthesis) {
       window.speechSynthesis.cancel();
-      const utter = new SpeechSynthesisUtterance(notif.text);
+      const body = notif.intro ? notif.text.slice(notif.intro.length).trimStart() : notif.text;
+      const utter = new SpeechSynthesisUtterance(body);
       utter.rate = 0.95;
       utter.onend = () => { if (state.pushNotification) { state.pushNotification.speaking = false; render(); } };
       utter.onerror = () => { if (state.pushNotification) { state.pushNotification.speaking = false; render(); } };
