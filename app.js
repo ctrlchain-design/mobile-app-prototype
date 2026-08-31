@@ -215,13 +215,56 @@ const MOCK_TRIP_HISTORY = [
   },
 ];
 
-const MOCK_NOTIFICATIONS = [
-  { id: 'notif-1', type: 'trip-assigned', title: 'New Trip Assigned', body: 'TRIP2026-000123 from Meridian DC, Coventry to Aldi RDC, Bristol is assigned to you. You can start the Order now.', date: 'Today', time: '07:30', read: false },
-  { id: 'notif-2', type: 'trip-assigned', title: 'New Trip Assigned', body: 'TRIP2026-000124 from Heathrow Cargo Terminal to Southampton Docks is assigned to you. You can start the Order now.', date: 'Today', time: '07:15', read: false },
-  { id: 'notif-3', type: 'trip-assigned', title: 'New Trip Assigned', body: 'TRIP2026-000098 from Dover Freight Village to Coventry is assigned to you. You can start the Order now.', date: 'This Week', time: '08:00', read: true },
-  { id: 'notif-4', type: 'pod-rejected', title: 'POD Rejected', body: 'Your uploaded POD for CCA2022-01234.2 has been rejected.', date: 'This Week', time: '14:20', read: false, link: 'Read more' },
-  { id: 'notif-5', type: 'trip-assigned', title: 'New Trip Assigned', body: 'TRIP2026-000095 from Rotterdam, NL to Eindhoven, NL is assigned to you. You can start the Order now.', date: 'This Week', time: '09:00', read: true },
-];
+function buildNotifications() {
+  const items = [];
+  const dismissed = state.dismissedNotifIds || {};
+
+  state.activeTrips.forEach(trip => {
+    const pickup = trip.stops.find(s => s.type === 'pickup');
+    const delivery = trip.stops.find(s => s.type === 'delivery');
+    const from = pickup ? pickup.location : '?';
+    const to = delivery ? delivery.location : '?';
+    items.push({ id: `notif-trip-${trip.id}`, type: 'trip-assigned', title: 'New Trip Assigned',
+      body: `${trip.id} from ${from} to ${to} is assigned to you. You can start the Order now.`,
+      date: 'Today', time: '07:30', read: !!dismissed[`notif-trip-${trip.id}`] });
+
+    trip.stops.forEach(stop => {
+      stop.milestones.forEach(m => {
+        if (m.status === 'proposed') {
+          const nid = `notif-ms-${stop.id}-${m.id}`;
+          items.push({ id: nid, type: 'milestone', title: 'Milestone Update',
+            body: `${m.label} detected at ${stop.location} — confirm to continue.`,
+            date: 'Today', time: m.timestamp || '', read: !!dismissed[nid] });
+        }
+      });
+      stop.orders && stop.orders.forEach(o => {
+        if (o.podStatus === 'rejected') {
+          const nid = `notif-pod-${o.id}`;
+          items.push({ id: nid, type: 'pod-rejected', title: 'POD Rejected',
+            body: `Your uploaded POD for ${o.ref} has been rejected.`,
+            date: 'This Week', time: '', read: !!dismissed[nid], link: 'Read more' });
+        }
+      });
+      stop.exceptions.forEach((e, i) => {
+        const nid = `notif-exc-${stop.id}-${i}`;
+        items.push({ id: nid, type: 'exception', title: 'Issue Reported',
+          body: `${e.type} reported at ${stop.location}.`,
+          date: 'Today', time: '', read: !!dismissed[nid] });
+      });
+    });
+  });
+
+  state.scheduledTrips.forEach(t => {
+    const from = t.stops[0] ? t.stops[0].location : '?';
+    const to = t.stops[t.stops.length - 1] ? t.stops[t.stops.length - 1].location : '?';
+    const nid = `notif-sched-${t.id}`;
+    items.push({ id: nid, type: 'trip-assigned', title: 'New Trip Assigned',
+      body: `${t.id} from ${from} to ${to} is assigned to you. You can start the Order now.`,
+      date: 'This Week', time: '08:00', read: !!dismissed[nid] });
+  });
+
+  return items;
+}
 
 /* A trip can carry more than one conversation (e.g. a general chat plus a
    one-off route-change thread) — this mirrors the web platform's Centralised
@@ -459,7 +502,7 @@ function freshState() {
     tripConversationsSheet: null, // tripId | null
     newConversationSheet: null, // { tripId } | null
 
-    notifications: deepClone(MOCK_NOTIFICATIONS),
+    dismissedNotifIds: {},
     markAllReadDialog: false,
 
     profileBiometrics: false,
@@ -1020,7 +1063,7 @@ const App = {
     render();
   },
   confirmMarkAllRead() {
-    state.notifications.forEach(n => { n.read = true; });
+    buildNotifications().forEach(n => { state.dismissedNotifIds[n.id] = true; });
     state.markAllReadDialog = false;
     render();
   },
@@ -2669,7 +2712,7 @@ function ooItemCard(item, idx) {
    milestone awaiting confirm, a reported exception) rather than static mock
    copy, so it stays honest about what's actually happened in the session. */
 function notificationUnreadCount() {
-  return state.notifications.filter(n => !n.read).length;
+  return buildNotifications().filter(n => !n.read).length;
 }
 
 const NOTIF_TYPE_META = {
@@ -2714,7 +2757,7 @@ function markAllReadDialogMarkup() {
 }
 
 function notificationsScreen() {
-  const items = state.notifications;
+  const items = buildNotifications();
   const hasUnread = items.some(n => !n.read);
   if (!items.length) {
     return h`
