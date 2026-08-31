@@ -900,9 +900,7 @@ const App = {
       const now = formatNowTime();
       const stopIdx = trip.stops.indexOf(stop) + 1;
       const convTitle = `Issue: ${typeLabel} — Stop ${stopIdx} ${stop.location}`;
-      const driverMsg = description
-        ? `Reported issue: ${typeLabel} at ${stop.location}.\n\n${description}`
-        : `Reported issue: ${typeLabel} at ${stop.location}.`;
+      const driverMsg = description || `Reported: ${typeLabel}`;
       const conv = {
         id: 'conv-exc-' + Date.now(),
         tripId: trip.id,
