@@ -215,6 +215,14 @@ const MOCK_TRIP_HISTORY = [
   },
 ];
 
+const MOCK_NOTIFICATIONS = [
+  { id: 'notif-1', type: 'trip-assigned', title: 'New Trip Assigned', body: 'TRIP2026-000123 from Meridian DC, Coventry to Aldi RDC, Bristol is assigned to you. You can start the Order now.', date: 'Today', time: '07:30', read: false },
+  { id: 'notif-2', type: 'trip-assigned', title: 'New Trip Assigned', body: 'TRIP2026-000124 from Heathrow Cargo Terminal to Southampton Docks is assigned to you. You can start the Order now.', date: 'Today', time: '07:15', read: false },
+  { id: 'notif-3', type: 'trip-assigned', title: 'New Trip Assigned', body: 'TRIP2026-000098 from Dover Freight Village to Coventry is assigned to you. You can start the Order now.', date: 'This Week', time: '08:00', read: true },
+  { id: 'notif-4', type: 'pod-rejected', title: 'POD Rejected', body: 'Your uploaded POD for CCA2022-01234.2 has been rejected.', date: 'This Week', time: '14:20', read: false, link: 'Read more' },
+  { id: 'notif-5', type: 'trip-assigned', title: 'New Trip Assigned', body: 'TRIP2026-000095 from Rotterdam, NL to Eindhoven, NL is assigned to you. You can start the Order now.', date: 'This Week', time: '09:00', read: true },
+];
+
 /* A trip can carry more than one conversation (e.g. a general chat plus a
    one-off route-change thread) — this mirrors the web platform's Centralised
    Conversation model, where each conversation is its own record scoped to an
@@ -450,6 +458,9 @@ function freshState() {
     chatFilter: 'all', // 'all' | 'unread'
     tripConversationsSheet: null, // tripId | null
     newConversationSheet: null, // { tripId } | null
+
+    notifications: deepClone(MOCK_NOTIFICATIONS),
+    markAllReadDialog: false,
 
     profileBiometrics: false,
     profileNotifications: true,
@@ -997,6 +1008,20 @@ const App = {
 
   setChatFilter(value) {
     state.chatFilter = value;
+    render();
+  },
+
+  showMarkAllReadDialog() {
+    state.markAllReadDialog = true;
+    render();
+  },
+  closeMarkAllReadDialog() {
+    state.markAllReadDialog = false;
+    render();
+  },
+  confirmMarkAllRead() {
+    state.notifications.forEach(n => { n.read = true; });
+    state.markAllReadDialog = false;
     render();
   },
 
@@ -2643,36 +2668,74 @@ function ooItemCard(item, idx) {
 /* Notifications feed — mostly derived live from actual trip state (a proposed
    milestone awaiting confirm, a reported exception) rather than static mock
    copy, so it stays honest about what's actually happened in the session. */
-function notificationItems() {
-  const items = [];
-  state.activeTrips.forEach(trip => {
-    trip.stops.forEach(stop => {
-      stop.milestones.forEach(m => {
-        if (m.status === 'proposed') {
-          items.push({ icon: 'geo-alt', tone: 'warning', text: `${m.label} detected at ${stop.location} — confirm to continue`, time: m.timestamp });
-        }
-      });
-      stop.exceptions.forEach(e => {
-        items.push({ icon: 'exclamation-triangle', tone: 'critical', text: `${e.type} reported at ${stop.location}`, time: '' });
-      });
-    });
-  });
-  state.scheduledTrips.forEach(t => {
-    items.push({ icon: 'calendar-event', tone: 'info', text: `Trip ${t.id} scheduled — ${t.pickup} → ${t.dropoff}`, time: t.eta });
-  });
-  return items;
+function notificationUnreadCount() {
+  return state.notifications.filter(n => !n.read).length;
 }
 
-function notificationRow(item) {
+const NOTIF_TYPE_META = {
+  'trip-assigned': { icon: 'truck', iconClass: 'notif-icon--trip' },
+  'pod-rejected':  { icon: 'exclamation-triangle', iconClass: 'notif-icon--warning' },
+  'milestone':     { icon: 'geo-alt', iconClass: 'notif-icon--trip' },
+  'exception':     { icon: 'flag', iconClass: 'notif-icon--warning' },
+};
+
+function notificationCard(n) {
+  const meta = NOTIF_TYPE_META[n.type] || NOTIF_TYPE_META['trip-assigned'];
+  const unread = !n.read;
   return h`
-    <div class="card notification-row">
-      <sl-icon class="notification-row__icon" name="${item.icon}"></sl-icon>
-      <div class="notification-row__body">
-        <div class="t-body-md">${item.text}</div>
-        ${item.time ? h`<div class="t-body-sm t-caption">${item.time}</div>` : ''}
+    <div class="notif-card ${unread ? 'notif-card--unread' : ''}">
+      <div class="notif-card__icon-wrap ${meta.iconClass}">
+        <sl-icon name="${meta.icon}"></sl-icon>
+        ${unread ? h`<span class="notif-card__dot"></span>` : ''}
       </div>
-    </div>
-  `;
+      <div class="notif-card__body">
+        <div class="notif-card__header">
+          <span class="notif-card__title ${unread ? '' : 'notif-card__title--read'}">${n.title}</span>
+          <span class="notif-card__time">${n.time}</span>
+        </div>
+        <div class="notif-card__text">${n.body}${n.link ? h` <a class="notif-card__link">${n.link}</a>` : ''}</div>
+      </div>
+    </div>`;
+}
+
+function markAllReadDialogMarkup() {
+  if (!state.markAllReadDialog) return '';
+  return h`
+    <div class="notif-dialog-overlay" onclick="App.closeMarkAllReadDialog()">
+      <div class="notif-dialog" onclick="event.stopPropagation()">
+        <div class="notif-dialog__title">Mark All As Read?</div>
+        <div class="notif-dialog__body">This will mark all your notifications as read. You can still view them in the notification list.</div>
+        <div class="notif-dialog__actions">
+          <button type="button" class="notif-dialog__btn" onclick="App.closeMarkAllReadDialog()">Back</button>
+          <button type="button" class="notif-dialog__btn notif-dialog__btn--primary" onclick="App.confirmMarkAllRead()">Confirm</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function notificationsScreen() {
+  const items = state.notifications;
+  const hasUnread = items.some(n => !n.read);
+  if (!items.length) {
+    return h`
+      <div class="notif-empty">
+        <sl-icon name="bell-slash" class="notif-empty__icon"></sl-icon>
+        <div class="notif-empty__title">No notifications to show.</div>
+        <div class="notif-empty__sub">You have not received any notification yet.</div>
+      </div>`;
+  }
+  const groups = {};
+  items.forEach(n => { (groups[n.date] = groups[n.date] || []).push(n); });
+  const order = ['Today', 'This Week', 'Earlier'];
+  return h`
+    ${hasUnread ? h`<div class="notif-mark-all"><button type="button" class="notif-mark-all__btn" onclick="App.showMarkAllReadDialog()"><sl-icon name="check2-all"></sl-icon></button></div>` : ''}
+    ${order.filter(g => groups[g]).map(g => h`
+      <div class="notif-group">
+        <div class="notif-group__label">${g}</div>
+        ${groups[g].map(n => notificationCard(n)).join('')}
+      </div>
+    `).join('')}
+    ${markAllReadDialogMarkup()}`;
 }
 
 /* ---------- Bottom tab bar (Dashboard / My Trips / Notifications / Chats / Profile) ----------
@@ -3295,16 +3358,9 @@ const SCREENS = {
     };
   },
 
-  'nav-notifications': () => {
-    const items = notificationItems();
-    return {
-      content: h`
-        ${items.length
-          ? items.map(n => notificationRow(n)).join('')
-          : h`<div class="center-state"><div class="t-body-md t-muted">Nothing new right now.</div></div>`}
-      `,
-    };
-  },
+  'nav-notifications': () => ({
+    content: h`${notificationsScreen()}`,
+  }),
 
   'nav-chats': () => ({
     content: h`${chatListScreen()}`,
@@ -3714,7 +3770,7 @@ function render() {
     // "always accessible" per Samuel's direct feedback, not just visible
     // at the top of the page.
     const showBell = route === 'dashboard' && state.dashboardMode === 'full';
-    const unreadCount = showBell ? notificationItems().length : 0;
+    const unreadCount = showBell ? notificationUnreadCount() : 0;
     const rightSlot = showBell
       ? h`<button type="button" class="app-header__bell" onclick="App.goTab('nav-notifications')" aria-label="Notifications">
             <sl-icon name="bell"></sl-icon>
