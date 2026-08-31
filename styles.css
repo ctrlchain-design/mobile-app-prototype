@@ -1966,6 +1966,10 @@ button { font-family: inherit; }
   background: #fcf0de;
   border: 1px solid #eb8900;
 }
+.hero-card--assumed {
+  background: var(--warning-surface-lighter, #fff8e1);
+  border: 1px solid var(--color-warning-500, #ff9800);
+}
 .hero-card--complete {
   background: var(--surface-neutral-subtle, #f0f2f5);
   border: 1px solid var(--border-neutral-subtle, #dde0e4);
@@ -1981,6 +1985,10 @@ button { font-family: inherit; }
 .dark .hero-card--manual {
   background: color-mix(in srgb, #eb8900 12%, transparent);
   border-color: color-mix(in srgb, #eb8900 30%, transparent);
+}
+.dark .hero-card--assumed {
+  background: color-mix(in srgb, #ff9800 12%, transparent);
+  border-color: color-mix(in srgb, #ff9800 40%, transparent);
 }
 .dark .hero-card--complete {
   background: var(--surface-neutral-subtle, #1c1e22);
@@ -2015,7 +2023,9 @@ button { font-family: inherit; }
 .dark .hero-card--action .hero-card__eyebrow { color: var(--color-brand-300, #8bbd7e); }
 .dark .hero-card--info .hero-card__eyebrow { color: var(--color-brand-300, #8bbd7e); }
 .hero-card--manual .hero-card__eyebrow { color: #804000; }
+.hero-card--assumed .hero-card__eyebrow { color: var(--color-warning-700, #e65100); }
 .dark .hero-card--manual .hero-card__eyebrow { color: var(--color-warning-300, #ffb74d); }
+.dark .hero-card--assumed .hero-card__eyebrow { color: var(--color-warning-300, #ffb74d); }
 .hero-card--complete .hero-card__eyebrow { color: var(--text-neutral-caption); }
 .hero-card__update {
   display: flex;
@@ -2147,6 +2157,11 @@ button { font-family: inherit; }
   color: #fff;
 }
 .hero-card--manual .hero-card__cta:active { opacity: 0.85; }
+.hero-card--assumed .hero-card__cta {
+  background: #6f8f2f;
+  color: #fff;
+}
+.hero-card--assumed .hero-card__cta:active { opacity: 0.85; }
 .hero-card .hero-card__cta--secondary {
   flex: none;
   background: transparent;

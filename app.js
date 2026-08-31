@@ -1457,7 +1457,6 @@ function activeTripSection(trips) {
           </button>
         </div>
         ${heroCard(trip)}
-        ${assumedEventsGate(trip)}
         ${expanded ? h`
           <div class="all-stops-label">All Stops</div>
           ${compactRouteStrip(trip)}
@@ -2028,14 +2027,19 @@ function newConversationSheetMarkup() {
    4. Unconfirmed proposals — missed confirmations the driver can revisit */
 
 function getHeroState(trip) {
+  const assumed = [];
   const proposals = [];
   const manualActions = [];
   trip.stops.forEach(stop => {
     stop.milestones.forEach(m => {
+      if (m.status === 'assumed') assumed.push({ milestone: m, stop });
       if (m.status === 'proposed') proposals.push({ milestone: m, stop });
       if (m.status === 'ready') manualActions.push({ milestone: m, stop });
     });
   });
+  if (assumed.length) {
+    return { type: 'assumed', current: assumed[0], unconfirmed: [], manualActions };
+  }
   if (proposals.length) {
     const latest = proposals[proposals.length - 1];
     const unconfirmed = proposals.slice(0, -1);
@@ -2068,6 +2072,34 @@ function heroTripContext(trip, stop) {
 
 function heroCard(trip) {
   const hero = getHeroState(trip);
+  if (hero.type === 'assumed') {
+    const { milestone: m, stop } = hero.current;
+    const stopIdx = trip.stops.indexOf(stop) + 1;
+    const totalStops = trip.stops.length;
+    const eventMap = {
+      arrived: stop.type === 'pickup' ? 'arrival at pickup' : 'arrival at delivery',
+      departed: stop.type === 'pickup' ? 'departure from pickup' : 'departure from delivery',
+    };
+    const eventLabel = eventMap[m.id] || m.label;
+    return h`
+      <div class="hero-card hero-card--assumed">
+        <div class="hero-card__top">
+          <div class="hero-card__eyebrow hero-card__eyebrow--warning"><sl-icon name="exclamation-triangle" style="font-size:14px"></sl-icon> Unverified ${eventLabel}</div>
+        </div>
+        ${progressBar(trip)}
+        <div class="hero-card__update">
+          <div class="hero-card__content-block">
+            <div class="hero-card__title"><strong>Stop ${stopIdx} of ${totalStops}:</strong> Did you arrive?</div>
+            <div class="hero-card__sub">We detected your <strong>${eventLabel}</strong> at <strong>${stop.location}</strong> at <strong>${m.timestamp}</strong>, but you didn't confirm.</div>
+          </div>
+          <div class="hero-card__actions">
+            <button type="button" class="hero-card__cta" onclick="App.confirmAssumed('${trip.id}','${stop.id}','${m.id}')">Yes, I arrived</button>
+            <button type="button" class="hero-card__edit" onclick="App.correctAssumed('${trip.id}','${stop.id}','${m.id}')">No, wasn't there</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
   if (hero.type === 'proposal') {
     const { milestone: m, stop } = hero.current;
     const stopIdx = trip.stops.indexOf(stop) + 1;
