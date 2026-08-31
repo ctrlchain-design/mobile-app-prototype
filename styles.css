@@ -227,6 +227,44 @@ button { font-family: inherit; }
 }
 /* Not enough room beside the phone frame to avoid running off-screen —
    dock it along the bottom instead rather than clipping. */
+.context-sticky {
+  position: fixed;
+  right: calc(50% + 207px);
+  top: 180px;
+  width: 180px;
+  background: #e3edf7;
+  color: #1e3a5f;
+  padding: 12px 14px;
+  border-radius: 2px;
+  box-shadow: 0 10px 24px rgba(0,0,0,0.18);
+  transform: rotate(1.5deg);
+  font-family: var(--font-family);
+  font-size: 12px;
+  line-height: 1.45;
+  z-index: 50;
+}
+.context-sticky__title {
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.context-sticky__body { margin-top: 6px; }
+.context-sticky__body strong { font-weight: 600; }
+@media (max-width: 900px) {
+  .context-sticky {
+    position: fixed;
+    left: 50%;
+    top: auto;
+    bottom: 16px;
+    right: auto;
+    transform: translateX(-50%) rotate(0deg);
+    width: min(340px, calc(100vw - 32px));
+    max-height: 30vh;
+    overflow-y: auto;
+  }
+}
 @media (max-width: 900px) {
   .reviewer-sticky {
     position: fixed;

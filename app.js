@@ -3443,12 +3443,13 @@ const SCREENS = {
         ${palletExchangeSheetMarkup()}
         ${addTripSheetMarkup()}
       `,
-      reviewerNote: (visibleActiveTrips.some(t => t.stops.some(s => s.milestones.some(m => m.status === 'assumed'))) ? h`
-        <div class="reviewer-sticky__title">Assumed state — what's happening</div>
-        <div class="reviewer-sticky__body">The driver ignored or swiped away the geofence confirmation. After a timeout (~60 min, or when a subsequent geofence event fires), the system auto-resolves the event as <strong>system-assumed</strong> — treated as operationally true so the trip can progress, but flagged as <em>unverified</em> everywhere it's consumed (ops dashboards, billing, waiting-time).</div>
-        <div class="reviewer-sticky__body" style="margin-top:6px">The driver can still confirm ("Yes, I arrived") or correct ("No, wasn't there") from the hero card or stop details. Correcting reverts the milestone to pending — downstream effects should be revocable.</div>
-        <div class="reviewer-sticky__body" style="margin-top:6px"><strong>Three confidence tiers:</strong> system-detected → driver-confirmed / system-assumed. Events on the never-automate-alone list (loading, POD, damage) can never reach assumed — they stay unresolved until the driver acts.</div>
-      ` : '') + (state.activeTrips.length > 1 ? h`
+      contextNote: visibleActiveTrips.some(t => t.stops.some(s => s.milestones.some(m => m.status === 'assumed'))) ? h`
+        <div class="context-sticky__title">Why this card?</div>
+        <div class="context-sticky__body">The driver didn't confirm a geofence event. After a timeout, the system marks it as <strong>assumed</strong> — the trip keeps moving, but the event stays flagged as unverified.</div>
+        <div class="context-sticky__body">The driver can confirm or correct it at any time. Correcting reverts the event to pending.</div>
+        <div class="context-sticky__body"><strong>Rule:</strong> only arrival/departure can be assumed. Loading, POD, and damage always require the driver.</div>
+      ` : '',
+      reviewerNote: (state.activeTrips.length > 1 ? h`
         <div class="reviewer-sticky__title">Active trips</div>
         <button type="button" class="reviewer-sticky__action" onclick="App.setAndRerender('hideSecondActiveTrip', false)">Show 2nd active trip${!state.hideSecondActiveTrip ? ' &#10003;' : ''}</button>
         <button type="button" class="reviewer-sticky__action" onclick="App.setAndRerender('hideSecondActiveTrip', true)">Hide 2nd active trip${state.hideSecondActiveTrip ? ' &#10003;' : ''}</button>
@@ -4045,6 +4046,16 @@ function render() {
     } else {
       sticky.innerHTML = '';
       sticky.style.display = 'none';
+    }
+  }
+  const ctx = document.getElementById('context-sticky');
+  if (ctx) {
+    if (screen.contextNote) {
+      ctx.innerHTML = screen.contextNote;
+      ctx.style.display = 'block';
+    } else {
+      ctx.innerHTML = '';
+      ctx.style.display = 'none';
     }
   }
 }
