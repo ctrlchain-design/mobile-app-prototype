@@ -54,7 +54,9 @@ const MOCK_RETURNING_DRIVER = { firstName: 'Jordan', lastName: 'Reyes', carrier:
                 exception for ops to review, not resolved silently.
    Status values: 'eta' (informational) | 'pending' (blocked, future) |
    'ready' (pod/pallet-exchange stage unlocked, awaiting the driver)
-   | 'proposed' (auto stage awaiting confirm) | 'confirmed' (done).
+   | 'proposed' (auto stage awaiting confirm) | 'confirmed' (done)
+   | 'assumed' (auto-resolved after driver never confirmed — carries an
+     "unverified" flag; see confirmation-confidence-design.md).
    completeMilestone() advances a stop
    to its next stage and, on a stop's last stage, hands the trip's
    activeStopId to the next stop — so the whole trip progresses, not just one
@@ -166,7 +168,12 @@ const MOCK_ACTIVE_TRIPS = [
         orders: [
           { id: 'ORD-9920001', ref: '#CCA2025-001045.1', customer: 'Lidl Netherlands BV' },
         ],
-        milestones: pickupStages('09:50'),
+        milestones: [
+          { id: 'eta', label: 'Pickup ETA', kind: 'eta', status: 'eta', source: null, timestamp: '09:50' },
+          { id: 'arrived', label: 'Arrived at pickup', kind: 'auto', status: 'assumed', source: 'automated', timestamp: '10:12' },
+          { id: 'loaded', label: 'Cargo loaded', kind: 'auto', status: 'proposed', source: 'automated', timestamp: '11:14' },
+          { id: 'departed', label: 'Departed pickup', kind: 'auto', status: 'pending', source: null, timestamp: null },
+        ],
         exceptions: [],
       },
       {
@@ -660,6 +667,30 @@ const App = {
     const trip = findActiveTrip(tripId);
     const stop = trip && findStop(trip, stopId);
     if (stop) confirmProposal(trip, stop, milestoneId);
+    render();
+  },
+
+  confirmAssumed(tripId, stopId, milestoneId) {
+    const trip = findActiveTrip(tripId);
+    const stop = trip && findStop(trip, stopId);
+    if (stop) {
+      const m = stop.milestones.find(x => x.id === milestoneId);
+      if (m && m.status === 'assumed') m.status = 'confirmed';
+    }
+    render();
+  },
+
+  correctAssumed(tripId, stopId, milestoneId) {
+    const trip = findActiveTrip(tripId);
+    const stop = trip && findStop(trip, stopId);
+    if (stop) {
+      const m = stop.milestones.find(x => x.id === milestoneId);
+      if (m && m.status === 'assumed') {
+        m.status = 'pending';
+        m.timestamp = null;
+        m.source = null;
+      }
+    }
     render();
   },
 
@@ -1319,11 +1350,6 @@ function simulateGeofenceEntry(trip, stop) {
       text: fullText, preview: preview,
       location: stop.location, speaking: false,
     };
-    setTimeout(() => {
-      if (state.pushNotification && state.pushNotification.stopId === stop.id) {
-        App.toggleNotificationTts();
-      }
-    }, 600);
   }
 }
 
@@ -1415,6 +1441,7 @@ function activeTripSection(trips) {
           </button>
         </div>
         ${heroCard(trip)}
+        ${assumedEventsGate(trip)}
         ${expanded ? h`
           <div class="all-stops-label">All Stops</div>
           ${compactRouteStrip(trip)}
@@ -1440,7 +1467,7 @@ function hasPendingPallets(stop) {
 function stopStatus(stop) {
   const real = stop.milestones.filter(m => m.kind !== 'eta');
   const blocking = real.filter(m => m.kind !== 'pallet-exchange');
-  if (blocking.every(m => m.status === 'confirmed')) return 'completed';
+  if (blocking.every(m => m.status === 'confirmed' || m.status === 'assumed')) return 'completed';
   if (real.some(m => m.status !== 'pending')) return 'active';
   return 'upcoming';
 }
@@ -1489,6 +1516,7 @@ function stopItem(trip, stop) {
 }
 
 function stageSourceLabel(m) {
+  if (m.status === 'assumed') return 'Unverified';
   if (m.source === 'manual') return 'Updated by driver';
   if (m.source === 'automated') return m.kind === 'auto' ? 'Geofence' : 'Automated';
   return '';
@@ -1499,6 +1527,7 @@ function stageSourceLabel(m) {
 function stageItem(trip, stop, m) {
   const editing = state.editingMilestone && state.editingMilestone.milestoneId === m.id;
   const dotClass = m.status === 'confirmed' ? 'done'
+    : m.status === 'assumed' ? 'assumed'
     : (m.status === 'proposed' || m.status === 'ready') ? 'active'
     : m.status === 'eta' ? 'eta' : 'todo';
   // Pallet exchange has no stage-level count any more — it's logged per
@@ -2000,7 +2029,7 @@ function getHeroState(trip) {
     return { type: 'manual', current: manualActions[0], unconfirmed: [], manualActions };
   }
   const allDone = trip.stops.every(s =>
-    s.milestones.filter(m => m.kind !== 'pallet-exchange').every(m => m.status === 'confirmed')
+    s.milestones.filter(m => m.kind !== 'pallet-exchange').every(m => m.status === 'confirmed' || m.status === 'assumed')
   );
   if (allDone) return { type: 'complete', current: null, unconfirmed: [], manualActions: [] };
   const activeStop = trip.stops.find(s => s.id === trip.activeStopId) || trip.stops[0];
@@ -2260,6 +2289,38 @@ function unconfirmedProposals(trip) {
       `).join('')}
     </div>
   `;
+}
+
+function assumedEventsGate(trip) {
+  const assumed = [];
+  trip.stops.forEach(stop => {
+    stop.milestones.forEach(m => {
+      if (m.status === 'assumed') assumed.push({ milestone: m, stop });
+    });
+  });
+  if (!assumed.length) return '';
+  return assumed.map(({ milestone: m, stop }) => {
+    const eventMap = {
+      arrived: stop.type === 'pickup' ? 'arrival at pickup' : 'arrival at delivery',
+      departed: stop.type === 'pickup' ? 'departure from pickup' : 'departure from delivery',
+    };
+    const eventLabel = eventMap[m.id] || m.label;
+    return h`
+      <div class="assumed-gate">
+        <div class="assumed-gate__header">
+          <sl-icon name="exclamation-triangle" style="font-size:14px"></sl-icon>
+          Unverified ${eventLabel}
+        </div>
+        <div class="assumed-gate__text">
+          We detected your <strong>${eventLabel}</strong> at <strong>${stop.location}</strong> at <strong>${m.timestamp}</strong>, but you didn't confirm. Is this correct?
+        </div>
+        <div class="assumed-gate__actions">
+          <button type="button" class="assumed-gate__btn assumed-gate__btn--confirm" onclick="App.confirmAssumed('${trip.id}','${stop.id}','${m.id}')">Yes, I arrived</button>
+          <button type="button" class="assumed-gate__btn assumed-gate__btn--correct" onclick="App.correctAssumed('${trip.id}','${stop.id}','${m.id}')">No, wasn't there</button>
+        </div>
+      </div>
+    `;
+  }).join('');
 }
 
 /* ── TRIP DETAIL ─────────────────────────────────────────────────────── */
@@ -2590,8 +2651,9 @@ function sdMilestoneItem(trip, stop, m, isFirst, isLast) {
   const isPending = m.status === 'pending';
   const isProposed = m.status === 'proposed';
   const isConfirmed = m.status === 'confirmed';
+  const isAssumed = m.status === 'assumed';
   const isReady = m.status === 'ready';
-  const isActive = isEta || isConfirmed || isProposed || isReady;
+  const isActive = isEta || isConfirmed || isProposed || isReady || isAssumed;
   const editing = state.editingMilestone && state.editingMilestone.milestoneId === m.id;
 
   let statusHtml;
@@ -2647,7 +2709,7 @@ function sdMilestoneItem(trip, stop, m, isFirst, isLast) {
     <div class="sd-ms${isFirst ? ' sd-ms--first' : ''}${isLast ? ' sd-ms--last' : ''}">
       <div class="sd-ms__track">
         ${!isFirst ? '<div class="sd-ms__line-top"></div>' : ''}
-        <div class="sd-ms__dot ${isActive ? 'sd-ms__dot--active' : 'sd-ms__dot--pending'}"></div>
+        <div class="sd-ms__dot ${isAssumed ? 'sd-ms__dot--assumed' : isActive ? 'sd-ms__dot--active' : 'sd-ms__dot--pending'}"></div>
         ${!isLast ? '<div class="sd-ms__line-bot"></div>' : ''}
       </div>
       <div class="sd-ms__body">
