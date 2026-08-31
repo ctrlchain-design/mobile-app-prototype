@@ -450,6 +450,10 @@ function freshState() {
     chatFilter: 'all', // 'all' | 'unread'
     tripConversationsSheet: null, // tripId | null
     newConversationSheet: null, // { tripId } | null
+
+    profileBiometrics: false,
+    profileNotifications: true,
+    profileTimeFormat12h: true,
   };
 }
 
@@ -886,11 +890,34 @@ const App = {
     if (stop) {
       const typeValue = typeEl ? typeEl.value : EXCEPTION_TYPES[0].value;
       const typeLabel = (EXCEPTION_TYPES.find(t => t.value === typeValue) || EXCEPTION_TYPES[0]).label;
+      const description = descEl ? descEl.value.trim() : '';
       stop.exceptions.push({
         type: typeLabel,
         orderId: orderEl && orderEl.value !== '__all' ? orderEl.value : null,
-        description: descEl ? descEl.value : '',
+        description,
       });
+
+      const now = formatNowTime();
+      const stopIdx = trip.stops.indexOf(stop) + 1;
+      const convTitle = `Issue: ${typeLabel} — Stop ${stopIdx} ${stop.location}`;
+      const driverMsg = description
+        ? `Reported issue: ${typeLabel} at ${stop.location}.\n\n${description}`
+        : `Reported issue: ${typeLabel} at ${stop.location}.`;
+      const conv = {
+        id: 'conv-exc-' + Date.now(),
+        tripId: trip.id,
+        title: convTitle,
+        contact: trip.contact || { name: 'CtrlChain', company: 'CtrlChain B.V.' },
+        messages: [
+          { id: 'msg-' + Date.now() + '-sys', from: 'system', text: `Issue reported for ${trip.id} — ${stop.location}`, time: now },
+          { id: 'msg-' + Date.now() + '-drv', from: 'driver', text: driverMsg, time: now },
+          { id: 'msg-' + Date.now() + '-ack', from: 'contact', text: `Thanks for reporting this. We've logged the ${typeLabel.toLowerCase()} issue and will get back to you shortly.`, time: now, unread: true },
+        ],
+      };
+      state.conversations.unshift(conv);
+      state.exceptionSheet = null;
+      this.openConversation(conv.id);
+      return;
     }
     state.exceptionSheet = null;
     render();
@@ -3292,12 +3319,63 @@ const SCREENS = {
 
   'nav-profile': () => {
     const { name, carrier, phone } = currentDriverIdentity();
+    const initials = name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+    const bio = state.profileBiometrics;
+    const notif = state.profileNotifications;
+    const t12 = state.profileTimeFormat12h;
+
+    const toggle = (key) => `App.set('${key}', !state.${key}); render();`;
+    const row = (icon, label, right, onclick) => h`
+      <button type="button" class="profile-row" ${onclick ? `onclick="${onclick}"` : ''}>
+        <sl-icon name="${icon}" class="profile-row__icon"></sl-icon>
+        <span class="profile-row__label">${label}</span>
+        <span class="profile-row__right">${right}</span>
+      </button>`;
+    const chevron = h`<sl-icon name="chevron-right" class="profile-row__chevron"></sl-icon>`;
+    const toggleEl = (key) => h`<sl-switch ${state[key] ? 'checked' : ''} size="small" onclick="event.stopPropagation(); ${toggle(key)}"></sl-switch>`;
+
     return {
       content: h`
-        <div class="card">
-          <div class="t-label-lg">${name}</div>
-          <div class="t-body-sm t-muted">${carrier}</div>
-          <div class="t-body-sm t-muted">${phone}</div>
+        <div class="profile-hero">
+          <div class="profile-hero__avatar">${initials}</div>
+          <div class="profile-hero__info">
+            <div class="profile-hero__name">${name}</div>
+            <div class="profile-hero__carrier">${carrier}</div>
+            <div class="profile-hero__phone">${phone}</div>
+          </div>
+        </div>
+
+        <div class="profile-section">
+          <div class="profile-section__title">Account</div>
+          ${row('key', 'Change Password', chevron)}
+          ${row('shield-lock', 'Change PIN', chevron)}
+          ${row('fingerprint', 'Biometrics', toggleEl('profileBiometrics'))}
+        </div>
+
+        <div class="profile-section">
+          <div class="profile-section__title">Notifications</div>
+          ${row('bell', 'Push Notifications', toggleEl('profileNotifications'))}
+          ${row('envelope', 'Email Notifications', chevron)}
+        </div>
+
+        <div class="profile-section">
+          <div class="profile-section__title">Preferences</div>
+          ${row('translate', 'Language', h`<span class="profile-row__value">English</span>${chevron}`)}
+          ${row('rulers', 'Unit of Measure', h`<span class="profile-row__value">Metric</span>${chevron}`)}
+          ${row('clock', '12-Hour Format', toggleEl('profileTimeFormat12h'))}
+        </div>
+
+        <div class="profile-section">
+          <div class="profile-section__title">Legal</div>
+          ${row('file-text', 'Terms and Conditions', chevron)}
+          ${row('shield-check', 'Privacy Policy', chevron)}
+        </div>
+
+        <div class="profile-footer">
+          <div class="profile-version">Version 6.0.2</div>
+          <button type="button" class="profile-logout" onclick="App.restartFlow()">
+            <sl-icon name="box-arrow-right"></sl-icon> Log Out
+          </button>
         </div>
       `,
     };
