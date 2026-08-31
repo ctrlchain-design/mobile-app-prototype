@@ -3443,7 +3443,12 @@ const SCREENS = {
         ${palletExchangeSheetMarkup()}
         ${addTripSheetMarkup()}
       `,
-      reviewerNote: (state.activeTrips.length > 1 ? h`
+      reviewerNote: (visibleActiveTrips.some(t => t.stops.some(s => s.milestones.some(m => m.status === 'assumed'))) ? h`
+        <div class="reviewer-sticky__title">Assumed state — what's happening</div>
+        <div class="reviewer-sticky__body">The driver ignored or swiped away the geofence confirmation. After a timeout (~60 min, or when a subsequent geofence event fires), the system auto-resolves the event as <strong>system-assumed</strong> — treated as operationally true so the trip can progress, but flagged as <em>unverified</em> everywhere it's consumed (ops dashboards, billing, waiting-time).</div>
+        <div class="reviewer-sticky__body" style="margin-top:6px">The driver can still confirm ("Yes, I arrived") or correct ("No, wasn't there") from the hero card or stop details. Correcting reverts the milestone to pending — downstream effects should be revocable.</div>
+        <div class="reviewer-sticky__body" style="margin-top:6px"><strong>Three confidence tiers:</strong> system-detected → driver-confirmed / system-assumed. Events on the never-automate-alone list (loading, POD, damage) can never reach assumed — they stay unresolved until the driver acts.</div>
+      ` : '') + (state.activeTrips.length > 1 ? h`
         <div class="reviewer-sticky__title">Active trips</div>
         <button type="button" class="reviewer-sticky__action" onclick="App.setAndRerender('hideSecondActiveTrip', false)">Show 2nd active trip${!state.hideSecondActiveTrip ? ' &#10003;' : ''}</button>
         <button type="button" class="reviewer-sticky__action" onclick="App.setAndRerender('hideSecondActiveTrip', true)">Hide 2nd active trip${state.hideSecondActiveTrip ? ' &#10003;' : ''}</button>

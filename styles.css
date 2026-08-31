@@ -262,6 +262,12 @@ button { font-family: inherit; }
   text-align: center;
 }
 .reviewer-sticky__action:hover { background: rgba(255,255,255,0.6); }
+.reviewer-sticky__body {
+  font-size: 11px;
+  line-height: 1.45;
+  opacity: 0.8;
+  margin-top: 4px;
+}
 .reviewer-sticky__stop-label {
   font-size: 10px;
   font-weight: 700;
