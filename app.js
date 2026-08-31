@@ -746,6 +746,12 @@ const App = {
     render();
   },
 
+  triggerInstructionsNotification(tripId, stopId) {
+    const trip = findActiveTrip(tripId);
+    const stop = trip && findStop(trip, stopId);
+    if (trip && stop) fireInstructionsNotification(trip, stop);
+  },
+
   triggerGeofenceExit(tripId, stopId) {
     const trip = findActiveTrip(tripId);
     const stop = trip && findStop(trip, stopId);
@@ -1336,20 +1342,29 @@ function simulateGeofenceEntry(trip, stop) {
   const pe = stop.milestones.find(m => m.kind === 'pallet-exchange');
   if (pe && pe.status === 'pending') pe.status = 'ready';
 
+}
+
+function fireInstructionsNotification(trip, stop) {
   const hasInstructions = stop.orders.some(o => o.instructions);
-  if (hasInstructions) {
-    const preview = stop.orders.filter(o => o.instructions)
-      .map(o => o.instructions.split('\n')[0]).join(' | ');
-    const stopType = stop.type === 'pickup' ? 'pickup' : stop.type === 'delivery' ? 'delivery' : stop.type;
-    const intro = 'You have a ' + stopType + ' instruction. ';
-    const fullText = intro + stop.orders.filter(o => o.instructions).map(o =>
-      (o.customer || o.ref) + '. ' + o.instructions.replace(/\n/g, '. ')
-    ).join('. Next order. ');
-    state.pushNotification = {
-      tripId: trip.id, stopId: stop.id,
-      text: fullText, preview: preview,
-      location: stop.location, speaking: false,
-    };
+  if (!hasInstructions) return;
+  const preview = stop.orders.filter(o => o.instructions)
+    .map(o => o.instructions.split('\n')[0]).join(' | ');
+  const stopType = stop.type === 'pickup' ? 'pickup' : stop.type === 'delivery' ? 'delivery' : stop.type;
+  const intro = 'You have a ' + stopType + ' instruction.';
+  const fullText = intro + ' ' + stop.orders.filter(o => o.instructions).map(o =>
+    (o.customer || o.ref) + '. ' + o.instructions.replace(/\n/g, '. ')
+  ).join('. Next order. ');
+  state.pushNotification = {
+    tripId: trip.id, stopId: stop.id,
+    text: fullText, intro: intro, preview: preview,
+    location: stop.location, speaking: false,
+  };
+  render();
+  if (window.speechSynthesis) {
+    window.speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(intro);
+    utter.rate = 0.95;
+    window.speechSynthesis.speak(utter);
   }
 }
 
@@ -3394,6 +3409,7 @@ const SCREENS = {
               <div class="reviewer-sticky__stop-label">Stop ${stopNum}: ${s.type === 'pickup' ? 'Pickup' : 'Delivery'}</div>
               <button type="button" class="reviewer-sticky__action" onclick="App.triggerGeofenceEntry('${t.id}','${s.id}')">Entry at ${s.location}</button>
               <button type="button" class="reviewer-sticky__action" onclick="App.triggerGeofenceExit('${t.id}','${s.id}')">Exit from ${s.location}</button>
+              ${s.orders.some(o => o.instructions) ? h`<button type="button" class="reviewer-sticky__action" onclick="App.triggerInstructionsNotification('${t.id}','${s.id}')">Instructions available</button>` : ''}
             `;
           }).join('')}
         `;
