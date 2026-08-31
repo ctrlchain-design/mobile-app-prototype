@@ -354,6 +354,13 @@ const OAUTH_PROVIDERS = {
       { name: 'Jordan Reyes', email: 'jordan.reyes@icloud.com', initial: 'J', color: '#5a5a5f' },
     ],
   },
+  microsoft: {
+    label: 'Microsoft', domain: 'login.microsoftonline.com', logo: 'assets/social-microsoft.svg',
+    share: 'name, email address, and profile picture',
+    accounts: [
+      { name: 'Jordan Reyes', email: 'jordan.reyes@outlook.com', initial: 'J', color: '#0078d4' },
+    ],
+  },
 };
 
 /* Returns whichever mock driver record the currently-displayed portal-flow screen should show —
@@ -368,6 +375,7 @@ const ROUTE_META = {
   'self-reg-welcome': null,
   'self-reg-social-google': null,
   'self-reg-social-apple': null,
+  'self-reg-social-microsoft': null,
   'self-reg-signup': { flow: 'self-reg', step: 1, total: 6 },
   'self-reg-otp': { flow: 'self-reg', step: 2, total: 6 },
   'self-reg-password': { flow: 'self-reg', step: 3, total: 6 },
@@ -502,7 +510,10 @@ function freshState() {
     tripConversationsSheet: null, // tripId | null
     newConversationSheet: null, // { tripId } | null
 
-    dismissedNotifIds: {},
+    dismissedNotifIds: {
+      'notif-pod-ORD-8841937': true,
+      'notif-sched-TRIP2026-000124': true,
+    },
     markAllReadDialog: false,
 
     profileBiometrics: false,
@@ -2840,12 +2851,17 @@ const SCREENS = {
         </div>
         <div class="launch-hero__actions" role="group" aria-label="Sign up or log in options">
           <div class="launch-hero__divider"><span>Sign up or log in with</span></div>
-          <button class="btn btn-social" onclick="App.set('activeFlow','self-reg'); App.nav('self-reg-social-google')">
-            <img class="btn-social__icon" src="assets/social-google.svg" alt="" /> Continue with Google
-          </button>
-          <button class="btn btn-social" onclick="App.set('activeFlow','self-reg'); App.nav('self-reg-social-apple')">
-            <img class="btn-social__icon" src="assets/social-apple.svg" alt="" /> Continue with Apple
-          </button>
+          <div class="social-icons-row">
+            <button class="btn-social-icon" onclick="App.set('activeFlow','self-reg'); App.nav('self-reg-social-google')" aria-label="Continue with Google">
+              <img src="assets/social-google.svg" alt="" />
+            </button>
+            <button class="btn-social-icon" onclick="App.set('activeFlow','self-reg'); App.nav('self-reg-social-apple')" aria-label="Continue with Apple">
+              <img src="assets/social-apple.svg" alt="" />
+            </button>
+            <button class="btn-social-icon" onclick="App.set('activeFlow','self-reg'); App.nav('self-reg-social-microsoft')" aria-label="Continue with Microsoft">
+              <img src="assets/social-microsoft.svg" alt="" />
+            </button>
+          </div>
           <div class="launch-hero__divider launch-hero__divider--secondary"><span>Continue with</span></div>
           <button class="btn launch-hero__secondary" onclick="App.set('activeFlow','self-reg'); App.nav('self-reg-signup')">Email or phone number</button>
           <button class="btn launch-hero__secondary" onclick="App.set('activeFlow','portal'); App.nav('portal-code')">Activation code</button>
@@ -2857,6 +2873,7 @@ const SCREENS = {
 
   'self-reg-social-google': () => oauthConsentScreen('google'),
   'self-reg-social-apple': () => oauthConsentScreen('apple'),
+  'self-reg-social-microsoft': () => oauthConsentScreen('microsoft'),
 
   'self-reg-signup': () => ({
     content: h`
