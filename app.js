@@ -694,6 +694,16 @@ const App = {
     render();
   },
 
+  simulateTimeout(tripId, stopId) {
+    const trip = findActiveTrip(tripId);
+    const stop = trip && findStop(trip, stopId);
+    if (!stop) return;
+    stop.milestones.forEach(m => {
+      if (m.status === 'proposed' && m.kind === 'auto') m.status = 'assumed';
+    });
+    render();
+  },
+
   openTripDetail(tripId) {
     state.activeDetailTripId = tripId;
     TITLES['trip-detail'] = tripId;
@@ -2744,6 +2754,12 @@ function sdMilestoneItem(trip, stop, m, isFirst, isLast) {
   let actionHtml = '';
   if (!editing && isProposed) {
     actionHtml = h`<button type="button" class="stage-confirm-btn" style="margin-top:4px" onclick="App.confirmMilestone('${trip.id}','${stop.id}','${m.id}')">Confirm</button>`;
+  } else if (!editing && isAssumed) {
+    actionHtml = h`
+      <div style="display:flex;gap:8px;margin-top:4px">
+        <button type="button" class="stage-confirm-btn" onclick="App.confirmAssumed('${trip.id}','${stop.id}','${m.id}')">Yes, I arrived</button>
+        <button type="button" class="stage-confirm-btn stage-confirm-btn--outline" onclick="App.correctAssumed('${trip.id}','${stop.id}','${m.id}')">No, wasn't there</button>
+      </div>`;
   }
 
   const hasOrderRows = m.kind === 'pod' || m.kind === 'pallet-exchange';
@@ -3442,6 +3458,7 @@ const SCREENS = {
               <div class="reviewer-sticky__stop-label">Stop ${stopNum}: ${s.type === 'pickup' ? 'Pickup' : 'Delivery'}</div>
               <button type="button" class="reviewer-sticky__action" onclick="App.triggerGeofenceEntry('${t.id}','${s.id}')">Entry at ${s.location}</button>
               <button type="button" class="reviewer-sticky__action" onclick="App.triggerGeofenceExit('${t.id}','${s.id}')">Exit from ${s.location}</button>
+              ${s.milestones.some(m => m.status === 'proposed' && m.kind === 'auto') ? h`<button type="button" class="reviewer-sticky__action" onclick="App.simulateTimeout('${t.id}','${s.id}')">Simulate timeout → assumed</button>` : ''}
               ${s.orders.some(o => o.instructions) ? h`<button type="button" class="reviewer-sticky__action" onclick="App.triggerInstructionsNotification('${t.id}','${s.id}')">Instructions available</button>` : ''}
             `;
           }).join('')}
@@ -3468,6 +3485,7 @@ const SCREENS = {
         <div class="reviewer-sticky__title">Geofence simulation</div>
         <button type="button" class="reviewer-sticky__action" onclick="App.triggerGeofenceEntry('${trip.id}','${stop.id}')">Simulate entry (arrived)</button>
         <button type="button" class="reviewer-sticky__action" onclick="App.triggerGeofenceExit('${trip.id}','${stop.id}')">Simulate exit (loaded + departed)</button>
+        ${stop.milestones.some(m => m.status === 'proposed' && m.kind === 'auto') ? h`<button type="button" class="reviewer-sticky__action" onclick="App.simulateTimeout('${trip.id}','${stop.id}')">Simulate timeout → assumed</button>` : ''}
       `;
     })(),
   }),

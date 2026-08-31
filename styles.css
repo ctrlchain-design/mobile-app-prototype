@@ -1463,6 +1463,8 @@ button { font-family: inherit; }
   cursor: pointer; white-space: nowrap; flex-shrink: 0;
 }
 .stage-confirm-btn:active { background: var(--button-secondary-bg-pressed); border-color: var(--button-secondary-border-pressed); }
+.stage-confirm-btn--outline { border-color: var(--text-secondary); color: var(--text-secondary); }
+.stage-confirm-btn--outline:active { opacity: 0.7; }
 .exception-flag { color: var(--critical-text); }
 
 /* ---------- POD / exception drawers (bottom sheets) ---------- */
