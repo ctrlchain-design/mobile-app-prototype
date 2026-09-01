@@ -678,6 +678,7 @@ const App = {
       if (m && m.status === 'assumed') m.status = 'confirmed';
     }
     render();
+    showToast('Arrival confirmed', 'success');
   },
 
   correctAssumed(tripId, stopId, milestoneId) {
@@ -692,6 +693,7 @@ const App = {
       }
     }
     render();
+    showToast('Arrival reverted — marked as not at location', 'warning');
   },
 
   simulateTimeout(tripId, stopId) {
@@ -1467,6 +1469,7 @@ function activeTripSection(trips) {
           </button>
         </div>
         ${heroCard(trip)}
+        ${assumedBanner(trip)}
         ${expanded ? h`
           <div class="all-stops-label">All Stops</div>
           ${compactRouteStrip(trip)}
@@ -2047,13 +2050,13 @@ function getHeroState(trip) {
       if (m.status === 'ready') manualActions.push({ milestone: m, stop });
     });
   });
-  if (assumed.length) {
-    return { type: 'assumed', current: assumed[0], unconfirmed: [], manualActions };
-  }
   if (proposals.length) {
     const latest = proposals[proposals.length - 1];
     const unconfirmed = proposals.slice(0, -1);
-    return { type: 'proposal', current: latest, unconfirmed, manualActions };
+    return { type: 'proposal', current: latest, unconfirmed, manualActions, assumed };
+  }
+  if (assumed.length) {
+    return { type: 'assumed', current: assumed[0], unconfirmed: [], manualActions, assumed };
   }
   if (manualActions.length) {
     return { type: 'manual', current: manualActions[0], unconfirmed: [], manualActions };
@@ -2078,6 +2081,19 @@ function heroTripContext(trip, stop) {
   return stopType
     ? `${trip.id} • ${stopType} • Stop ${stopIdx} of ${totalStops}`
     : trip.id;
+}
+
+function assumedBanner(trip) {
+  const hero = getHeroState(trip);
+  if (hero.type === 'assumed' || !hero.assumed || !hero.assumed.length) return '';
+  const count = hero.assumed.length;
+  const { stop } = hero.assumed[0];
+  return h`
+    <button type="button" class="assumed-banner" onclick="App.openStopDetail('${trip.id}','${stop.id}')">
+      <sl-icon name="exclamation-triangle" style="font-size:13px"></sl-icon>
+      <span>${count} unverified event${count > 1 ? 's' : ''} — tap to review</span>
+    </button>
+  `;
 }
 
 function heroCard(trip) {
@@ -3941,6 +3957,15 @@ function updateFooterState() {
     const rendered = screen();
     if (rendered.footer) footerEl.innerHTML = rendered.footer();
   }
+}
+
+function showToast(message, variant) {
+  const el = document.createElement('div');
+  el.className = 'app-toast' + (variant ? ' app-toast--' + variant : '');
+  el.textContent = message;
+  document.querySelector('.phone-frame').appendChild(el);
+  setTimeout(() => el.classList.add('app-toast--visible'), 10);
+  setTimeout(() => { el.classList.remove('app-toast--visible'); setTimeout(() => el.remove(), 300); }, 2500);
 }
 
 function render() {
