@@ -3034,7 +3034,7 @@ const SCREENS = {
           <div class="launch-hero__tagline">Moving transport forward</div>
         </div>
         <div class="launch-hero__actions" role="group" aria-label="Sign up or log in options">
-          <div class="launch-hero__divider"><span>Sign up or log in with</span></div>
+          <div class="launch-hero__label">Sign up with:</div>
           <div class="social-icons-row">
             <button class="btn-social-icon" onclick="App.set('activeFlow','self-reg'); App.nav('self-reg-social-google')" aria-label="Continue with Google">
               <img src="assets/social-google.svg" alt="" />

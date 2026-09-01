@@ -1057,6 +1057,11 @@ button { font-family: inherit; }
   box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
 .btn-social-icon img { width: 22px; height: 22px; }
+.launch-hero__label {
+  color: rgba(255,255,255,0.6);
+  font-size: 12px;
+  margin-bottom: 6px;
+}
 .launch-hero__divider {
   display: flex;
   align-items: center;
