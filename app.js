@@ -177,11 +177,11 @@ const MOCK_ACTIVE_TRIPS = [
         exceptions: [],
       },
       {
-        id: 'STOP-4', type: 'delivery', location: 'Lidl DC, Bridgend', appointment: '16:00 – 17:00',
+        id: 'STOP-4', type: 'delivery', location: 'Lidl DC, Bridgend', appointment: '16:00 – 17:00 BST',
         orders: [
           { id: 'ORD-9920001', ref: '#CCA2025-001045.1', customer: 'Lidl Netherlands BV', podStatus: 'pending', podRejectedReason: null },
         ],
-        milestones: deliveryStages('15:45'),
+        milestones: deliveryStages('15:45 BST'),
         exceptions: [],
       },
     ],
@@ -214,7 +214,7 @@ const MOCK_TRIP_HISTORY = [
       { type: 'pickup', location: 'Dover Freight Village', appointment: '08:00 – 09:00', orders: 2 },
       { type: 'delivery', location: 'Meridian Distribution Centre, Coventry', appointment: '14:00 – 15:00', orders: 2 },
     ],
-    date: 'Yesterday',
+    date: 'Sun 31 Aug',
     completed: true,
     vehicle: 'NL-82-BKZ',
     trailer: '441290',
@@ -298,10 +298,10 @@ const MOCK_CONVERSATIONS = [
     title: 'Dover pickup coordination',
     contact: { name: 'Sarah Chen', company: 'CtrlChain B.V.' },
     messages: [
-      { id: 'h1', from: 'system', text: 'Conversation started for TRIP2026-000098', time: 'Yesterday, 08:00' },
-      { id: 'h2', from: 'contact', text: 'Hi Jordan, pickup at Dover Freight Village is confirmed. Gate 2 for your trailer size.', time: 'Yesterday, 08:05' },
-      { id: 'h3', from: 'driver', text: 'Arrived at Dover. Slight queue at the gate.', time: 'Yesterday, 09:12' },
-      { id: 'h4', from: 'contact', text: 'Thanks for the update. Safe drive to Coventry.', time: 'Yesterday, 09:15' },
+      { id: 'h1', from: 'system', text: 'Conversation started for TRIP2026-000098', time: 'Sun 31 Aug, 08:00' },
+      { id: 'h2', from: 'contact', text: 'Hi Jordan, pickup at Dover Freight Village is confirmed. Gate 2 for your trailer size.', time: 'Sun 31 Aug, 08:05' },
+      { id: 'h3', from: 'driver', text: 'Arrived at Dover. Slight queue at the gate.', time: 'Sun 31 Aug, 09:12' },
+      { id: 'h4', from: 'contact', text: 'Thanks for the update. Safe drive to Coventry.', time: 'Sun 31 Aug, 09:15' },
     ],
   },
 ];
