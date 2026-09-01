@@ -934,76 +934,95 @@ button { font-family: inherit; }
   justify-content: flex-end;
   color: #fff;
   text-align: center;
-  background: var(--color-newCold-500);
+  background: #0a0e1f;
 }
+/* Background image — covers top 72% to reveal more of the subject */
 .launch-hero::before {
   content: '';
   position: absolute;
   top: 0; left: 0; right: 0;
-  height: 58%;
+  height: 72%;
   background-image: url('assets/hero-truck.jpeg');
   background-size: cover;
-  background-position: 40% 40%;
-  animation: launch-hero-zoom 24s ease-in-out infinite alternate;
+  background-position: 30% 30%;
+  animation: launch-hero-zoom 28s ease-in-out infinite alternate;
   z-index: 0;
 }
+/* Multi-layer gradient: soft top tint → cinematic dissolve → solid base */
 .launch-hero::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(16,21,46,0.05) 0%, rgba(16,21,46,0.2) 38%, rgba(16,21,46,0.68) 56%, rgba(16,21,46,0.97) 74%, var(--color-newCold-500) 100%);
+  background:
+    radial-gradient(ellipse 120% 80% at 50% 15%, transparent 0%, rgba(10,14,31,0.15) 100%),
+    linear-gradient(
+      180deg,
+      rgba(10,14,31,0.0)   0%,
+      rgba(10,14,31,0.05)  20%,
+      rgba(10,14,31,0.22)  38%,
+      rgba(10,14,31,0.52)  50%,
+      rgba(10,14,31,0.82)  60%,
+      rgba(10,14,31,0.96)  70%,
+      #0a0e1f              78%
+    );
   z-index: 1;
 }
 @keyframes launch-hero-zoom {
   0% { transform: scale(1); }
-  100% { transform: scale(1.035); }
+  100% { transform: scale(1.06); }
 }
+/* Subtle light sweep for depth */
 .launch-hero__sheen {
   position: absolute;
   inset: -20% -60%;
-  background: linear-gradient(115deg, transparent 40%, rgba(255,255,255,0.10) 48%, rgba(255,255,255,0.18) 50%, rgba(255,255,255,0.10) 52%, transparent 60%);
-  animation: launch-hero-sheen 7s ease-in-out infinite;
+  background: linear-gradient(115deg, transparent 42%, rgba(255,255,255,0.06) 48%, rgba(255,255,255,0.12) 50%, rgba(255,255,255,0.06) 52%, transparent 58%);
+  animation: launch-hero-sheen 8s ease-in-out infinite;
   z-index: 1;
   pointer-events: none;
 }
 @keyframes launch-hero-sheen {
-  0%, 100% { transform: translateX(-35%); }
-  50% { transform: translateX(35%); }
+  0%, 100% { transform: translateX(-40%); }
+  50% { transform: translateX(40%); }
 }
 .launch-hero__body {
   position: relative;
   z-index: 2;
-  padding: 56px 28px 0;
+  padding: 40px 28px 0;
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 6px;
 }
 .launch-hero__mark {
   position: relative;
-  width: 76px;
-  height: 76px;
+  width: 72px;
+  height: 72px;
   display: flex;
   align-items: center;
   justify-content: center;
+  background: rgba(255,255,255,0.08);
+  border-radius: 50%;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.15), 0 8px 32px rgba(0,0,0,0.3);
 }
 .launch-hero__mark-ring {
   position: absolute;
-  inset: 0;
+  inset: -4px;
   border-radius: 50%;
-  border: 1.5px solid rgba(255,255,255,0.55);
-  animation: launch-hero-pulse 2.6s ease-out infinite;
+  border: 1px solid rgba(255,255,255,0.3);
+  animation: launch-hero-pulse 3s ease-out infinite;
 }
 @keyframes launch-hero-pulse {
-  0% { transform: scale(0.85); opacity: 0.9; }
-  70% { transform: scale(1.6); opacity: 0; }
-  100% { transform: scale(1.6); opacity: 0; }
+  0% { transform: scale(0.9); opacity: 0.7; }
+  70% { transform: scale(1.5); opacity: 0; }
+  100% { transform: scale(1.5); opacity: 0; }
 }
-.launch-hero__icon { width: 40px; height: 40px; position: relative; z-index: 1; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.5)); }
-.launch-hero__wordmark { font-size: 30px; font-weight: 700; letter-spacing: -0.01em; text-shadow: 0 2px 10px rgba(0,0,0,0.55), 0 1px 3px rgba(0,0,0,0.85); }
-.launch-hero__tagline { color: var(--color-green-300); font-size: var(--type-body-md-size); text-shadow: 0 1px 6px rgba(0,0,0,0.65), 0 1px 3px rgba(0,0,0,0.9); }
+.launch-hero__icon { width: 34px; height: 34px; position: relative; z-index: 1; filter: drop-shadow(0 1px 4px rgba(0,0,0,0.4)); }
+.launch-hero__wordmark { font-size: 28px; font-weight: 700; letter-spacing: 0.02em; text-shadow: 0 2px 16px rgba(0,0,0,0.5); margin-top: 4px; }
+.launch-hero__tagline { color: rgba(255,255,255,0.65); font-size: 13px; font-weight: 400; letter-spacing: 0.06em; text-transform: uppercase; text-shadow: 0 1px 8px rgba(0,0,0,0.6); }
 .launch-hero__actions {
   position: relative;
   z-index: 2;
