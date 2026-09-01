@@ -3046,7 +3046,7 @@ const SCREENS = {
               <img src="assets/social-microsoft.svg" alt="" />
             </button>
           </div>
-          <div class="launch-hero__divider launch-hero__divider--secondary"><span>Continue with</span></div>
+          <div class="launch-hero__divider launch-hero__divider--secondary"><span>Or continue with</span></div>
           <button class="btn launch-hero__secondary" onclick="App.set('activeFlow','self-reg'); App.nav('self-reg-signup')">Email or phone number</button>
           <button class="btn launch-hero__secondary" onclick="App.set('activeFlow','portal'); App.nav('portal-code')">Activation code</button>
           <button class="btn-link launch-hero__signin" onclick="App.switchFlow('returning')">Already have an account? Sign in</button>
