@@ -2924,7 +2924,6 @@ function notificationsScreen() {
   items.forEach(n => { (groups[n.date] = groups[n.date] || []).push(n); });
   const order = ['Today', 'This Week', 'Earlier'];
   return h`
-    ${hasUnread ? h`<div class="notif-mark-all"><button type="button" class="notif-mark-all__btn" onclick="App.showMarkAllReadDialog()"><sl-icon name="check2-all"></sl-icon></button></div>` : ''}
     ${order.filter(g => groups[g]).map(g => h`
       <div class="notif-group">
         <div class="notif-group__label">${g}</div>
@@ -3980,11 +3979,16 @@ function render() {
     // at the top of the page.
     const showBell = route === 'dashboard' && state.dashboardMode === 'full';
     const unreadCount = showBell ? notificationUnreadCount() : 0;
+    const notifHasUnread = route === 'nav-notifications' && buildNotifications().some(n => !n.read);
     const rightSlot = showBell
       ? h`<button type="button" class="app-header__bell" onclick="App.goTab('nav-notifications')" aria-label="Notifications">
             <sl-icon name="bell"></sl-icon>
             ${unreadCount ? h`<span class="app-header__bell-dot"></span>` : ''}
           </button>`
+      : notifHasUnread
+        ? h`<button type="button" class="app-header__bell" onclick="App.showMarkAllReadDialog()" aria-label="Mark all read">
+              <sl-icon name="check2-all"></sl-icon>
+            </button>`
       : (route === 'trip-detail' || route === 'stop-detail') && state.activeDetailTripId
         ? (() => {
             const tripUnread = conversationsForTrip(state.activeDetailTripId).reduce((n, c) => n + conversationUnreadCount(c), 0);

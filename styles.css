@@ -744,22 +744,6 @@ button { font-family: inherit; }
 .app-tabbar__item.is-active { color: var(--text-brand-default); }
 
 /* ---------- Notifications ---------- */
-.notif-mark-all {
-  display: flex;
-  justify-content: flex-end;
-  padding: 0 4px 4px;
-}
-.notif-mark-all__btn {
-  background: none;
-  border: none;
-  color: var(--text-neutral-subtitle);
-  font-size: 22px;
-  padding: 4px 8px;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-.notif-mark-all__btn:active { color: var(--surface-brand-default); }
-
 .notif-group { margin-bottom: 8px; }
 .notif-group__label {
   font-size: 13px;
