@@ -3380,10 +3380,6 @@ const SCREENS = {
       return {
         hideBack: true,
         content: h`
-          <div class="dash-header">
-            <div class="t-headline-md">${greeting()}, ${state.firstName || 'there'}</div>
-            <div class="t-body-sm t-muted">${MOCK_PLANNER_RECORD.carrier}</div>
-          </div>
           <div class="approval-banner">
             <sl-icon class="approval-banner__icon" name="hourglass-split"></sl-icon>
             <div class="approval-banner__text">
@@ -3412,9 +3408,9 @@ const SCREENS = {
       return {
         hideBack: true,
         content: h`
-          <div class="dash-header">
-            <div class="t-headline-md">${greeting()}</div>
+          <div class="dash-header" style="flex-direction:row;align-items:center;justify-content:space-between">
             <span class="badge badge--info">Guest access — this trip only</span>
+            <button type="button" class="btn-link" style="font-size:12px;" onclick="App.openAddTripSheet()">+ Add trip</button>
           </div>
           ${trackingStatusBanner()}
           ${activeTripSection([state.guestTrip])}
@@ -3435,13 +3431,6 @@ const SCREENS = {
     return {
       content: h`
         <div class="dash-hero">
-          <div class="dash-hero__top">
-            <div>
-              <div class="t-headline-md">${greeting()}, ${name.split(' ')[0] || 'driver'}</div>
-              <div class="dash-hero__sub t-body-sm">${carrier}</div>
-            </div>
-            <button type="button" class="btn-link" style="font-size:12px;" onclick="App.openAddTripSheet()">+ Add trip</button>
-          </div>
           ${trackingStatusBanner()}
         </div>
         <div class="dash-section">
