@@ -522,6 +522,7 @@ function freshState() {
       'notif-sched-TRIP2026-000124': true,
     },
     markAllReadDialog: false,
+    newConversationPicker: false,
 
     profileBiometrics: false,
     profileNotifications: true,
@@ -1168,6 +1169,21 @@ const App = {
   closeTripConversationsSheet() {
     state.tripConversationsSheet = null;
     render();
+  },
+
+  openNewConversationPicker() {
+    state.newConversationPicker = true;
+    render();
+  },
+
+  closeNewConversationPicker() {
+    state.newConversationPicker = false;
+    render();
+  },
+
+  pickTripForNewConversation(tripId) {
+    state.newConversationPicker = false;
+    this.openNewConversationSheet(tripId);
   },
 
   openNewConversationSheet(tripId) {
@@ -2028,6 +2044,33 @@ function newConversationSheetMarkup() {
           <sl-button style="flex:1;" variant="primary" onclick="App.submitNewConversation()">Send</sl-button>
         </div>
       ` : ''}
+    </sl-drawer>
+  `;
+}
+
+function newConversationPickerMarkup() {
+  if (!state.newConversationPicker) return '';
+  const trips = [...state.activeTrips, ...state.scheduledTrips];
+  return h`
+    <sl-drawer id="new-conversation-picker" label="New Conversation" placement="bottom" open>
+      <div class="sheet-body" style="padding-bottom:8px;">
+        <div class="t-label-sm" style="margin-bottom:8px;">Which trip is this about?</div>
+        ${trips.length ? trips.map(t => {
+          const from = t.stops[0];
+          const to = t.stops[t.stops.length - 1];
+          const isActive = state.activeTrips.some(a => a.id === t.id);
+          return h`
+            <button type="button" class="td__convo-row" onclick="App.pickTripForNewConversation('${t.id}')">
+              <div class="td__convo-row__body">
+                <div class="td__convo-row__title t-label-sm">${t.id}${isActive ? h` <span class="badge badge--info" style="font-size:10px;padding:1px 5px;">Active</span>` : ''}</div>
+                <div class="td__convo-row__preview t-body-sm t-muted">${from ? from.location.split(',')[0] : ''} → ${to ? to.location.split(',')[0] : ''}</div>
+              </div>
+              <sl-icon name="chevron-right" class="td__convo-row__chevron"></sl-icon>
+            </button>`;
+        }).join('') : h`
+          <div class="t-body-sm t-muted" style="text-align:center; padding:16px 0;">No trips available.</div>
+        `}
+      </div>
     </sl-drawer>
   `;
 }
@@ -3562,7 +3605,7 @@ const SCREENS = {
   }),
 
   'nav-chats': () => ({
-    content: h`${chatListScreen()}`,
+    content: h`${chatListScreen()}${newConversationPickerMarkup()}${newConversationSheetMarkup()}`,
   }),
 
   'chat-conversation': () => ({
@@ -3990,6 +4033,10 @@ function render() {
         ? h`<button type="button" class="app-header__bell${notifHasUnread ? '' : ' app-header__bell--disabled'}" ${notifHasUnread ? 'onclick="App.showMarkAllReadDialog()"' : 'disabled'} aria-label="Mark all read">
               <sl-icon name="check2-all"></sl-icon>
             </button>`
+      : route === 'nav-chats'
+        ? h`<button type="button" class="app-header__bell" onclick="App.openNewConversationPicker()" aria-label="New conversation">
+              <sl-icon name="pencil-square"></sl-icon>
+            </button>`
       : (route === 'trip-detail' || route === 'stop-detail') && state.activeDetailTripId
         ? (() => {
             const tripUnread = conversationsForTrip(state.activeDetailTripId).reduce((n, c) => n + conversationUnreadCount(c), 0);
@@ -4042,6 +4089,7 @@ function render() {
     'add-trip-drawer': () => App.closeAddTripSheet(),
     'trip-conversations-drawer': () => App.closeTripConversationsSheet(),
     'new-conversation-drawer': () => App.closeNewConversationSheet(),
+    'new-conversation-picker': () => App.closeNewConversationPicker(),
   };
   Object.keys(drawerClosers).forEach(id => {
     const el = document.getElementById(id);
