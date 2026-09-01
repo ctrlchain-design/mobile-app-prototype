@@ -3979,14 +3979,15 @@ function render() {
     // at the top of the page.
     const showBell = route === 'dashboard' && state.dashboardMode === 'full';
     const unreadCount = showBell ? notificationUnreadCount() : 0;
-    const notifHasUnread = route === 'nav-notifications' && buildNotifications().some(n => !n.read);
+    const isNotifScreen = route === 'nav-notifications' && buildNotifications().length > 0;
+    const notifHasUnread = isNotifScreen && buildNotifications().some(n => !n.read);
     const rightSlot = showBell
       ? h`<button type="button" class="app-header__bell" onclick="App.goTab('nav-notifications')" aria-label="Notifications">
             <sl-icon name="bell"></sl-icon>
             ${unreadCount ? h`<span class="app-header__bell-dot"></span>` : ''}
           </button>`
-      : notifHasUnread
-        ? h`<button type="button" class="app-header__bell" onclick="App.showMarkAllReadDialog()" aria-label="Mark all read">
+      : isNotifScreen
+        ? h`<button type="button" class="app-header__bell${notifHasUnread ? '' : ' app-header__bell--disabled'}" ${notifHasUnread ? 'onclick="App.showMarkAllReadDialog()"' : 'disabled'} aria-label="Mark all read">
               <sl-icon name="check2-all"></sl-icon>
             </button>`
       : (route === 'trip-detail' || route === 'stop-detail') && state.activeDetailTripId

@@ -399,6 +399,7 @@ button { font-family: inherit; }
 }
 .app-header__bell:hover { background: var(--surface-neutral-dark); }
 .app-header__bell:active { background: var(--surface-neutral-darker); }
+.app-header__bell--disabled { opacity: 0.35; cursor: default; pointer-events: none; }
 .app-header__bell-dot {
   position: absolute; top: 5px; right: 6px;
   width: 8px; height: 8px; border-radius: 50%;
